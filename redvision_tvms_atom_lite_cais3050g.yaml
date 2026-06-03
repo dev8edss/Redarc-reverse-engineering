@@ -447,8 +447,3 @@ sensor:
     filters:
       - throttle_average: ${sensor_average_interval}
 
-  # Redvision -> Rouge command tracking
-      - throttle_average: ${sensor_average_interval}
-    entity_category: diagnostic
-      - throttle_average: ${sensor_average_interval}
-    entity_category: diagnostic
