@@ -1,0 +1,475 @@
+substitutions:
+  device_name: redvision_can_bridge
+  friendly_name: Redvision CAN Bridge
+
+  # M5Stack Atom CAN Base / CA-IS3050G transceiver pins.
+  # M5Stack example code for Atom CAN uses CAN TX GPIO22 and CAN RX GPIO19.
+  can_tx_pin: GPIO22
+  can_rx_pin: GPIO19
+
+  # RedVision/TVMS bus speed. Change if your bus is not 250 kbit/s.
+  can_bit_rate: 250KBPS
+
+  # LISTENONLY is safest for monitoring an existing vehicle/RV CAN bus.
+  # Change to NORMAL only if you need this ESP32 to ACK or transmit frames.
+  can_mode: LISTENONLY
+
+  # Home Assistant update/averaging interval for numeric sensors
+  sensor_average_interval: 5s
+
+  # Configurable J1939-style source addresses
+  manager30_sa: "0x01"
+  battery_sensor_sa: "0x08"
+  redvision_1_sa: "0x20"
+  redvision_2_sa: "0x21"
+  tvms_1280_sa: "0x24"
+  tvms_rouge_sa: "0x30"
+
+esphome:
+  name: ${device_name}
+  friendly_name: ${friendly_name}
+  comment: "M5Stack Atom Lite ESP32-PICO + Atomic CAN Base / CA-IS3050G RedVision CAN monitor"
+
+esp32:
+  board: m5stack-atom
+  framework:
+    type: arduino
+
+logger:
+  level: INFO
+
+api:
+
+ota:
+  - platform: esphome
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+captive_portal:
+
+# ESP32 internal CAN/TWAI using CA-IS3050G as the external CAN transceiver.
+canbus:
+  - platform: esp32_can
+    id: rv_can
+    tx_pin: ${can_tx_pin}
+    rx_pin: ${can_rx_pin}
+    can_id: 0x7FE
+    use_extended_id: true
+    bit_rate: ${can_bit_rate}
+    mode: ${can_mode}
+    rx_queue_len: 64
+
+    # Accept all extended frames and decode only the confirmed IDs.
+    on_frame:
+      - can_id: 0x00000000
+        can_id_mask: 0x00000000
+        use_extended_id: true
+        remote_transmission_request: false
+        then:
+          - lambda: |-
+              if (x.size() < 8) return;
+
+              const uint32_t id_rx = can_id & 0x1FFFFFFFUL;
+
+              const uint32_t ID_MANAGER_CURRENT = 0x03F20A00UL | (uint32_t) ${manager30_sa};
+              const uint32_t ID_BATTERY_CURRENT = 0x13F10200UL | (uint32_t) ${battery_sensor_sa};
+              const uint32_t ID_BATTERY_SOC     = 0x13F10400UL | (uint32_t) ${battery_sensor_sa};
+
+              const uint32_t ID_RV1_CURRENT     = 0x13F28000UL | (uint32_t) ${redvision_1_sa};
+              const uint32_t ID_RV2_CURRENT     = 0x13F28200UL | (uint32_t) ${redvision_2_sa};
+
+              const uint32_t ID_ROUGE_TANKS     = 0x1BFD0200UL | (uint32_t) ${tvms_rouge_sa};
+              const uint32_t ID_TVMS1280_STATUS = 0x1BFD0200UL | (uint32_t) ${tvms_1280_sa};
+
+              const uint32_t ID_ROUGE_COMMAND   = 0x0F003000UL | (uint32_t) ${redvision_1_sa};
+
+              auto u16_le = [&](int i) -> uint16_t {
+                return (uint16_t) x[i] | ((uint16_t) x[i + 1] << 8);
+              };
+
+              auto u32_le = [&](int i) -> uint32_t {
+                return ((uint32_t) x[i]) |
+                       ((uint32_t) x[i + 1] << 8) |
+                       ((uint32_t) x[i + 2] << 16) |
+                       ((uint32_t) x[i + 3] << 24);
+              };
+
+              // Manager30 source output current:
+              // CAN ID 0x03F20A01, D1-D4 uint32 little-endian.
+              // Current_A = raw / 1000 - 1000.
+              if (id_rx == ID_MANAGER_CURRENT) {
+                const uint32_t raw = u32_le(0);
+                const float amps = ((float) raw / 1000.0f) - 1000.0f;
+                id(manager_output_current_a).publish_state(amps);
+                id(manager_output_current_raw).publish_state((float) raw);
+                if (!isnan(id(battery_current_a).state)) {
+                  id(source_device_current_a).publish_state(amps - id(battery_current_a).state);
+                }
+                return;
+              }
+
+              // Battery Sensor source current:
+              // CAN ID 0x13F10208, D1-D4 uint32 little-endian.
+              // Current_A = raw / 1000 - 1000.
+              // Positive = charging into battery, negative = battery discharge.
+              if (id_rx == ID_BATTERY_CURRENT) {
+                const uint32_t raw = u32_le(0);
+                const float amps = ((float) raw / 1000.0f) - 1000.0f;
+                id(battery_current_a).publish_state(amps);
+                id(battery_current_raw).publish_state((float) raw);
+                if (!isnan(id(manager_output_current_a).state)) {
+                  id(source_device_current_a).publish_state(id(manager_output_current_a).state - amps);
+                }
+                return;
+              }
+
+              // Battery Sensor SOC:
+              // CAN ID 0x13F10408, D1 = percent.
+              if (id_rx == ID_BATTERY_SOC) {
+                id(battery_soc_percent).publish_state((float) x[0]);
+                return;
+              }
+
+              // Redvision 1 display/rebroadcast currents:
+              // CAN ID 0x13F28020.
+              // D1-D2 battery current display, D5-D6 device/load current display.
+              // Current_A = raw / 10 - 1000.
+              if (id_rx == ID_RV1_CURRENT) {
+                const uint16_t raw_batt = u16_le(0);
+                const uint16_t raw_load = u16_le(4);
+                const float batt_a = ((float) raw_batt / 10.0f) - 1000.0f;
+                const float load_a = ((float) raw_load / 10.0f) - 1000.0f;
+                id(rv1_battery_current_display_a).publish_state(batt_a);
+                id(rv1_device_current_display_a).publish_state(load_a);
+                id(rv1_battery_current_display_raw).publish_state((float) raw_batt);
+                id(rv1_device_current_display_raw).publish_state((float) raw_load);
+                return;
+              }
+
+              // Redvision 2 display/rebroadcast Manager current:
+              // CAN ID 0x13F28221, D7-D8, Current_A = raw / 10 - 1000.
+              if (id_rx == ID_RV2_CURRENT) {
+                const uint16_t raw_mgr = u16_le(6);
+                const float mgr_a = ((float) raw_mgr / 10.0f) - 1000.0f;
+                id(rv2_manager_output_current_display_a).publish_state(mgr_a);
+                id(rv2_manager_output_current_display_raw).publish_state((float) raw_mgr);
+                return;
+              }
+
+              // TVMS Rouge water tanks:
+              // CAN ID 0x1BFD0230, D1=0x09, D2 tank1 %, D3 tank2 %.
+              if (id_rx == ID_ROUGE_TANKS) {
+                if (x[0] == 0x09) {
+                  id(rouge_tank1_percent).publish_state((float) x[1]);
+                  id(rouge_tank2_percent).publish_state((float) x[2]);
+                }
+                return;
+              }
+
+              // TVMS1280 temp/tank status:
+              // CAN ID 0x1BFD0224.
+              if (id_rx == ID_TVMS1280_STATUS) {
+                if (x[0] == 0x14) {
+                  // MUX 0x14: Temp1, Tank1, Tank2
+                  id(tvms1280_temp1_c).publish_state((float) x[1] - 100.0f);
+                  id(tvms1280_tank1_percent).publish_state((float) x[3]);
+                  id(tvms1280_tank2_percent).publish_state((float) x[5]);
+                } else if (x[0] == 0x11) {
+                  // MUX 0x11: Temp2
+                  id(tvms1280_temp2_c).publish_state((float) x[5] - 100.0f);
+                } else if (x[0] == 0x17) {
+                  // MUX 0x17: Tank3, Tank4, Tank5
+                  id(tvms1280_tank3_percent).publish_state((float) x[1]);
+                  id(tvms1280_tank4_percent).publish_state((float) x[3]);
+                  id(tvms1280_tank5_percent).publish_state((float) x[5] * 1.25f);
+                } else if (x[0] == 0x1A) {
+                  // MUX 0x1A: Tank6
+                  id(tvms1280_tank6_percent).publish_state((float) x[1]);
+                }
+                return;
+              }
+
+              // Confirmed Redvision_1 -> TVMS Rouge output ON/OFF command:
+              // CAN ID 0x0F003020
+              // Data: CB 00 FF <channel 0x0C..0x15> <state 0/1> 00 00 00
+              if (id_rx == ID_ROUGE_COMMAND) {
+                if (x[0] == 0xCB && x[2] == 0xFF && x[3] >= 0x0C && x[3] <= 0x15) {
+                  const uint8_t output_num = x[3] - 0x0B;  // 0x0C => 1
+                  const bool state = x[4] != 0;
+                  id(rouge_last_output_command_channel).publish_state((float) output_num);
+                  id(rouge_last_output_command_state).publish_state(state ? 1.0f : 0.0f);
+
+                  switch (output_num) {
+                    case 1: id(rouge_output_1_command).publish_state(state); break;
+                    case 2: id(rouge_output_2_command).publish_state(state); break;
+                    case 3: id(rouge_output_3_command).publish_state(state); break;
+                    case 4: id(rouge_output_4_command).publish_state(state); break;
+                    case 5: id(rouge_output_5_command).publish_state(state); break;
+                    case 6: id(rouge_output_6_command).publish_state(state); break;
+                    case 7: id(rouge_output_7_command).publish_state(state); break;
+                    case 8: id(rouge_output_8_command).publish_state(state); break;
+                    case 9: id(rouge_output_9_command).publish_state(state); break;
+                    case 10: id(rouge_output_10_command).publish_state(state); break;
+                  }
+                }
+                return;
+              }
+
+sensor:
+  # Source-node measurements
+  - platform: template
+    id: manager_output_current_a
+    name: "Manager30 Output Current"
+    unit_of_measurement: "A"
+    device_class: current
+    state_class: measurement
+    accuracy_decimals: 3
+    filters:
+      - throttle_average: ${sensor_average_interval}
+
+  - platform: template
+    id: manager_output_current_raw
+    name: "Manager30 Output Current Raw"
+    entity_category: diagnostic
+    accuracy_decimals: 0
+    filters:
+      - throttle_average: ${sensor_average_interval}
+
+  - platform: template
+    id: battery_current_a
+    name: "Battery Current"
+    unit_of_measurement: "A"
+    device_class: current
+    state_class: measurement
+    accuracy_decimals: 3
+    filters:
+      - throttle_average: ${sensor_average_interval}
+
+  - platform: template
+    id: battery_current_raw
+    name: "Battery Current Raw"
+    entity_category: diagnostic
+    accuracy_decimals: 0
+    filters:
+      - throttle_average: ${sensor_average_interval}
+
+  - platform: template
+    id: source_device_current_a
+    name: "Device Current Derived from Manager and Battery"
+    # Calculated as Manager30 Output Current minus Battery Current.
+    unit_of_measurement: "A"
+    device_class: current
+    state_class: measurement
+    accuracy_decimals: 3
+    filters:
+      - throttle_average: ${sensor_average_interval}
+
+  - platform: template
+    id: battery_soc_percent
+    name: "Battery SOC"
+    unit_of_measurement: "%"
+    device_class: battery
+    state_class: measurement
+    accuracy_decimals: 0
+    filters:
+      - throttle_average: ${sensor_average_interval}
+
+  # Redvision display/rebroadcast values
+  - platform: template
+    id: rv1_battery_current_display_a
+    name: "Redvision 1 Battery Current Display"
+    unit_of_measurement: "A"
+    device_class: current
+    state_class: measurement
+    accuracy_decimals: 1
+    filters:
+      - throttle_average: ${sensor_average_interval}
+
+  - platform: template
+    id: rv1_device_current_display_a
+    name: "Redvision 1 Device Current Display"
+    unit_of_measurement: "A"
+    device_class: current
+    state_class: measurement
+    accuracy_decimals: 1
+    filters:
+      - throttle_average: ${sensor_average_interval}
+
+  - platform: template
+    id: rv1_battery_current_display_raw
+    name: "Redvision 1 Battery Current Display Raw"
+    entity_category: diagnostic
+    accuracy_decimals: 0
+    filters:
+      - throttle_average: ${sensor_average_interval}
+
+  - platform: template
+    id: rv1_device_current_display_raw
+    name: "Redvision 1 Device Current Display Raw"
+    entity_category: diagnostic
+    accuracy_decimals: 0
+    filters:
+      - throttle_average: ${sensor_average_interval}
+
+  - platform: template
+    id: rv2_manager_output_current_display_a
+    name: "Redvision 2 Manager Output Current Display"
+    unit_of_measurement: "A"
+    device_class: current
+    state_class: measurement
+    accuracy_decimals: 1
+    filters:
+      - throttle_average: ${sensor_average_interval}
+
+  - platform: template
+    id: rv2_manager_output_current_display_raw
+    name: "Redvision 2 Manager Output Current Display Raw"
+    entity_category: diagnostic
+    accuracy_decimals: 0
+    filters:
+      - throttle_average: ${sensor_average_interval}
+
+  # TVMS Rouge tanks
+  - platform: template
+    id: rouge_tank1_percent
+    name: "TVMS Rouge Tank 1"
+    unit_of_measurement: "%"
+    state_class: measurement
+    accuracy_decimals: 0
+    filters:
+      - throttle_average: ${sensor_average_interval}
+
+  - platform: template
+    id: rouge_tank2_percent
+    name: "TVMS Rouge Tank 2"
+    unit_of_measurement: "%"
+    state_class: measurement
+    accuracy_decimals: 0
+    filters:
+      - throttle_average: ${sensor_average_interval}
+
+  # TVMS1280 confirmed values
+  - platform: template
+    id: tvms1280_temp1_c
+    name: "TVMS1280 Temperature 1"
+    unit_of_measurement: "°C"
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 0
+    filters:
+      - throttle_average: ${sensor_average_interval}
+
+  - platform: template
+    id: tvms1280_temp2_c
+    name: "TVMS1280 Temperature 2"
+    unit_of_measurement: "°C"
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 0
+    filters:
+      - throttle_average: ${sensor_average_interval}
+
+  - platform: template
+    id: tvms1280_tank1_percent
+    name: "TVMS1280 Tank 1"
+    unit_of_measurement: "%"
+    state_class: measurement
+    accuracy_decimals: 0
+    filters:
+      - throttle_average: ${sensor_average_interval}
+
+  - platform: template
+    id: tvms1280_tank2_percent
+    name: "TVMS1280 Tank 2"
+    unit_of_measurement: "%"
+    state_class: measurement
+    accuracy_decimals: 0
+    filters:
+      - throttle_average: ${sensor_average_interval}
+
+  - platform: template
+    id: tvms1280_tank3_percent
+    name: "TVMS1280 Tank 3"
+    unit_of_measurement: "%"
+    state_class: measurement
+    accuracy_decimals: 0
+    filters:
+      - throttle_average: ${sensor_average_interval}
+
+  - platform: template
+    id: tvms1280_tank4_percent
+    name: "TVMS1280 Tank 4"
+    unit_of_measurement: "%"
+    state_class: measurement
+    accuracy_decimals: 0
+    filters:
+      - throttle_average: ${sensor_average_interval}
+
+  - platform: template
+    id: tvms1280_tank5_percent
+    name: "TVMS1280 Tank 5"
+    unit_of_measurement: "%"
+    state_class: measurement
+    accuracy_decimals: 0
+    filters:
+      - throttle_average: ${sensor_average_interval}
+
+  - platform: template
+    id: tvms1280_tank6_percent
+    name: "TVMS1280 Tank 6"
+    unit_of_measurement: "%"
+    state_class: measurement
+    accuracy_decimals: 0
+    filters:
+      - throttle_average: ${sensor_average_interval}
+
+  # Redvision -> Rouge command tracking
+  - platform: template
+    id: rouge_last_output_command_channel
+    name: "Rouge Last Output Command Channel"
+    accuracy_decimals: 0
+    filters:
+      - throttle_average: ${sensor_average_interval}
+    entity_category: diagnostic
+
+  - platform: template
+    id: rouge_last_output_command_state
+    name: "Rouge Last Output Command State"
+    accuracy_decimals: 0
+    filters:
+      - throttle_average: ${sensor_average_interval}
+    entity_category: diagnostic
+
+binary_sensor:
+  - platform: template
+    id: rouge_output_1_command
+    name: "Rouge Output 1 Command"
+  - platform: template
+    id: rouge_output_2_command
+    name: "Rouge Output 2 Command"
+  - platform: template
+    id: rouge_output_3_command
+    name: "Rouge Output 3 Command"
+  - platform: template
+    id: rouge_output_4_command
+    name: "Rouge Output 4 Command"
+  - platform: template
+    id: rouge_output_5_command
+    name: "Rouge Output 5 Command"
+  - platform: template
+    id: rouge_output_6_command
+    name: "Rouge Output 6 Command"
+  - platform: template
+    id: rouge_output_7_command
+    name: "Rouge Output 7 Command"
+  - platform: template
+    id: rouge_output_8_command
+    name: "Rouge Output 8 Command"
+  - platform: template
+    id: rouge_output_9_command
+    name: "Rouge Output 9 Command"
+  - platform: template
+    id: rouge_output_10_command
+    name: "Rouge Output 10 Command"
