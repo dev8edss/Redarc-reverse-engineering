@@ -1,11 +1,3 @@
-# RedVision / TVMS CAN Decode
-
-Latest confirmed sensor DBC reference: `Current_SOC_v49_TVMS1280_Tank5_raw_percent.dbc`
-
-Latest experimental/control DBC reference: `Current_SOC_v58_TVMS1280_outputs_04_0D_Rouge_dimming.dbc`
-
-Latest ESPHome transmit/control YAML reference: `redvision_tvms_atom_lite_cais3050g_v59_rouge_timed_dimming.yaml`
-
 This document summarises the current DBC, ESPHome bridge setup, and the J1939-style CAN ID layout used by the RedVision / TVMS system.
 
 ## CAN ID structure
