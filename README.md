@@ -1,6 +1,10 @@
 # RedVision / TVMS CAN Decode
 
-Latest DBC reference: `Current_SOC_v49_TVMS1280_Tank5_raw_percent.dbc`
+Latest confirmed sensor DBC reference: `Current_SOC_v49_TVMS1280_Tank5_raw_percent.dbc`
+
+Latest experimental/control DBC reference: `Current_SOC_v58_TVMS1280_outputs_04_0D_Rouge_dimming.dbc`
+
+Latest ESPHome transmit/control YAML reference: `redvision_tvms_atom_lite_cais3050g_v59_rouge_timed_dimming.yaml`
 
 This document summarises the current DBC, ESPHome bridge setup, and the J1939-style CAN ID layout used by the RedVision / TVMS system.
 
@@ -42,6 +46,149 @@ The source address identifies which device sent the message.
 | `0x21` | Redvision 2 |
 | `0x24` | TVMS 1280 |
 | `0x30` | TVMS Rouge |
+
+## Hardware capability map
+
+| Device | Hardware / role | Status |
+|---|---|---|
+| Manager30 `0x01` | Battery manager / charger integration | confirmed |
+| Battery Sensor `0x08` | Battery shunt / BMS sensor | confirmed |
+| Redvision 1 `0x20` | Display used to press buttons and send commands | confirmed |
+| Redvision 2 `0x21` | Display / status display | confirmed |
+| TVMS 1280 `0x24` | 10 relay outputs, 1 inverter output, 6 tank inputs, 2 temperature sensors | confirmed hardware |
+| TVMS Rouge `0x30` | 10 dimmable outputs, 8 hardware button inputs, 2 analog tank sensors | confirmed hardware |
+
+Important correction:
+
+- TVMS 1280 does **not** have hardware button inputs.
+- Any button press data should be attributed to Redvision displays or TVMS Rouge hardware button inputs, not TVMS 1280.
+- TVMS 1280 input/status frames should be labelled as tank/status/input-state only, not buttons.
+
+## Output and channel mapping
+
+### TVMS 1280 output channels
+
+Working assumption:
+
+| TVMS 1280 output | Channel ID | Status |
+|---|---:|---|
+| Output 1 | `0x04` | unconfirmed assumed |
+| Output 2 | `0x05` | unconfirmed assumed |
+| Output 3 | `0x06` | unconfirmed assumed |
+| Output 4 | `0x07` | unconfirmed assumed |
+| Output 5 | `0x08` | unconfirmed assumed |
+| Output 6 | `0x09` | confirmed toggled |
+| Output 7 | `0x0A` | confirmed toggled |
+| Output 8 | `0x0B` | unconfirmed assumed |
+| Output 9 | `0x0C` | unconfirmed assumed |
+| Output 10 | `0x0D` | unconfirmed assumed |
+| Inverter | `0x0E` | observed from Redvision display capture |
+
+TVMS 1280 command frame:
+
+```text
+CAN ID: 0x0F002420
+Source: Redvision 1 / 0x20
+Target hardware: TVMS 1280 / 0x24
+
+Data:
+CB 00 FF <channel> <state> 00 00 00
+
+state:
+00 = Off
+01 = On
+```
+
+Observed inverter examples:
+
+```text
+ON:  0F002420  CB 00 FF 0E 01 00 00 00
+OFF: 0F002420  CB 00 FF 0E 00 00 00 00
+```
+
+### TVMS Rouge output channels
+
+Known Rouge output channel range:
+
+| TVMS Rouge output | Channel ID | Status |
+|---|---:|---|
+| Output 1 | `0x0C` | confirmed mapping from user |
+| Output 2 | `0x0D` | observed/toggled |
+| Output 3 | `0x0E` | observed/toggled and dim-capture activity |
+| Output 4 | `0x0F` | observed/toggled and dim-capture activity |
+| Output 5 | `0x10` | observed/toggled |
+| Output 6 | `0x11` | observed/toggled |
+| Output 7 | `0x12` | not observed in large log 2 |
+| Output 8 | `0x13` | specifically not toggled in large log 2 |
+| Output 9 | `0x14` | observed/toggled |
+| Output 10 | `0x15` | confirmed mapping from user / observed |
+
+Rouge on/off command frame:
+
+```text
+CAN ID: 0x0F003020
+Source: Redvision 1 / 0x20
+Target hardware: TVMS Rouge / 0x30
+
+Data:
+CB 00 FF <channel> <state> 00 00 00
+
+state:
+00 = Off
+01 = On
+```
+
+Rouge output level feedback:
+
+```text
+CAN ID: 0x1BFD1230
+Source: TVMS Rouge / 0x30
+
+Meaning:
+Output level feedback, 0-100 %
+```
+
+Current behaviour seen in Home Assistant testing:
+
+- Rouge outputs turn on and off correctly.
+- Rouge output level feedback remains at `100%` while the output is on.
+- The level feedback can be used as an on/off state source: `0% = off`, `>0% = on`.
+- This does not prove that dimming control works.
+
+## Rouge dimming status
+
+Rouge dimming is **not confirmed working** from ESPHome.
+
+The earlier absolute-brightness implementation did not work. The likely reason is that captured dimming traffic appears to behave like a Redvision button-hold dim command, not a direct absolute brightness set command.
+
+Candidate dimming frames from capture:
+
+```text
+Dim down / low target candidate:
+0x0F053020  <channel> 01 01 05 00 FF FF FF
+
+Dim up / high target candidate:
+0x0F053020  <channel> 01 64 05 00 FF FF FF
+
+Release / stop dimming:
+0x0F053020  <channel> 01 FF 00 00 FF FF FF
+```
+
+Status:
+
+| Item | Status |
+|---|---|
+| Rouge on/off command | works |
+| Rouge level feedback | works as on/off feedback; reports 100% while output is on |
+| Rouge absolute dim command | not working / unconfirmed |
+| Rouge timed-hold dim command | experimental / unconfirmed |
+| ESPHome dimmable light entities | experimental only until dimming is validated |
+
+Recommendation:
+
+- Keep Rouge outputs as simple switches if reliable control is required.
+- Use Rouge output level feedback only for state tracking.
+- Treat all dimming transmit frames as experimental until a new capture confirms the exact Redvision sequence and required timing.
 
 ## Signal table
 
@@ -141,6 +288,19 @@ can_mode: LISTENONLY
 
 This makes the ESP32 passively listen to the existing RedVision / TVMS CAN bus without transmitting frames.
 
+## RJ45 CAN pinout
+
+Observed RedVision / TVMS RJ45 pinout for all devices:
+
+| RJ45 pin | Function | Status |
+|---:|---|---|
+| 4 | CAN L | confirmed |
+| 5 | CAN H | confirmed |
+| 8 | Ground | confirmed |
+| unknown | 24 V supply | unconfirmed |
+
+Do not assume the 24 V pin until it has been verified with a meter or wiring reference.
+
 ## ESPHome source-address configuration
 
 The ESPHome YAML keeps source addresses configurable at the top:
@@ -192,8 +352,31 @@ The ESPHome bridge publishes:
 
 Rouge output command tracking was intentionally removed from the latest YAML, so the bridge is monitor-only for the confirmed sensor data.
 
+### ESPHome transmit/control YAML versions
+
+Some later YAML versions are no longer monitor-only. Output-control versions must use:
+
+```yaml
+can_mode: NORMAL
+```
+
+Use `LISTENONLY` only when passive monitoring is required.
+
+Known ESPHome control behaviour:
+
+| Feature | Behaviour |
+|---|---|
+| TVMS 1280 Output 6 / 7 switches | expected to work using channels `0x09` and `0x0A` |
+| TVMS 1280 Inverter switch | expected to work using channel `0x0E` |
+| TVMS 1280 Outputs 1-5 and 8-10 | included only from assumed channel sequence `0x04-0x0D`; unconfirmed |
+| TVMS Rouge output switches | on/off works |
+| TVMS Rouge dimmable light control | not working yet / experimental |
+| Rouge HA state tracking | should follow `0x1BFD1230` output level feedback instead of unreliable bitfield-only state |
+
 ## Confirmation status
 
 Signals marked `CONFIRMED CORRECT DO NOT EDIT` are locked and should not be changed unless a correction is explicitly requested.
 
-Signals marked `UNCONFIRMED PENDING TEST` are included for testing only. Once validated, they can be marked confirmed.
+Signals marked `UNCONFIRMED PENDING TEST`, `UNCONFIRMED ASSUMED`, or `EXPERIMENTAL` are included for testing only. Once validated, they can be marked confirmed.
+
+Do not overwrite or rename confirmed sensor decodes when adding output-control or dimming experiments.
