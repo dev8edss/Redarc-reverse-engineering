@@ -1,0 +1,505 @@
+VERSION "TVMS Redvision most up to date - J1939 PGN decode"
+
+NS_ :
+	NS_DESC_
+	CM_
+	BA_DEF_
+	BA_
+	VAL_
+	CAT_DEF_
+	CAT_
+	FILTER
+	BA_DEF_DEF_
+	EV_DATA_
+	ENVVAR_DATA_
+	SGTYPE_
+	SGTYPE_VAL_
+	SIG_TYPE_REF_
+	SIG_GROUP_
+	SIG_VALTYPE_
+	SIGTYPE_VALTYPE_
+	BO_TX_BU_
+	BA_DEF_REL_
+	BA_REL_
+	BA_DEF_DEF_REL_
+	BU_SG_REL_
+	BU_EV_REL_
+	BU_BO_REL_
+	SG_MUL_VAL_
+
+BS_:
+
+BU_: Manager30 Battery_Sensor Redvision_1 Redvision_2 TVMS_1280 TVMS_Rouge Analyzer
+
+VAL_TABLE_ OffOn 0 "Off" 1 "On" ;
+VAL_TABLE_ ActiveLow 0 "Active_or_Pressed" 1 "Inactive_or_Released" ;
+
+
+BO_ 2617049124 TVMS1280_Input_Tank_Status: 8 TVMS_1280
+ SG_ TVMS1280_Input_Page M : 0|8@1+ (1,0) [0|255] "page" Analyzer
+ SG_ TVMS1280_TankInput_1_Raw m1 : 8|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ TVMS1280_TankInput_2_Raw m1 : 16|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ TVMS1280_TankInput_3_Raw m1 : 24|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ TVMS1280_TankInput_4_Raw m1 : 32|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ TVMS1280_TankInput_5_Raw m1 : 40|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ TVMS1280_TankInput_6_Raw m1 : 48|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ TVMS1280_Button_1_Observed m8 : 16|1@1+ (1,0) [0|1] "bool" Analyzer
+ SG_ TVMS1280_Button_2_Observed m8 : 24|1@1+ (1,0) [0|1] "bool" Analyzer
+ SG_ TVMS1280_Button_3_Observed m8 : 56|1@1+ (1,0) [0|1] "bool" Analyzer
+ SG_ TVMS1280_Input_1_Raw m8 : 8|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ TVMS1280_Input_2_Raw m8 : 16|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ TVMS1280_Input_3_Raw m8 : 24|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ TVMS1280_Input_4_Raw m8 : 32|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ TVMS1280_Input_5_Raw m8 : 40|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ TVMS1280_Input_6_Raw m8 : 48|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ TVMS1280_Input_7_Raw m8 : 56|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ TVMS1280_Page15_Status_1 m15 : 8|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ TVMS1280_Page15_Status_2 m15 : 16|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ TVMS1280_Page15_Status_3 m15 : 24|8@1+ (1,0) [0|255] "raw" Analyzer
+
+
+
+BO_ 2617049636 TVMS1280_Temperature_Status: 8 TVMS_1280
+ SG_ TVMS1280_Temp_Page M : 0|8@1+ (1,0) [0|255] "page" Analyzer
+ SG_ TVMS1280_TempSensor_1_C m20 : 8|8@1+ (1,-100) [-100|155] "degC" Analyzer
+ SG_ TVMS1280_TempSensor_2_C m17 : 40|8@1+ (1,-100) [-100|155] "degC" Analyzer
+ SG_ TVMS1280_Temp_Page17_RawD2 m17 : 8|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ TVMS1280_Temp_Page20_RawD6 m20 : 40|8@1+ (1,0) [0|255] "raw" Analyzer
+
+
+
+BO_ 2399151136 TVMS1280_Output_Command_From_Redvision1: 8 Redvision_1
+ SG_ TVMS1280_Command_Constant : 0|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ TVMS1280_Output_Channel M : 24|8@1+ (1,0) [0|255] "channel" Analyzer
+
+ SG_ TVMS1280_Output_01_State m1 : 32|1@1+ (1,0) [0|1] "bool" Analyzer
+ SG_ TVMS1280_Output_02_State m2 : 32|1@1+ (1,0) [0|1] "bool" Analyzer
+ SG_ TVMS1280_Output_03_State m3 : 32|1@1+ (1,0) [0|1] "bool" Analyzer
+ SG_ TVMS1280_Output_04_State m4 : 32|1@1+ (1,0) [0|1] "bool" Analyzer
+ SG_ TVMS1280_Output_05_State m5 : 32|1@1+ (1,0) [0|1] "bool" Analyzer
+ SG_ TVMS1280_Output_06_State m6 : 32|1@1+ (1,0) [0|1] "bool" Analyzer
+ SG_ TVMS1280_Output_07_State m7 : 32|1@1+ (1,0) [0|1] "bool" Analyzer
+ SG_ TVMS1280_Output_08_State m8 : 32|1@1+ (1,0) [0|1] "bool" Analyzer
+ SG_ TVMS1280_Output_09_State m9 : 32|1@1+ (1,0) [0|1] "bool" Analyzer
+ SG_ TVMS1280_Output_10_State m10 : 32|1@1+ (1,0) [0|1] "bool" Analyzer
+ SG_ TVMS1280_Inverter_State m11 : 32|1@1+ (1,0) [0|1] "bool" Analyzer
+
+
+BO_ 2617049136 TVMSRouge_Input_Tank_Status: 8 TVMS_Rouge
+ SG_ TVMSRouge_Input_Page M : 0|8@1+ (1,0) [0|255] "page" Analyzer
+ SG_ TVMSRouge_Tank_1_Raw m1 : 8|16@1+ (1,0) [0|65535] "raw" Analyzer
+ SG_ TVMSRouge_Tank_2_Raw m1 : 24|16@1+ (1,0) [0|65535] "raw" Analyzer
+ SG_ TVMSRouge_InputSupply_Raw m1 : 40|16@1+ (1,0) [0|65535] "raw" Analyzer
+ SG_ TVMSRouge_Button_1 m15 : 8|1@1+ (1,0) [0|1] "bool" Analyzer
+ SG_ TVMSRouge_Button_2 m15 : 16|1@1+ (1,0) [0|1] "bool" Analyzer
+ SG_ TVMSRouge_Button_3 m15 : 24|1@1+ (1,0) [0|1] "bool" Analyzer
+ SG_ TVMSRouge_Button_4 m15 : 32|1@1+ (1,0) [0|1] "bool" Analyzer
+ SG_ TVMSRouge_Button_5 m15 : 40|1@1+ (1,0) [0|1] "bool" Analyzer
+ SG_ TVMSRouge_Button_6 m15 : 48|1@1+ (1,0) [0|1] "bool" Analyzer
+ SG_ TVMSRouge_Button_7 m15 : 56|1@1+ (1,0) [0|1] "bool" Analyzer
+ SG_ TVMSRouge_Button_8 m8 : 32|1@1+ (1,0) [0|1] "bool" Analyzer
+ SG_ TVMSRouge_Button_Observed_A m8 : 32|1@1+ (1,0) [0|1] "bool" Analyzer
+ SG_ TVMSRouge_Button_Observed_B m8 : 48|1@1+ (1,0) [0|1] "bool" Analyzer
+ SG_ TVMSRouge_Button_Observed_C m8 : 56|1@1+ (1,0) [0|1] "bool" Analyzer
+
+
+
+
+BO_ 2617053744 TVMSRouge_Output_Level_Status: 8 TVMS_Rouge
+ SG_ TVMSRouge_Level_Page M : 0|8@1+ (1,0) [0|255] "page" Analyzer
+ SG_ TVMSRouge_Output_01_Level m12 : 8|8@1+ (1,0) [0|100] "%" Analyzer
+ SG_ TVMSRouge_Output_02_Level m12 : 16|8@1+ (1,0) [0|100] "%" Analyzer
+ SG_ TVMSRouge_Output_03_Level m12 : 24|8@1+ (1,0) [0|100] "%" Analyzer
+ SG_ TVMSRouge_Output_04_Level m12 : 32|8@1+ (1,0) [0|100] "%" Analyzer
+ SG_ TVMSRouge_Output_05_Level m12 : 40|8@1+ (1,0) [0|100] "%" Analyzer
+ SG_ TVMSRouge_Output_06_Level m12 : 48|8@1+ (1,0) [0|100] "%" Analyzer
+ SG_ TVMSRouge_Output_07_Level m12 : 56|8@1+ (1,0) [0|100] "%" Analyzer
+ SG_ TVMSRouge_Output_08_Level m19 : 8|8@1+ (1,0) [0|100] "%" Analyzer
+ SG_ TVMSRouge_Output_09_Level m19 : 16|8@1+ (1,0) [0|100] "%" Analyzer
+ SG_ TVMSRouge_Output_10_Level m19 : 24|8@1+ (1,0) [0|100] "%" Analyzer
+
+BO_ 2617054256 TVMSRouge_Output_Bitfield_Status: 8 TVMS_Rouge
+ SG_ TVMSRouge_Bitfield_Page M : 0|8@1+ (1,0) [0|255] "page" Analyzer
+ SG_ TVMSRouge_Output_01_OnFeedback m12 : 8|1@1+ (1,0) [0|1] "bool" Analyzer
+ SG_ TVMSRouge_Output_02_OnFeedback m12 : 16|1@1+ (1,0) [0|1] "bool" Analyzer
+ SG_ TVMSRouge_Output_03_OnFeedback m12 : 24|1@1+ (1,0) [0|1] "bool" Analyzer
+ SG_ TVMSRouge_Output_04_OnFeedback m12 : 32|1@1+ (1,0) [0|1] "bool" Analyzer
+ SG_ TVMSRouge_Output_05_OnFeedback m12 : 40|1@1+ (1,0) [0|1] "bool" Analyzer
+ SG_ TVMSRouge_Output_06_OnFeedback m12 : 48|1@1+ (1,0) [0|1] "bool" Analyzer
+ SG_ TVMSRouge_Output_07_OnFeedback m12 : 56|1@1+ (1,0) [0|1] "bool" Analyzer
+ SG_ TVMSRouge_Output_08_OnFeedback m19 : 8|1@1+ (1,0) [0|1] "bool" Analyzer
+ SG_ TVMSRouge_Output_09_OnFeedback m19 : 16|1@1+ (1,0) [0|1] "bool" Analyzer
+ SG_ TVMSRouge_Output_10_OnFeedback m19 : 24|1@1+ (1,0) [0|1] "bool" Analyzer
+
+BO_ 2617049648 TVMSRouge_Analog_Status: 8 TVMS_Rouge
+ SG_ TVMSRouge_Analog_Page M : 0|8@1+ (1,0) [0|255] "page" Analyzer
+ SG_ TVMSRouge_Analog_Tank1_Raw m22 : 8|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ TVMSRouge_Analog_Tank2_Raw m22 : 24|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ TVMSRouge_Analog_StatusByte m22 : 32|8@1+ (1,0) [0|255] "raw" Analyzer
+
+
+
+BO_ 2399154208 TVMSRouge_Output_OnOff_Command_From_Redvision1: 8 Redvision_1
+ SG_ TVMSRouge_Command_Constant : 0|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ TVMSRouge_Output_Channel M : 24|8@1+ (1,0) [0|255] "channel" Analyzer
+
+ SG_ TVMSRouge_Output_01_OnOffCmd m12 : 32|1@1+ (1,0) [0|1] "bool" Analyzer
+ SG_ TVMSRouge_Output_02_OnOffCmd m13 : 32|1@1+ (1,0) [0|1] "bool" Analyzer
+ SG_ TVMSRouge_Output_03_OnOffCmd m14 : 32|1@1+ (1,0) [0|1] "bool" Analyzer
+ SG_ TVMSRouge_Output_04_OnOffCmd m15 : 32|1@1+ (1,0) [0|1] "bool" Analyzer
+ SG_ TVMSRouge_Output_05_OnOffCmd m16 : 32|1@1+ (1,0) [0|1] "bool" Analyzer
+ SG_ TVMSRouge_Output_06_OnOffCmd m17 : 32|1@1+ (1,0) [0|1] "bool" Analyzer
+ SG_ TVMSRouge_Output_07_OnOffCmd m18 : 32|1@1+ (1,0) [0|1] "bool" Analyzer
+ SG_ TVMSRouge_Output_08_OnOffCmd m19 : 32|1@1+ (1,0) [0|1] "bool" Analyzer
+ SG_ TVMSRouge_Output_09_OnOffCmd m20 : 32|1@1+ (1,0) [0|1] "bool" Analyzer
+ SG_ TVMSRouge_Output_10_OnOffCmd m21 : 32|1@1+ (1,0) [0|1] "bool" Analyzer
+
+
+BO_ 2399219760 TVMSRouge_Output_Dim_Command: 8 TVMS_Rouge
+ SG_ TVMSRouge_Dim_Channel M : 0|8@1+ (1,0) [0|255] "channel" Analyzer
+ SG_ TVMSRouge_Dim_Enable : 8|8@1+ (1,0) [0|255] "raw" Analyzer
+
+ SG_ TVMSRouge_Output_01_TargetLevel m12 : 16|8@1+ (1,0) [0|100] "%" Analyzer
+ SG_ TVMSRouge_Output_01_DimMode m12 : 24|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ TVMSRouge_Output_02_TargetLevel m13 : 16|8@1+ (1,0) [0|100] "%" Analyzer
+ SG_ TVMSRouge_Output_02_DimMode m13 : 24|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ TVMSRouge_Output_03_TargetLevel m14 : 16|8@1+ (1,0) [0|100] "%" Analyzer
+ SG_ TVMSRouge_Output_03_DimMode m14 : 24|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ TVMSRouge_Output_04_TargetLevel m15 : 16|8@1+ (1,0) [0|100] "%" Analyzer
+ SG_ TVMSRouge_Output_04_DimMode m15 : 24|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ TVMSRouge_Output_05_TargetLevel m16 : 16|8@1+ (1,0) [0|100] "%" Analyzer
+ SG_ TVMSRouge_Output_05_DimMode m16 : 24|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ TVMSRouge_Output_06_TargetLevel m17 : 16|8@1+ (1,0) [0|100] "%" Analyzer
+ SG_ TVMSRouge_Output_06_DimMode m17 : 24|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ TVMSRouge_Output_07_TargetLevel m18 : 16|8@1+ (1,0) [0|100] "%" Analyzer
+ SG_ TVMSRouge_Output_07_DimMode m18 : 24|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ TVMSRouge_Output_08_TargetLevel m19 : 16|8@1+ (1,0) [0|100] "%" Analyzer
+ SG_ TVMSRouge_Output_08_DimMode m19 : 24|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ TVMSRouge_Output_09_TargetLevel m20 : 16|8@1+ (1,0) [0|100] "%" Analyzer
+ SG_ TVMSRouge_Output_09_DimMode m20 : 24|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ TVMSRouge_Output_10_TargetLevel m21 : 16|8@1+ (1,0) [0|100] "%" Analyzer
+ SG_ TVMSRouge_Output_10_DimMode m21 : 24|8@1+ (1,0) [0|255] "raw" Analyzer
+
+
+BO_ 2414280480 Redvision1_Heartbeat_Global: 8 Redvision_1
+ SG_ Redvision1_Heartbeat_Global_D1 : 0|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Redvision1_Heartbeat_Global_D2 : 8|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Redvision1_Heartbeat_Global_D3 : 16|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Redvision1_Heartbeat_Global_D4 : 24|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Redvision1_Heartbeat_Global_D5 : 32|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Redvision1_Heartbeat_Global_D6 : 40|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Redvision1_Heartbeat_Global_D7 : 48|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Redvision1_Heartbeat_Global_D8 : 56|8@1+ (1,0) [0|255] "raw" Analyzer
+
+
+BO_ 2482143264 Redvision1_Analog_Status_A: 8 Redvision_1
+ SG_ Redvision1_Analog_Status_A_D1 : 0|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Redvision1_Analog_Status_A_D2 : 8|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Redvision1_Analog_Status_A_D3 : 16|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Redvision1_Analog_Status_A_D4 : 24|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Redvision1_Analog_Status_A_D5 : 32|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Redvision1_Analog_Status_A_D6 : 40|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Redvision1_Analog_Status_A_D7 : 48|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Redvision1_Analog_Status_A_D8 : 56|8@1+ (1,0) [0|255] "raw" Analyzer
+
+
+BO_ 2482144288 Redvision1_Analog_Status_B: 8 Redvision_1
+ SG_ Redvision1_Analog_Status_B_D1 : 0|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Redvision1_Analog_Status_B_D2 : 8|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Redvision1_Analog_Status_B_D3 : 16|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Redvision1_Analog_Status_B_D4 : 24|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Redvision1_Analog_Status_B_D5 : 32|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Redvision1_Analog_Status_B_D6 : 40|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Redvision1_Analog_Status_B_D7 : 48|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Redvision1_Analog_Status_B_D8 : 56|8@1+ (1,0) [0|255] "raw" Analyzer
+
+
+BO_ 2616460320 Redvision1_Raw_1BF40420: 8 Redvision_1
+ SG_ Redvision1_Raw_1BF40420_D1 : 0|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Redvision1_Raw_1BF40420_D2 : 8|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Redvision1_Raw_1BF40420_D3 : 16|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Redvision1_Raw_1BF40420_D4 : 24|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Redvision1_Raw_1BF40420_D5 : 32|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Redvision1_Raw_1BF40420_D6 : 40|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Redvision1_Raw_1BF40420_D7 : 48|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Redvision1_Raw_1BF40420_D8 : 56|8@1+ (1,0) [0|255] "raw" Analyzer
+
+
+BO_ 2482143777 Display21_Analog_Status: 8 Redvision_2
+ SG_ Display21_Analog_Status_D1 : 0|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Display21_Analog_Status_D2 : 8|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Display21_Analog_Status_D3 : 16|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Display21_Analog_Status_D4 : 24|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Display21_Analog_Status_D5 : 32|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Display21_Analog_Status_D6 : 40|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Display21_Analog_Status_D7 : 48|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Display21_Analog_Status_D8 : 56|8@1+ (1,0) [0|255] "raw" Analyzer
+
+
+BO_ 2616460321 Display21_Raw_1BF40421: 8 Redvision_2
+ SG_ Display21_Raw_1BF40421_D1 : 0|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Display21_Raw_1BF40421_D2 : 8|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Display21_Raw_1BF40421_D3 : 16|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Display21_Raw_1BF40421_D4 : 24|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Display21_Raw_1BF40421_D5 : 32|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Display21_Raw_1BF40421_D6 : 40|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Display21_Raw_1BF40421_D7 : 48|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Display21_Raw_1BF40421_D8 : 56|8@1+ (1,0) [0|255] "raw" Analyzer
+
+
+BO_ 2482047012 TVMS1280_Raw_13F10824: 8 TVMS_1280
+ SG_ TVMS1280_Raw_13F10824_D1 : 0|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ TVMS1280_Raw_13F10824_D2 : 8|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ TVMS1280_Raw_13F10824_D3 : 16|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ TVMS1280_Raw_13F10824_D4 : 24|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ TVMS1280_Raw_13F10824_D5 : 32|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ TVMS1280_Raw_13F10824_D6 : 40|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ TVMS1280_Raw_13F10824_D7 : 48|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ TVMS1280_Raw_13F10824_D8 : 56|8@1+ (1,0) [0|255] "raw" Analyzer
+
+
+BO_ 2616460324 TVMS1280_Raw_1BF40424: 8 TVMS_1280
+ SG_ TVMS1280_Raw_1BF40424_D1 : 0|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ TVMS1280_Raw_1BF40424_D2 : 8|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ TVMS1280_Raw_1BF40424_D3 : 16|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ TVMS1280_Raw_1BF40424_D4 : 24|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ TVMS1280_Raw_1BF40424_D5 : 32|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ TVMS1280_Raw_1BF40424_D6 : 40|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ TVMS1280_Raw_1BF40424_D7 : 48|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ TVMS1280_Raw_1BF40424_D8 : 56|8@1+ (1,0) [0|255] "raw" Analyzer
+
+
+BO_ 2482047024 TVMSRouge_Raw_13F10830: 8 TVMS_Rouge
+ SG_ TVMSRouge_Raw_13F10830_D1 : 0|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ TVMSRouge_Raw_13F10830_D2 : 8|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ TVMSRouge_Raw_13F10830_D3 : 16|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ TVMSRouge_Raw_13F10830_D4 : 24|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ TVMSRouge_Raw_13F10830_D5 : 32|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ TVMSRouge_Raw_13F10830_D6 : 40|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ TVMSRouge_Raw_13F10830_D7 : 48|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ TVMSRouge_Raw_13F10830_D8 : 56|8@1+ (1,0) [0|255] "raw" Analyzer
+
+
+BO_ 2616460336 TVMSRouge_Raw_1BF40430: 8 TVMS_Rouge
+ SG_ TVMSRouge_Raw_1BF40430_D1 : 0|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ TVMSRouge_Raw_1BF40430_D2 : 8|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ TVMSRouge_Raw_1BF40430_D3 : 16|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ TVMSRouge_Raw_1BF40430_D4 : 24|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ TVMSRouge_Raw_1BF40430_D5 : 32|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ TVMSRouge_Raw_1BF40430_D6 : 40|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ TVMSRouge_Raw_1BF40430_D7 : 48|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ TVMSRouge_Raw_1BF40430_D8 : 56|8@1+ (1,0) [0|255] "raw" Analyzer
+
+
+BO_ 2213675009 Manager30_Raw_03F20001: 8 Manager30
+ SG_ Manager30_D1 : 0|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Manager30_D2 : 8|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Manager30_D3 : 16|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Manager30_D4 : 24|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Manager30_D5 : 32|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Manager30_D6 : 40|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Manager30_D7 : 48|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Manager30_D8 : 56|8@1+ (1,0) [0|255] "raw" Analyzer
+
+
+BO_ 2213676033 Manager30_Raw_03F20401: 8 Manager30
+ SG_ Manager30_D1 : 0|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Manager30_D2 : 8|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Manager30_D3 : 16|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Manager30_D4 : 24|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Manager30_D5 : 32|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Manager30_D6 : 40|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Manager30_D7 : 48|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Manager30_D8 : 56|8@1+ (1,0) [0|255] "raw" Analyzer
+
+
+BO_ 2213676545 Manager30_Raw_03F20601: 8 Manager30
+ SG_ Manager30_D1 : 0|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Manager30_D2 : 8|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Manager30_D3 : 16|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Manager30_D4 : 24|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Manager30_D5 : 32|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Manager30_D6 : 40|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Manager30_D7 : 48|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Manager30_D8 : 56|8@1+ (1,0) [0|255] "raw" Analyzer
+
+
+BO_ 2213677057 Manager30_Raw_03F20801: 8 Manager30
+ SG_ Manager30_D1 : 0|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Manager30_D2 : 8|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Manager30_D3 : 16|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Manager30_D4 : 24|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Manager30_D5 : 32|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Manager30_D6 : 40|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Manager30_D7 : 48|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Manager30_D8 : 56|8@1+ (1,0) [0|255] "raw" Analyzer
+
+
+BO_ 2213677569 Manager30_Raw_03F20A01: 8 Manager30
+ SG_ Manager30_D1 : 0|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Manager30_D2 : 8|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Manager30_D3 : 16|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Manager30_D4 : 24|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Manager30_D5 : 32|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Manager30_D6 : 40|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Manager30_D7 : 48|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Manager30_D8 : 56|8@1+ (1,0) [0|255] "raw" Analyzer
+
+
+BO_ 2213611521 Manager30_Raw_03F10801: 8 Manager30
+ SG_ Manager30_D1 : 0|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Manager30_D2 : 8|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Manager30_D3 : 16|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Manager30_D4 : 24|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Manager30_D5 : 32|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Manager30_D6 : 40|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Manager30_D7 : 48|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Manager30_D8 : 56|8@1+ (1,0) [0|255] "raw" Analyzer
+
+
+BO_ 2213741569 Manager30_Raw_03F30401: 8 Manager30
+ SG_ Manager30_D1 : 0|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Manager30_D2 : 8|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Manager30_D3 : 16|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Manager30_D4 : 24|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Manager30_D5 : 32|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Manager30_D6 : 40|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Manager30_D7 : 48|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Manager30_D8 : 56|8@1+ (1,0) [0|255] "raw" Analyzer
+
+
+BO_ 2213807105 Manager30_Raw_03F40401: 8 Manager30
+ SG_ Manager30_D1 : 0|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Manager30_D2 : 8|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Manager30_D3 : 16|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Manager30_D4 : 24|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Manager30_D5 : 32|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Manager30_D6 : 40|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Manager30_D7 : 48|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Manager30_D8 : 56|8@1+ (1,0) [0|255] "raw" Analyzer
+
+
+BO_ 2213808129 Manager30_Raw_03F40801: 8 Manager30
+ SG_ Manager30_D1 : 0|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Manager30_D2 : 8|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Manager30_D3 : 16|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Manager30_D4 : 24|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Manager30_D5 : 32|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Manager30_D6 : 40|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Manager30_D7 : 48|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ Manager30_D8 : 56|8@1+ (1,0) [0|255] "raw" Analyzer
+
+
+BO_ 2482044936 BatterySensor_Raw_13F10008: 8 Battery_Sensor
+ SG_ BatterySensor_D1 : 0|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ BatterySensor_D2 : 8|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ BatterySensor_D3 : 16|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ BatterySensor_D4 : 24|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ BatterySensor_D5 : 32|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ BatterySensor_D6 : 40|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ BatterySensor_D7 : 48|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ BatterySensor_D8 : 56|8@1+ (1,0) [0|255] "raw" Analyzer
+
+
+BO_ 2482045448 BatterySensor_Raw_13F10208: 8 Battery_Sensor
+ SG_ BatterySensor_D1 : 0|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ BatterySensor_D2 : 8|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ BatterySensor_D3 : 16|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ BatterySensor_D4 : 24|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ BatterySensor_D5 : 32|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ BatterySensor_D6 : 40|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ BatterySensor_D7 : 48|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ BatterySensor_D8 : 56|8@1+ (1,0) [0|255] "raw" Analyzer
+
+
+BO_ 2482045960 BatterySensor_Raw_13F10408: 8 Battery_Sensor
+ SG_ BatterySensor_D1 : 0|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ BatterySensor_D2 : 8|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ BatterySensor_D3 : 16|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ BatterySensor_D4 : 24|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ BatterySensor_D5 : 32|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ BatterySensor_D6 : 40|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ BatterySensor_D7 : 48|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ BatterySensor_D8 : 56|8@1+ (1,0) [0|255] "raw" Analyzer
+
+
+BO_ 2482047496 BatterySensor_Raw_13F10A08: 8 Battery_Sensor
+ SG_ BatterySensor_D1 : 0|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ BatterySensor_D2 : 8|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ BatterySensor_D3 : 16|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ BatterySensor_D4 : 24|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ BatterySensor_D5 : 32|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ BatterySensor_D6 : 40|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ BatterySensor_D7 : 48|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ BatterySensor_D8 : 56|8@1+ (1,0) [0|255] "raw" Analyzer
+
+
+BO_ 2616460296 BatterySensor_Raw_1BF40408: 8 Battery_Sensor
+ SG_ BatterySensor_D1 : 0|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ BatterySensor_D2 : 8|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ BatterySensor_D3 : 16|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ BatterySensor_D4 : 24|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ BatterySensor_D5 : 32|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ BatterySensor_D6 : 40|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ BatterySensor_D7 : 48|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ BatterySensor_D8 : 56|8@1+ (1,0) [0|255] "raw" Analyzer
+
+
+BO_ 2617246256 TVMSRouge_WaterLevelStatus: 8 TVMS_Rouge
+ SG_ WaterLevel_MUX M : 0|8@1+ (1,0) [0|255] "" Analyzer
+ SG_ TVMSRouge_WaterTank1_Percent m9 : 8|8@1+ (1,0) [0|100] "%" Analyzer
+ SG_ TVMSRouge_WaterTank2_Percent m9 : 16|8@1+ (1,0) [0|100] "%" Analyzer
+ SG_ TVMSRouge_WaterReserved_D2 m22 : 8|8@1+ (1,0) [0|255] "raw" Analyzer
+ SG_ TVMSRouge_WaterReserved_D3 m22 : 16|8@1+ (1,0) [0|255] "raw" Analyzer
+
+CM_ BU_ Manager30 "Node 0x01: Manager30 battery charger";
+CM_ BU_ Battery_Sensor "Node 0x08: Battery Sensor / BMS sensor";
+CM_ BU_ Redvision_1 "Node 0x20: Redvision 1 display, used to press buttons";
+CM_ BU_ Redvision_2 "Node 0x21: Redvision 2 display";
+CM_ BU_ TVMS_1280 "Node 0x24: TVMS 1280 relay output board, no dimming; includes two temperature sensors and tank inputs";
+CM_ BU_ TVMS_Rouge "Node 0x30: TVMS Rouge dimming output board; 10 outputs, 8 button inputs, 2 tank sensors";
+CM_ BO_ 2617246256 "Dual water tank level status from TVMS Rouge. Original supplied raw 29-bit CAN ID: 0x1C000230 / 469762608; DBC extended ID uses 0x9C000230 / 2617246256.";
+CM_ SG_ 2617246256 WaterLevel_MUX "Multiplexor: 0x09=Tank levels, 0x16=Reserved";
+CM_ SG_ 2617246256 TVMSRouge_WaterTank1_Percent "Fresh water tank 1 fill level";
+CM_ SG_ 2617246256 TVMSRouge_WaterTank2_Percent "Fresh water tank 2 fill level";
+VAL_ 2617246256 WaterLevel_MUX 9 "TankLevels" 22 "Reserved" ;
+
+BA_DEF_ BO_ "GenMsgCycleTime" INT 0 100000;
+BA_DEF_DEF_ "GenMsgCycleTime" 0;
+
+
+
+
+CM_ BO_ 2399154208 "TVMS Rouge output on/off command from Redvision 1. Hardware has 10 physical output channels; mux/channel IDs 0x0C-0x15.";
+CM_ BO_ 2399219760 "TVMS Rouge dimming command. Hardware has 10 dimmable outputs; target level is 0-100 percent.";
+CM_ BO_ 2617053744 "TVMS Rouge output level feedback. Only 10 physical outputs are modelled.";
+CM_ BO_ 2617054256 "TVMS Rouge output on/off feedback bitfield. Only 10 physical outputs are modelled.";
+CM_ BO_ 2617246256 "TVMS Rouge two tank sensors / water level percent status from supplied DBC.";
+CM_ BO_ 2617049136 "TVMS Rouge local inputs: 8 button inputs and 2 analog tank sensor raw channels.";
+
+
+CM_ "Node names supplied by Steven: 0x01 Manager30, 0x08 Battery Sensor, 0x20 Redvision 1, 0x21 Redvision 2, 0x24 TVMS 1280, 0x30 TVMS Rouge.";
+CM_ BU_ Manager30 "Node 0x01: Manager30 battery charger/system manager.";
+CM_ BU_ Battery_Sensor "Node 0x08: Battery Sensor / BMS sensor.";
+CM_ BU_ Redvision_1 "Node 0x20: Redvision 1 display used to press buttons.";
+CM_ BU_ Redvision_2 "Node 0x21: Redvision 2 display.";
+CM_ BU_ TVMS_1280 "Node 0x24: TVMS 1280 relay output board: 10 non-dimming outputs plus inverter output, 6 tank inputs, 2 temperature sensors.";
+CM_ BU_ TVMS_Rouge "Node 0x30: TVMS Rouge dimming output board: 10 outputs, 8 button inputs, 2 tank sensors.";
+CM_ BO_ 2617049124 "TVMS 1280 status/input frame. Hardware has 6 tank inputs; earlier observed button-like bits are kept as raw/observed only.";
+CM_ BO_ 2399151136 "TVMS 1280 non-dimming output command frame from Redvision 1. Outputs 1-10 plus inverter output are modelled.";
+CM_ BO_ 2617049136 "TVMS Rouge input/tank status frame. Hardware has 8 button inputs and 2 tank sensors.";
+CM_ BO_ 2617246256 "TVMS Rouge dual water tank level status. Original supplied raw extended CAN ID: 0x1C000230.";
+CM_ BO_ 2399154208 "TVMS Rouge output on/off command frame. Hardware has 10 dimmable outputs.";
+CM_ BO_ 2399219760 "TVMS Rouge dimming command frame for outputs 1-10.";
+
+CM_ "Most up to date hardware notes: CAN identifiers are J1939-style 29-bit IDs: priority + PGN + source address. DBC BO_ IDs use the standard extended-ID flag 0x80000000 added to the raw 29-bit CAN ID.";
+CM_ "Node names: 0x01 Manager30, 0x08 Battery Sensor, 0x20 Redvision 1, 0x21 Redvision 2, 0x24 TVMS 1280, 0x30 TVMS Rouge.";
+CM_ BO_ 2399151136 "Redvision 1 command frame to TVMS 1280. TVMS 1280 has 10 normal relay outputs plus dedicated inverter output. Inverter channel is modelled as mux 11 pending capture confirmation.";
+CM_ SG_ 2399151136 TVMS1280_Inverter_State "Dedicated TVMS 1280 inverter output command/status bit; mux 11 is inferred placeholder until a dedicated inverter capture confirms exact channel ID.";
+CM_ BO_ 2399154208 "Redvision 1 command frame to TVMS Rouge. TVMS Rouge has 10 outputs with application channel IDs 0x0C-0x15 for outputs 1-10.";
+CM_ BO_ 2399219760 "TVMS Rouge dimming command. Output channel mux IDs are 0x0C-0x15 for outputs 1-10; target level raw 0-100 = percent.";
+CM_ BO_ 2617053744 "TVMS Rouge output level feedback. Page/mux 0x0C carries outputs 1-7; page/mux 0x13 carries outputs 8-10. These correspond to application channel IDs 0x0C-0x15.";
+CM_ BO_ 2617054256 "TVMS Rouge output on/off feedback. Page/mux 0x0C carries outputs 1-7; page/mux 0x13 carries outputs 8-10.";
+VAL_ 2399154208 TVMSRouge_Output_Channel 12 "Output_01" 13 "Output_02" 14 "Output_03" 15 "Output_04" 16 "Output_05" 17 "Output_06" 18 "Output_07" 19 "Output_08" 20 "Output_09" 21 "Output_10" ;
+VAL_ 2399219760 TVMSRouge_Dim_Channel 12 "Output_01" 13 "Output_02" 14 "Output_03" 15 "Output_04" 16 "Output_05" 17 "Output_06" 18 "Output_07" 19 "Output_08" 20 "Output_09" 21 "Output_10" ;
+VAL_ 2399151136 TVMS1280_Output_Channel 1 "Output_01" 2 "Output_02" 3 "Output_03" 4 "Output_04" 5 "Output_05" 6 "Output_06" 7 "Output_07" 8 "Output_08" 9 "Output_09" 10 "Output_10" 11 "Inverter" ;
