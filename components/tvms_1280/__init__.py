@@ -28,14 +28,12 @@ ns = cg.esphome_ns.namespace("tvms_1280")
 TVMS1280Component = ns.class_("TVMS1280Component", cg.Component)
 TVMS1280Switch = ns.class_("TVMS1280Switch", switch.Switch)
 
-OUTPUT_SCHEMA = switch.SWITCH_SCHEMA.extend({
-    cv.GenerateID(): cv.declare_id(TVMS1280Switch),
+OUTPUT_SCHEMA = switch.switch_schema(TVMS1280Switch).extend({
     cv.Required(CONF_OUTPUT_NUMBER): cv.int_range(min=1, max=10),
     cv.Optional(CONF_CHANNEL): cv.hex_uint8_t,
 })
 
-INVERTER_SCHEMA = switch.SWITCH_SCHEMA.extend({
-    cv.GenerateID(): cv.declare_id(TVMS1280Switch),
+INVERTER_SCHEMA = switch.switch_schema(TVMS1280Switch).extend({
     cv.Optional(CONF_CHANNEL, default=0x0E): cv.hex_uint8_t,
 })
 
