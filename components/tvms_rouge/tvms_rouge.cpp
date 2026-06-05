@@ -33,6 +33,25 @@ void TVMSRougeLight::publish_feedback_level(float level_percent) {
   this->state_->publish_state();
 }
 
+void TVMSRougeLight::publish_target_level(float level_percent) {
+  if (this->state_ == nullptr) return;
+
+  if (level_percent < 0.0f) level_percent = 0.0f;
+  if (level_percent > 100.0f) level_percent = 100.0f;
+
+  const bool on = level_percent > 0.5f;
+  const float brightness = on ? level_percent / 100.0f : 0.0f;
+
+  // This is the HA-requested target. Hold this value in the light entity while
+  // the Rouge output physically ramps; the separate level sensor continues to
+  // show real hardware feedback during the ramp.
+  this->state_->current_values.set_state(on);
+  this->state_->current_values.set_brightness(brightness);
+  this->state_->remote_values.set_state(on);
+  this->state_->remote_values.set_brightness(brightness);
+  this->state_->publish_state();
+}
+
 void TVMSRougeLight::write_state(light::LightState *state) {
   if (this->parent_ == nullptr) return;
 
@@ -42,6 +61,7 @@ void TVMSRougeLight::write_state(light::LightState *state) {
   float brightness = state->remote_values.get_brightness();
 
   if (!binary) {
+    this->publish_target_level(0.0f);
     this->parent_->turn_off(this->output_number_, this->channel_);
     return;
   }
@@ -63,6 +83,11 @@ void TVMSRougeLight::write_state(light::LightState *state) {
 
   if (target_percent > 100.0f) target_percent = 100.0f;
   if (target_percent < this->parent_->true_off_threshold()) target_percent = this->parent_->true_off_threshold();
+
+  // Keep HA showing the requested target immediately. Hardware feedback will
+  // continue to update the per-output level sensor, then reconcile the light
+  // once the dimming loop finishes or aborts.
+  this->publish_target_level(target_percent);
   this->parent_->set_target(this->output_number_, this->channel_, target_percent);
 }
 
@@ -124,6 +149,7 @@ void TVMSRougeComponent::abort_and_release() {
   this->pending_active_ = false;
   this->state_ = IDLE;
   this->learning_pending_ = false;
+  for (uint8_t output = 1; output <= 10; output++) this->publish_actual_light_level_(output);
 }
 
 void TVMSRougeComponent::turn_off(uint8_t output_number, uint8_t channel) {
@@ -226,7 +252,26 @@ void TVMSRougeComponent::set_feedback_level_(uint8_t output_number, float level)
   if (level > 100.0f) level = 100.0f;
   this->levels_[output_number] = level;
   if (this->level_sensors_[output_number] != nullptr) this->level_sensors_[output_number]->publish_state(level);
-  if (this->lights_[output_number] != nullptr) this->lights_[output_number]->publish_feedback_level(level);
+
+  // During an HA-requested dimming operation, do not let the actual hardware
+  // feedback overwrite the requested brightness in the HA light entity. The
+  // diagnostic level sensor above still tracks the real ramp continuously.
+  if (!this->should_suppress_light_feedback_(output_number)) this->publish_actual_light_level_(output_number);
+}
+
+bool TVMSRougeComponent::should_suppress_light_feedback_(uint8_t output_number) const {
+  if (output_number < 1 || output_number > 10) return false;
+  return (this->pending_active_ && this->pending_output_ == output_number) ||
+         (this->active_ && this->active_output_ == output_number);
+}
+
+void TVMSRougeComponent::publish_actual_light_level_(uint8_t output_number) {
+  if (output_number < 1 || output_number > 10) return;
+  if (this->lights_[output_number] == nullptr) return;
+
+  float level = this->levels_[output_number];
+  if (std::isnan(level)) return;
+  this->lights_[output_number]->publish_feedback_level(level);
 }
 
 void TVMSRougeComponent::loop() {
@@ -259,6 +304,7 @@ void TVMSRougeComponent::loop() {
       this->active_ = false;
       this->state_ = IDLE;
       this->learning_pending_ = false;
+      this->publish_actual_light_level_(out);
       return;
     }
     this->settle_end_ms_ = now + 250;
@@ -312,6 +358,7 @@ void TVMSRougeComponent::loop() {
       this->active_ = false;
       this->state_ = IDLE;
       this->learning_pending_ = false;
+      this->publish_actual_light_level_(out);
       return;
     }
 
@@ -334,6 +381,7 @@ void TVMSRougeComponent::loop() {
       this->active_ = false;
       this->state_ = IDLE;
       this->learning_pending_ = false;
+      this->publish_actual_light_level_(out);
       return;
     }
 
@@ -370,6 +418,7 @@ void TVMSRougeComponent::loop() {
   this->active_ = false;
   this->learning_pending_ = false;
   this->state_ = IDLE;
+  this->publish_actual_light_level_(out);
 }
 
 }  // namespace tvms_rouge
