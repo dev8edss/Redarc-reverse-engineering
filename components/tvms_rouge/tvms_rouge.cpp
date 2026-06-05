@@ -36,19 +36,33 @@ void TVMSRougeLight::publish_feedback_level(float level_percent) {
 void TVMSRougeLight::write_state(light::LightState *state) {
   if (this->parent_ == nullptr) return;
 
-  bool binary = false;
-  float brightness = 0.0f;
-  state->current_values_as_binary(&binary);
-  state->current_values_as_brightness(&brightness);
+  // Use the requested frontend target, not current_values. current_values may still
+  // contain the previous OFF feedback when HA sends a plain turn_on command.
+  bool binary = state->remote_values.is_on();
+  float brightness = state->remote_values.get_brightness();
 
-  float target_percent = brightness * 100.0f;
-  if (!binary || target_percent <= this->parent_->true_off_threshold()) {
+  if (!binary) {
     this->parent_->turn_off(this->output_number_, this->channel_);
     return;
   }
 
+  float target_percent = brightness * 100.0f;
+
+  // A plain HA turn_on can arrive as ON with brightness still at 0 because our
+  // feedback publisher correctly reported the real Rouge output as OFF/0%. Do
+  // not translate that into another OFF command; use current feedback if known,
+  // otherwise request full ON.
+  if (target_percent <= 0.0f) {
+    float current = this->parent_->level(this->output_number_);
+    if (!std::isnan(current) && current > this->parent_->true_off_threshold()) {
+      target_percent = current;
+    } else {
+      target_percent = 100.0f;
+    }
+  }
+
   if (target_percent > 100.0f) target_percent = 100.0f;
-  if (target_percent < 0.0f) target_percent = 0.0f;
+  if (target_percent < this->parent_->true_off_threshold()) target_percent = this->parent_->true_off_threshold();
   this->parent_->set_target(this->output_number_, this->channel_, target_percent);
 }
 
