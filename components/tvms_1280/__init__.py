@@ -41,7 +41,7 @@ INVERTER_SCHEMA = switch.SWITCH_SCHEMA.extend({
 
 CONFIG_SCHEMA = cv.Schema({
     cv.GenerateID(): cv.declare_id(TVMS1280Component),
-    cv.Required(CONF_CANBUS_ID): cv.use_id(canbus.Canbus),
+    cv.Required(CONF_CANBUS_ID): cv.use_id(canbus.CanbusComponent),
     cv.Optional(CONF_SOURCE_ADDRESS, default=0x24): cv.hex_uint8_t,
     cv.Optional(CONF_COMMAND_ID, default=0x0F002420): cv.hex_uint32_t,
     cv.Optional(CONF_TEMP_TANK_ID, default=0x1BFD0224): cv.hex_uint32_t,
