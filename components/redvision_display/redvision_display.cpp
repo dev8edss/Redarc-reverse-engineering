@@ -1,0 +1,39 @@
+#include "redvision_display.h"
+
+namespace esphome {
+namespace redvision_display {
+
+static const char *const TAG = "redvision_display";
+
+void RedvisionDisplayComponent::dump_config() {
+  ESP_LOGCONFIG(TAG, "Redvision display SA 0x%02X type %u", this->source_address_, this->display_type_);
+}
+
+void RedvisionDisplayComponent::handle_can_frame(uint32_t can_id, const std::vector<uint8_t> &data) {
+  can_id &= 0x1FFFFFFFUL;
+  if (data.size() < 8) return;
+
+  if (this->display_type_ == 1) {
+    const uint32_t id = redarc_common::with_sa(0x13F28000UL, this->source_address_);
+    if (can_id != id) return;
+    const uint16_t raw_batt = redarc_common::u16_le(data, 0);
+    const uint16_t raw_load = redarc_common::u16_le(data, 4);
+    if (this->battery_current_display_sensor_ != nullptr) this->battery_current_display_sensor_->publish_state(redarc_common::current_display_16_centered(raw_batt));
+    if (this->device_current_display_sensor_ != nullptr) this->device_current_display_sensor_->publish_state(redarc_common::current_display_16_centered(raw_load));
+    if (this->battery_current_display_raw_sensor_ != nullptr) this->battery_current_display_raw_sensor_->publish_state((float) raw_batt);
+    if (this->device_current_display_raw_sensor_ != nullptr) this->device_current_display_raw_sensor_->publish_state((float) raw_load);
+    return;
+  }
+
+  if (this->display_type_ == 2) {
+    const uint32_t id = redarc_common::with_sa(0x13F28200UL, this->source_address_);
+    if (can_id != id) return;
+    const uint16_t raw_mgr = redarc_common::u16_le(data, 6);
+    if (this->manager_output_current_display_sensor_ != nullptr) this->manager_output_current_display_sensor_->publish_state(redarc_common::current_display_16_centered(raw_mgr));
+    if (this->manager_output_current_display_raw_sensor_ != nullptr) this->manager_output_current_display_raw_sensor_->publish_state((float) raw_mgr);
+    return;
+  }
+}
+
+}  // namespace redvision_display
+}  // namespace esphome

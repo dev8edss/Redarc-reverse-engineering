@@ -1,0 +1,36 @@
+#pragma once
+#include "esphome/core/component.h"
+#include "esphome/core/log.h"
+#include "esphome/components/sensor/sensor.h"
+#include "esphome/components/redarc_common/redarc_common.h"
+#include <vector>
+
+namespace esphome {
+namespace redvision_display {
+
+class RedvisionDisplayComponent : public Component {
+ public:
+  void set_source_address(uint8_t source_address) { this->source_address_ = source_address; }
+  void set_display_type(uint8_t display_type) { this->display_type_ = display_type; }
+  void set_battery_current_display_sensor(sensor::Sensor *s) { this->battery_current_display_sensor_ = s; }
+  void set_device_current_display_sensor(sensor::Sensor *s) { this->device_current_display_sensor_ = s; }
+  void set_manager_output_current_display_sensor(sensor::Sensor *s) { this->manager_output_current_display_sensor_ = s; }
+  void set_battery_current_display_raw_sensor(sensor::Sensor *s) { this->battery_current_display_raw_sensor_ = s; }
+  void set_device_current_display_raw_sensor(sensor::Sensor *s) { this->device_current_display_raw_sensor_ = s; }
+  void set_manager_output_current_display_raw_sensor(sensor::Sensor *s) { this->manager_output_current_display_raw_sensor_ = s; }
+  void dump_config() override;
+  void handle_can_frame(uint32_t can_id, const std::vector<uint8_t> &data);
+
+ protected:
+  uint8_t source_address_{0x20};
+  uint8_t display_type_{1};
+  sensor::Sensor *battery_current_display_sensor_{nullptr};
+  sensor::Sensor *device_current_display_sensor_{nullptr};
+  sensor::Sensor *manager_output_current_display_sensor_{nullptr};
+  sensor::Sensor *battery_current_display_raw_sensor_{nullptr};
+  sensor::Sensor *device_current_display_raw_sensor_{nullptr};
+  sensor::Sensor *manager_output_current_display_raw_sensor_{nullptr};
+};
+
+}  // namespace redvision_display
+}  // namespace esphome

@@ -40,6 +40,7 @@ void TVMSRougeComponent::dump_config() {
   ESP_LOGCONFIG(TAG, "  Dim command: 0x%08X", this->dim_command_id_);
   ESP_LOGCONFIG(TAG, "  Keepalive: 0x%08X", this->keepalive_id_);
   ESP_LOGCONFIG(TAG, "  Level feedback: 0x%08X", this->level_feedback_id_);
+  ESP_LOGCONFIG(TAG, "  Tank feedback: 0x%08X", this->tank_feedback_id_);
   ESP_LOGCONFIG(TAG, "  True-off threshold: %.1f%%", this->true_off_threshold_percent_);
 }
 
@@ -136,8 +137,17 @@ void TVMSRougeComponent::set_target(uint8_t output_number, uint8_t channel, floa
 
 void TVMSRougeComponent::handle_can_frame(uint32_t can_id, const std::vector<uint8_t> &data) {
   can_id &= 0x1FFFFFFFUL;
-  if (can_id != this->level_feedback_id_) return;
   if (data.size() < 8) return;
+
+  if (can_id == this->tank_feedback_id_) {
+    if (data[0] == 0x09) {
+      if (this->tank1_sensor_ != nullptr) this->tank1_sensor_->publish_state((float) data[1]);
+      if (this->tank2_sensor_ != nullptr) this->tank2_sensor_->publish_state((float) data[2]);
+    }
+    return;
+  }
+
+  if (can_id != this->level_feedback_id_) return;
 
   if (data[0] == 0x0C) {
     for (uint8_t i = 1; i <= 7; i++) this->set_feedback_level_(i, (float) data[i]);
@@ -153,6 +163,7 @@ void TVMSRougeComponent::set_feedback_level_(uint8_t output_number, float level)
   if (level < 0.0f) level = 0.0f;
   if (level > 100.0f) level = 100.0f;
   this->levels_[output_number] = level;
+  if (this->level_sensors_[output_number] != nullptr) this->level_sensors_[output_number]->publish_state(level);
 }
 
 void TVMSRougeComponent::loop() {

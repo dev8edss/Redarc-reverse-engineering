@@ -4,6 +4,7 @@
 #include "esphome/core/log.h"
 #include "esphome/components/canbus/canbus.h"
 #include "esphome/components/light/light_output.h"
+#include "esphome/components/sensor/sensor.h"
 #include <array>
 #include <cmath>
 #include <vector>
@@ -42,6 +43,10 @@ class TVMSRougeComponent : public Component {
   void set_dim_command_id(uint32_t id) { this->dim_command_id_ = id; }
   void set_keepalive_id(uint32_t id) { this->keepalive_id_ = id; }
   void set_level_feedback_id(uint32_t id) { this->level_feedback_id_ = id; }
+  void set_tank_feedback_id(uint32_t id) { this->tank_feedback_id_ = id; }
+  void set_tank1_sensor(sensor::Sensor *s) { this->tank1_sensor_ = s; }
+  void set_tank2_sensor(sensor::Sensor *s) { this->tank2_sensor_ = s; }
+  void set_level_sensor(uint8_t output, sensor::Sensor *s) { if (output >= 1 && output <= 10) this->level_sensors_[output] = s; }
 
   void set_true_off_threshold(float v) { this->true_off_threshold_percent_ = v; }
   void set_target_debounce_ms(uint32_t v) { this->target_debounce_ms_ = v; }
@@ -98,9 +103,13 @@ class TVMSRougeComponent : public Component {
   uint32_t dim_command_id_{0x0F053020};
   uint32_t keepalive_id_{0x0FE6FF20};
   uint32_t level_feedback_id_{0x1BFD1230};
+  uint32_t tank_feedback_id_{0x1BFD0230};
 
   std::array<float, 11> levels_{};
   std::array<TVMSRougeLight *, 11> lights_{};
+  std::array<sensor::Sensor *, 11> level_sensors_{};
+  sensor::Sensor *tank1_sensor_{nullptr};
+  sensor::Sensor *tank2_sensor_{nullptr};
 
   float true_off_threshold_percent_{1.0f};
   uint32_t target_debounce_ms_{600};
