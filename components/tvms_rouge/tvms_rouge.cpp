@@ -11,6 +11,28 @@ light::LightTraits TVMSRougeLight::get_traits() {
   return traits;
 }
 
+void TVMSRougeLight::setup_state(light::LightState *state) {
+  this->state_ = state;
+}
+
+void TVMSRougeLight::publish_feedback_level(float level_percent) {
+  if (this->state_ == nullptr) return;
+
+  if (level_percent < 0.0f) level_percent = 0.0f;
+  if (level_percent > 100.0f) level_percent = 100.0f;
+
+  const bool on = level_percent > 0.5f;
+  const float brightness = on ? level_percent / 100.0f : 0.0f;
+
+  // This is bus feedback from the RedVision/TVMS side. Update the frontend state
+  // directly so we do not echo a physical-display button press back onto the CAN bus.
+  this->state_->current_values.set_state(on);
+  this->state_->current_values.set_brightness(brightness);
+  this->state_->remote_values.set_state(on);
+  this->state_->remote_values.set_brightness(brightness);
+  this->state_->publish_state();
+}
+
 void TVMSRougeLight::write_state(light::LightState *state) {
   if (this->parent_ == nullptr) return;
 
@@ -147,6 +169,32 @@ void TVMSRougeComponent::handle_can_frame(uint32_t can_id, const std::vector<uin
     return;
   }
 
+  if (can_id == this->output_command_id_) {
+    if (data[0] == 0xCB && data[2] == 0xFF) {
+      const uint8_t channel = data[3];
+      if (channel >= 0x0C && channel <= 0x15) {
+        const uint8_t output_number = channel - 0x0B;
+
+        // Do not let an echoed copy of our own HA-originated command shortcut the
+        // dimming state machine; real Rouge level feedback remains authoritative.
+        const bool local_command_in_progress =
+            (this->active_ && output_number == this->active_output_) ||
+            (this->pending_active_ && output_number == this->pending_output_);
+        if (local_command_in_progress) return;
+
+        const bool on = data[4] != 0;
+        if (!on) {
+          this->set_feedback_level_(output_number, 0.0f);
+        } else {
+          float current = this->level(output_number);
+          if (std::isnan(current) || current <= this->true_off_threshold_percent_) current = 100.0f;
+          this->set_feedback_level_(output_number, current);
+        }
+      }
+    }
+    return;
+  }
+
   if (can_id != this->level_feedback_id_) return;
 
   if (data[0] == 0x0C) {
@@ -164,6 +212,7 @@ void TVMSRougeComponent::set_feedback_level_(uint8_t output_number, float level)
   if (level > 100.0f) level = 100.0f;
   this->levels_[output_number] = level;
   if (this->level_sensors_[output_number] != nullptr) this->level_sensors_[output_number]->publish_state(level);
+  if (this->lights_[output_number] != nullptr) this->lights_[output_number]->publish_feedback_level(level);
 }
 
 void TVMSRougeComponent::loop() {

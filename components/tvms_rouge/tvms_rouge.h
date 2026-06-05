@@ -4,6 +4,7 @@
 #include "esphome/core/log.h"
 #include "esphome/components/canbus/canbus.h"
 #include "esphome/components/light/light_output.h"
+#include "esphome/components/light/light_state.h"
 #include "esphome/components/sensor/sensor.h"
 #include <array>
 #include <cmath>
@@ -21,13 +22,16 @@ class TVMSRougeLight : public light::LightOutput {
   void set_channel(uint8_t channel) { this->channel_ = channel; }
 
   light::LightTraits get_traits() override;
+  void setup_state(light::LightState *state) override;
   void write_state(light::LightState *state) override;
+  void publish_feedback_level(float level_percent);
 
   uint8_t output_number() const { return this->output_number_; }
   uint8_t channel() const { return this->channel_; }
 
  protected:
   TVMSRougeComponent *parent_{nullptr};
+  light::LightState *state_{nullptr};
   uint8_t output_number_{1};
   uint8_t channel_{0x0C};
 };
