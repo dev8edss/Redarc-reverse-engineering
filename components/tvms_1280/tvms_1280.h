@@ -25,7 +25,7 @@ class TVMS1280Switch : public switch_::Switch {
   bool is_inverter() const { return this->is_inverter_; }
  protected:
   TVMS1280Component *parent_{nullptr};
-  uint8_t output_number_{1};
+  uint8_t output_number_{0};
   uint8_t channel_{0x04};
   bool is_inverter_{false};
 };
@@ -60,7 +60,7 @@ class TVMS1280Component : public Component {
   uint32_t temp_tank_id_{0x1BFD0224};
   uint32_t output_status_id_{0x1BFD0024};
   uint32_t channel_status_id_{0x1BFCF024};
-  std::array<TVMS1280Switch *, 11> output_switches_{};
+  std::array<TVMS1280Switch *, 10> output_switches_{};
   TVMS1280Switch *inverter_switch_{nullptr};
   sensor::Sensor *temp1_sensor_{nullptr};
   sensor::Sensor *temp2_sensor_{nullptr};

@@ -29,7 +29,7 @@ TVMS1280Component = ns.class_("TVMS1280Component", cg.Component)
 TVMS1280Switch = ns.class_("TVMS1280Switch", switch.Switch)
 
 OUTPUT_SCHEMA = switch.switch_schema(TVMS1280Switch).extend({
-    cv.Required(CONF_OUTPUT_NUMBER): cv.int_range(min=1, max=10),
+    cv.Required(CONF_OUTPUT_NUMBER): cv.int_range(min=0, max=9),
     cv.Optional(CONF_CHANNEL): cv.hex_uint8_t,
 })
 
@@ -85,7 +85,7 @@ async def to_code(config):
     for out_conf in config.get(CONF_OUTPUTS, []):
         sw = await switch.new_switch(out_conf)
         output_number = out_conf[CONF_OUTPUT_NUMBER]
-        channel = out_conf.get(CONF_CHANNEL, 0x03 + output_number)
+        channel = out_conf.get(CONF_CHANNEL, 0x04 + output_number)
         cg.add(sw.set_parent(var))
         cg.add(sw.set_output_number(output_number))
         cg.add(sw.set_channel(channel))

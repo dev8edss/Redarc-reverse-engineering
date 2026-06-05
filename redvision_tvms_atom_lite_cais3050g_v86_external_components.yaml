@@ -398,36 +398,36 @@ tvms_1280:
     entity_category: diagnostic
     accuracy_decimals: 0
   outputs:
-    - output_number: 1
+    - output_number: 0
       channel: 0x04
+      name: "TVMS1280 Output 0"
+    - output_number: 1
+      channel: 0x05
       name: "TVMS1280 Output 1"
     - output_number: 2
-      channel: 0x05
+      channel: 0x06
       name: "TVMS1280 Output 2"
     - output_number: 3
-      channel: 0x06
+      channel: 0x07
       name: "TVMS1280 Output 3"
     - output_number: 4
-      channel: 0x07
+      channel: 0x08
       name: "TVMS1280 Output 4"
     - output_number: 5
-      channel: 0x08
+      channel: 0x09
       name: "TVMS1280 Output 5"
     - output_number: 6
-      channel: 0x09
+      channel: 0x0A
       name: "TVMS1280 Output 6"
     - output_number: 7
-      channel: 0x0A
+      channel: 0x0B
       name: "TVMS1280 Output 7"
     - output_number: 8
-      channel: 0x0B
+      channel: 0x0C
       name: "TVMS1280 Output 8"
     - output_number: 9
-      channel: 0x0C
-      name: "TVMS1280 Output 9"
-    - output_number: 10
       channel: 0x0D
-      name: "TVMS1280 Output 10"
+      name: "TVMS1280 Output 9"
   inverter:
     channel: 0x0E
     name: "TVMS1280 Inverter"

@@ -17,7 +17,7 @@ void TVMS1280Component::dump_config() {
 void TVMS1280Component::register_output_switch(TVMS1280Switch *sw) {
   if (sw == nullptr) return;
   const uint8_t n = sw->output_number();
-  if (n >= 1 && n <= 10) this->output_switches_[n] = sw;
+  if (n <= 9) this->output_switches_[n] = sw;
 }
 
 void TVMS1280Component::send_channel(uint8_t channel, bool state) {
@@ -28,13 +28,13 @@ void TVMS1280Component::send_channel(uint8_t channel, bool state) {
 }
 
 void TVMS1280Component::publish_output_(uint8_t output_number, bool state) {
-  if (output_number < 1 || output_number > 10) return;
+  if (output_number > 9) return;
   if (this->output_switches_[output_number] != nullptr) this->output_switches_[output_number]->publish_state(state);
 }
 
 void TVMS1280Component::publish_channel_(uint8_t channel, bool state) {
   if (channel >= 0x04 && channel <= 0x0D) {
-    this->publish_output_(channel - 0x03, state);
+    this->publish_output_(channel - 0x04, state);
   } else if (channel == 0x0E && this->inverter_switch_ != nullptr) {
     this->inverter_switch_->publish_state(state);
   }
@@ -74,9 +74,9 @@ void TVMS1280Component::handle_can_frame(uint32_t can_id, const std::vector<uint
 
   if (can_id == this->output_status_id_) {
     if (data[0] == 0x08) {
-      // Confirmed by logs/user: Output 6 = channel 0x09, Output 7 = channel 0x0A, inverter bit appears at D8 bit0.
-      this->publish_output_(6, (data[2] & 0x01) != 0);
-      this->publish_output_(7, (data[3] & 0x01) != 0);
+      // Confirmed by logs/user: channel 0x09 = zero-based Output 5, channel 0x0A = zero-based Output 6, inverter bit appears at D8 bit0.
+      this->publish_output_(5, (data[2] & 0x01) != 0);
+      this->publish_output_(6, (data[3] & 0x01) != 0);
       if (this->inverter_switch_ != nullptr) this->inverter_switch_->publish_state((data[7] & 0x01) != 0);
     }
     return;
