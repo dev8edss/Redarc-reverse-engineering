@@ -18,4 +18,4 @@ substitutions:
   logger_level: INFO
 
 packages:
-  redvision_can_bridge: !include packages/redvision_can_bridge.yaml
+  redvision_can_bridge: github://dev8edss/Redarc-reverse-engineering/packages/redvision_can_bridge.yaml@main
