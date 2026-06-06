@@ -103,15 +103,11 @@ async def to_code(config):
         sens = await sensor.new_sensor(config[CONF_INPUT_CURRENT])
         cg.add(var.set_input_current_sensor(sens))
     if CONF_OUTPUT_LEVELS in config:
-        for idx, level_conf in enumerate(config[CONF_OUTPUT_LEVELS], start=1):
-            if idx > 10:
-                break
+        for idx, level_conf in enumerate(config[CONF_OUTPUT_LEVELS][:10], start=1):
             sens = await sensor.new_sensor(level_conf)
             cg.add(var.set_level_sensor(idx, sens))
 
     if CONF_BUTTON_STATES in config:
-        for idx, button_conf in enumerate(config[CONF_BUTTON_STATES], start=1):
-            if idx > 10:
-                break
+        for idx, button_conf in enumerate(config[CONF_BUTTON_STATES][:10], start=1):
             sens = await binary_sensor.new_binary_sensor(button_conf)
             cg.add(var.set_button_sensor(idx, sens))

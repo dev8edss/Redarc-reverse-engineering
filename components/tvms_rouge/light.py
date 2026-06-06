@@ -1,7 +1,7 @@
 import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome.components import light
-from esphome.const import CONF_ID, CONF_OUTPUT_ID
+from esphome.const import CONF_OUTPUT_ID
 from . import tvms_rouge_ns, TVMSRougeComponent
 
 CONF_TVMS_ROUGE_ID = "tvms_rouge_id"

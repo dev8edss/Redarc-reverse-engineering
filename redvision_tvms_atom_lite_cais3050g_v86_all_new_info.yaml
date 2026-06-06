@@ -181,7 +181,6 @@ manager30:
     accuracy_decimals: 1
     filters:
       - throttle_average: ${sensor_average_interval}
-
   solar_energy:
     name: "Solar Energy"
     unit_of_measurement: "Wh"

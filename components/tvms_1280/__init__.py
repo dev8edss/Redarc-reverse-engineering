@@ -1,7 +1,7 @@
 import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome.components import canbus, sensor, switch
-from esphome.const import CONF_ID, CONF_NAME
+from esphome.const import CONF_ID
 
 CODEOWNERS = ["@dev8edss"]
 DEPENDENCIES = ["canbus"]
@@ -88,9 +88,7 @@ async def to_code(config):
     await _setup_sensor(var, config, CONF_LAST_COMMAND_STATE, "set_last_command_state_sensor")
 
     if CONF_TANKS in config:
-        for idx, tank_conf in enumerate(config[CONF_TANKS], start=1):
-            if idx > 6:
-                break
+        for idx, tank_conf in enumerate(config[CONF_TANKS][:6], start=1):
             sens = await sensor.new_sensor(tank_conf)
             cg.add(var.set_tank_sensor(idx, sens))
 
