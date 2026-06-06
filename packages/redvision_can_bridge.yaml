@@ -1,0 +1,646 @@
+esphome:
+  name: ${device_name}
+  friendly_name: ${friendly_name}
+  comment: "RedVision/TVMS CAN bridge; v86 split external components"
+
+esp32:
+  board: ${board}
+  framework:
+    type: arduino
+
+logger:
+  level: ${logger_level}
+
+api:
+
+ota:
+  - platform: esphome
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+captive_portal:
+
+external_components:
+  - source:
+      type: git
+      url: https://github.com/dev8edss/Redarc-reverse-engineering
+      ref: main
+    components:
+      - redarc_common
+      - tvms_rouge
+      - tvms_1280
+      - manager30
+      - battery_sensor
+      - redvision_display
+
+canbus:
+  - platform: esp32_can
+    id: rv_can
+    tx_pin: ${can_tx_pin}
+    rx_pin: ${can_rx_pin}
+    can_id: 0x7FE
+    use_extended_id: true
+    bit_rate: ${can_bit_rate}
+    mode: ${can_mode}
+    rx_queue_len: 64
+    on_frame:
+      - can_id: 0x00000000
+        can_id_mask: 0x00000000
+        use_extended_id: true
+        remote_transmission_request: false
+        then:
+          - lambda: |-
+              const uint32_t id_rx = can_id & 0x1FFFFFFFUL;
+              id(tvms_rouge_hub).handle_can_frame(id_rx, x);
+              id(tvms1280_hub).handle_can_frame(id_rx, x);
+              id(manager30_hub).handle_can_frame(id_rx, x);
+              id(battery_sensor_hub).handle_can_frame(id_rx, x);
+              id(redvision1_hub).handle_can_frame(id_rx, x);
+              id(redvision2_hub).handle_can_frame(id_rx, x);
+
+battery_sensor:
+  id: battery_sensor_hub
+  source_address: 0x08
+  current:
+    name: "Battery Current"
+    unit_of_measurement: "A"
+    device_class: current
+    state_class: measurement
+    accuracy_decimals: 3
+    filters:
+      - throttle_average: ${sensor_average_interval}
+  current_raw:
+    name: "Battery Current Raw"
+    state_class: measurement
+    entity_category: diagnostic
+    accuracy_decimals: 0
+    filters:
+      - throttle_average: ${sensor_average_interval}
+  voltage:
+    name: "Battery Voltage"
+    unit_of_measurement: "V"
+    device_class: voltage
+    state_class: measurement
+    accuracy_decimals: 3
+    filters:
+      - throttle_average: ${sensor_average_interval}
+  temperature:
+    name: "Battery Temperature"
+    unit_of_measurement: "°C"
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 0
+    filters:
+      - throttle_average: ${sensor_average_interval}
+  soc:
+    name: "Battery SOC"
+    unit_of_measurement: "%"
+    device_class: battery
+    state_class: measurement
+    accuracy_decimals: 0
+    filters:
+      - throttle_average: ${sensor_average_interval}
+
+manager30:
+  id: manager30_hub
+  source_address: 0x01
+  battery_sensor_id: battery_sensor_hub
+  output_current:
+    name: "Manager30 Output Current"
+    unit_of_measurement: "A"
+    device_class: current
+    state_class: measurement
+    accuracy_decimals: 3
+    filters:
+      - throttle_average: ${sensor_average_interval}
+  output_current_raw:
+    name: "Manager30 Output Current Raw"
+    state_class: measurement
+    entity_category: diagnostic
+    accuracy_decimals: 0
+    filters:
+      - throttle_average: ${sensor_average_interval}
+  battery_voltage:
+    name: "Manager30 Battery Voltage"
+    unit_of_measurement: "V"
+    device_class: voltage
+    state_class: measurement
+    accuracy_decimals: 3
+    filters:
+      - throttle_average: ${sensor_average_interval}
+  source_device_current:
+    name: "Device Current Derived from Manager and Battery"
+    unit_of_measurement: "A"
+    device_class: current
+    state_class: measurement
+    accuracy_decimals: 3
+    filters:
+      - throttle_average: ${sensor_average_interval}
+  solar_current:
+    name: "Solar Input Current"
+    unit_of_measurement: "A"
+    device_class: current
+    state_class: measurement
+    entity_category: diagnostic
+    accuracy_decimals: 3
+    filters:
+      - throttle_average: ${sensor_average_interval}
+  solar_voltage:
+    name: "Solar Input Voltage"
+    unit_of_measurement: "V"
+    device_class: voltage
+    state_class: measurement
+    entity_category: diagnostic
+    accuracy_decimals: 3
+    filters:
+      - throttle_average: ${sensor_average_interval}
+  solar_power:
+    name: "Solar Input Power"
+    unit_of_measurement: "W"
+    device_class: power
+    state_class: measurement
+    accuracy_decimals: 1
+    filters:
+      - throttle_average: ${sensor_average_interval}
+  solar_energy:
+    name: "Solar Energy"
+    unit_of_measurement: "Wh"
+    device_class: energy
+    state_class: total_increasing
+    accuracy_decimals: 0
+    filters:
+      - throttle_average: ${sensor_average_interval}
+  ac_input_voltage:
+    name: "AC Input Voltage"
+    unit_of_measurement: "V"
+    device_class: voltage
+    state_class: measurement
+    accuracy_decimals: 0
+    filters:
+      - throttle_average: ${sensor_average_interval}
+
+redvision_display:
+  - id: redvision1_hub
+    source_address: 0x20
+    display_type: rv1
+    battery_current_display:
+      name: "Redvision 1 Battery Current Display"
+      unit_of_measurement: "A"
+      device_class: current
+      state_class: measurement
+      accuracy_decimals: 1
+      filters:
+        - throttle_average: ${sensor_average_interval}
+    device_current_display:
+      name: "Redvision 1 Device Current Display"
+      unit_of_measurement: "A"
+      device_class: current
+      state_class: measurement
+      accuracy_decimals: 1
+      filters:
+        - throttle_average: ${sensor_average_interval}
+    battery_current_display_raw:
+      name: "Redvision 1 Battery Current Display Raw"
+      state_class: measurement
+      entity_category: diagnostic
+      accuracy_decimals: 0
+      filters:
+        - throttle_average: ${sensor_average_interval}
+    device_current_display_raw:
+      name: "Redvision 1 Device Current Display Raw"
+      state_class: measurement
+      entity_category: diagnostic
+      accuracy_decimals: 0
+      filters:
+        - throttle_average: ${sensor_average_interval}
+
+  - id: redvision2_hub
+    source_address: 0x21
+    display_type: rv2
+    manager_output_current_display:
+      name: "Redvision 2 Manager Output Current Display"
+      unit_of_measurement: "A"
+      device_class: current
+      state_class: measurement
+      accuracy_decimals: 1
+      filters:
+        - throttle_average: ${sensor_average_interval}
+    manager_output_current_display_raw:
+      name: "Redvision 2 Manager Output Current Display Raw"
+      state_class: measurement
+      entity_category: diagnostic
+      accuracy_decimals: 0
+      filters:
+        - throttle_average: ${sensor_average_interval}
+
+tvms_rouge:
+  id: tvms_rouge_hub
+  canbus_id: rv_can
+  output_command_id: 0x0F003020
+  dim_command_id: 0x0F053020
+  keepalive_id: 0x0FE6FF20
+  level_feedback_id: 0x1BFD1230
+  tank_feedback_id: 0x1BFD0230
+  button_status_id: 0x1BFD1430
+  input_status_id: 0x13F10830
+  true_off_threshold: 1.0
+  target_debounce: 600ms
+  start_deadline: 2500ms
+  default_deadband: 3.0
+  initial_rate_ms_per_percent: 50.0
+  learning_gain: 0.25
+  approach: 0.80
+  max_pulse: 1200ms
+  settle_time: 700ms
+  max_iterations: 12
+  tank1:
+    name: "TVMS Rouge Tank 1"
+    unit_of_measurement: "%"
+    state_class: measurement
+    accuracy_decimals: 0
+    filters:
+      - throttle_average: ${sensor_average_interval}
+  tank2:
+    name: "TVMS Rouge Tank 2"
+    unit_of_measurement: "%"
+    state_class: measurement
+    accuracy_decimals: 0
+    filters:
+      - throttle_average: ${sensor_average_interval}
+  input_voltage:
+    name: "TVMS Rouge Input Voltage"
+    unit_of_measurement: "V"
+    device_class: voltage
+    state_class: measurement
+    accuracy_decimals: 2
+    filters:
+      - throttle_average: ${sensor_average_interval}
+  input_current:
+    name: "TVMS Rouge Input Current"
+    unit_of_measurement: "A"
+    device_class: current
+    state_class: measurement
+    accuracy_decimals: 1
+    entity_category: diagnostic
+    filters:
+      - throttle_average: ${sensor_average_interval}
+  output_levels:
+    - name: "TVMS Rouge Output 1 Level"
+      unit_of_measurement: "%"
+      state_class: measurement
+      entity_category: diagnostic
+      accuracy_decimals: 0
+    - name: "TVMS Rouge Output 2 Level"
+      unit_of_measurement: "%"
+      state_class: measurement
+      entity_category: diagnostic
+      accuracy_decimals: 0
+    - name: "TVMS Rouge Output 3 Level"
+      unit_of_measurement: "%"
+      state_class: measurement
+      entity_category: diagnostic
+      accuracy_decimals: 0
+    - name: "TVMS Rouge Output 4 Level"
+      unit_of_measurement: "%"
+      state_class: measurement
+      entity_category: diagnostic
+      accuracy_decimals: 0
+    - name: "TVMS Rouge Output 5 Level"
+      unit_of_measurement: "%"
+      state_class: measurement
+      entity_category: diagnostic
+      accuracy_decimals: 0
+    - name: "TVMS Rouge Output 6 Level"
+      unit_of_measurement: "%"
+      state_class: measurement
+      entity_category: diagnostic
+      accuracy_decimals: 0
+    - name: "TVMS Rouge Output 7 Level"
+      unit_of_measurement: "%"
+      state_class: measurement
+      entity_category: diagnostic
+      accuracy_decimals: 0
+    - name: "TVMS Rouge Output 8 Level"
+      unit_of_measurement: "%"
+      state_class: measurement
+      entity_category: diagnostic
+      accuracy_decimals: 0
+    - name: "TVMS Rouge Output 9 Level"
+      unit_of_measurement: "%"
+      state_class: measurement
+      entity_category: diagnostic
+      accuracy_decimals: 0
+    - name: "TVMS Rouge Output 10 Level"
+      unit_of_measurement: "%"
+      state_class: measurement
+      entity_category: diagnostic
+      accuracy_decimals: 0
+  button_states:
+    - name: "TVMS Rouge Output 1 Button Active"
+    - name: "TVMS Rouge Output 2 Button Active"
+    - name: "TVMS Rouge Output 3 Button Active"
+    - name: "TVMS Rouge Output 4 Button Active"
+    - name: "TVMS Rouge Output 5 Button Active"
+    - name: "TVMS Rouge Output 6 Button Active"
+    - name: "TVMS Rouge Output 7 Button Active"
+    - name: "TVMS Rouge Output 8 Button Active"
+    - name: "TVMS Rouge Output 9 Button Active"
+    - name: "TVMS Rouge Output 10 Button Active"
+
+tvms_1280:
+  id: tvms1280_hub
+  canbus_id: rv_can
+  source_address: 0x24
+  command_id: 0x0F002420
+  temp_tank_id: 0x1BFD0224
+  output_status_id: 0x1BFD0024
+  channel_status_id: 0x1BFCF024
+  input_status_id: 0x13F10824
+  temp1:
+    name: "TVMS1280 Temperature 1"
+    unit_of_measurement: "°C"
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 0
+    filters:
+      - throttle_average: ${sensor_average_interval}
+  temp2:
+    name: "TVMS1280 Temperature 2"
+    unit_of_measurement: "°C"
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 0
+    filters:
+      - throttle_average: ${sensor_average_interval}
+  supply_voltage:
+    name: "TVMS1280 Supply Voltage"
+    unit_of_measurement: "V"
+    device_class: voltage
+    state_class: measurement
+    accuracy_decimals: 2
+    entity_category: diagnostic
+    filters:
+      - throttle_average: ${sensor_average_interval}
+  voltage_input_1:
+    name: "TVMS1280 Voltage Input 1 Candidate"
+    unit_of_measurement: "V"
+    device_class: voltage
+    state_class: measurement
+    accuracy_decimals: 1
+    entity_category: diagnostic
+    filters:
+      - throttle_average: ${sensor_average_interval}
+  voltage_input_2:
+    name: "TVMS1280 Voltage Input 2 Candidate"
+    unit_of_measurement: "V"
+    device_class: voltage
+    state_class: measurement
+    accuracy_decimals: 1
+    entity_category: diagnostic
+    filters:
+      - throttle_average: ${sensor_average_interval}
+  tanks:
+    - name: "TVMS1280 Tank 1"
+      unit_of_measurement: "%"
+      state_class: measurement
+      accuracy_decimals: 0
+      filters:
+        - throttle_average: ${sensor_average_interval}
+    - name: "TVMS1280 Tank 2"
+      unit_of_measurement: "%"
+      state_class: measurement
+      accuracy_decimals: 0
+      filters:
+        - throttle_average: ${sensor_average_interval}
+    - name: "TVMS1280 Tank 3"
+      unit_of_measurement: "%"
+      state_class: measurement
+      accuracy_decimals: 0
+      filters:
+        - throttle_average: ${sensor_average_interval}
+    - name: "TVMS1280 Tank 4"
+      unit_of_measurement: "%"
+      state_class: measurement
+      accuracy_decimals: 0
+      filters:
+        - throttle_average: ${sensor_average_interval}
+    - name: "TVMS1280 Tank 5"
+      unit_of_measurement: "%"
+      state_class: measurement
+      accuracy_decimals: 0
+      filters:
+        - throttle_average: ${sensor_average_interval}
+    - name: "TVMS1280 Tank 6"
+      unit_of_measurement: "%"
+      state_class: measurement
+      accuracy_decimals: 0
+      filters:
+        - throttle_average: ${sensor_average_interval}
+  last_command_channel:
+    name: "TVMS1280 Last Output Command Channel"
+    entity_category: diagnostic
+    accuracy_decimals: 0
+  last_command_state:
+    name: "TVMS1280 Last Output Command State"
+    entity_category: diagnostic
+    accuracy_decimals: 0
+  outputs:
+    - output_number: 0
+      channel: 0x04
+      name: "TVMS1280 Output 0"
+    - output_number: 1
+      channel: 0x05
+      name: "TVMS1280 Output 1"
+    - output_number: 2
+      channel: 0x06
+      name: "TVMS1280 Output 2"
+    - output_number: 3
+      channel: 0x07
+      name: "TVMS1280 Output 3"
+    - output_number: 4
+      channel: 0x08
+      name: "TVMS1280 Output 4"
+    - output_number: 5
+      channel: 0x09
+      name: "TVMS1280 Output 5"
+    - output_number: 6
+      channel: 0x0A
+      name: "TVMS1280 Output 6"
+    - output_number: 7
+      channel: 0x0B
+      name: "TVMS1280 Output 7"
+    - output_number: 8
+      channel: 0x0C
+      name: "TVMS1280 Output 8"
+    - output_number: 9
+      channel: 0x0D
+      name: "TVMS1280 Output 9"
+  inverter:
+    channel: 0x0E
+    name: "TVMS1280 Inverter"
+
+number:
+  - platform: template
+    name: "TVMS Rouge Deadband"
+    min_value: 0.5
+    max_value: 10
+    step: 0.5
+    initial_value: 3
+    optimistic: true
+    restore_value: true
+    unit_of_measurement: "%"
+    entity_category: config
+    set_action:
+      - lambda: id(tvms_rouge_hub).set_deadband(x);
+  - platform: template
+    name: "TVMS Rouge Initial Ramp Rate"
+    min_value: 20
+    max_value: 160
+    step: 1
+    initial_value: 50
+    optimistic: true
+    restore_value: true
+    unit_of_measurement: "ms/%"
+    entity_category: config
+    set_action:
+      - lambda: id(tvms_rouge_hub).set_initial_rate(x);
+  - platform: template
+    name: "TVMS Rouge Learning Gain"
+    min_value: 1
+    max_value: 100
+    step: 1
+    initial_value: 25
+    optimistic: true
+    restore_value: true
+    unit_of_measurement: "%"
+    entity_category: config
+    set_action:
+      - lambda: id(tvms_rouge_hub).set_learning_gain_percent(x);
+  - platform: template
+    name: "TVMS Rouge Approach"
+    min_value: 25
+    max_value: 100
+    step: 5
+    initial_value: 80
+    optimistic: true
+    restore_value: true
+    unit_of_measurement: "%"
+    entity_category: config
+    set_action:
+      - lambda: id(tvms_rouge_hub).set_approach_percent(x);
+  - platform: template
+    name: "TVMS Rouge Max Pulse"
+    min_value: 200
+    max_value: 5000
+    step: 50
+    initial_value: 1200
+    optimistic: true
+    restore_value: true
+    unit_of_measurement: "ms"
+    entity_category: config
+    set_action:
+      - lambda: id(tvms_rouge_hub).set_max_pulse(x);
+  - platform: template
+    name: "TVMS Rouge Settle Time"
+    min_value: 200
+    max_value: 3000
+    step: 50
+    initial_value: 700
+    optimistic: true
+    restore_value: true
+    unit_of_measurement: "ms"
+    entity_category: config
+    set_action:
+      - lambda: id(tvms_rouge_hub).set_settle_time(x);
+  - platform: template
+    name: "TVMS Rouge Max Iterations"
+    min_value: 1
+    max_value: 30
+    step: 1
+    initial_value: 12
+    optimistic: true
+    restore_value: true
+    entity_category: config
+    set_action:
+      - lambda: id(tvms_rouge_hub).set_max_iterations_float(x);
+
+button:
+  - platform: template
+    name: "TVMS Rouge Abort and Release"
+    entity_category: diagnostic
+    on_press:
+      - lambda: id(tvms_rouge_hub).abort_and_release();
+
+light:
+  - platform: tvms_rouge
+    tvms_rouge_id: tvms_rouge_hub
+    output_number: 1
+    channel: 0x0C
+    name: "TVMS Rouge Output 1"
+    gamma_correct: 1.0
+    default_transition_length: 0s
+  - platform: tvms_rouge
+    tvms_rouge_id: tvms_rouge_hub
+    output_number: 2
+    channel: 0x0D
+    name: "TVMS Rouge Output 2"
+    gamma_correct: 1.0
+    default_transition_length: 0s
+  - platform: tvms_rouge
+    tvms_rouge_id: tvms_rouge_hub
+    output_number: 3
+    channel: 0x0E
+    name: "TVMS Rouge Output 3"
+    gamma_correct: 1.0
+    default_transition_length: 0s
+  - platform: tvms_rouge
+    tvms_rouge_id: tvms_rouge_hub
+    output_number: 4
+    channel: 0x0F
+    name: "TVMS Rouge Output 4"
+    gamma_correct: 1.0
+    default_transition_length: 0s
+  - platform: tvms_rouge
+    tvms_rouge_id: tvms_rouge_hub
+    output_number: 5
+    channel: 0x10
+    name: "TVMS Rouge Output 5"
+    gamma_correct: 1.0
+    default_transition_length: 0s
+  - platform: tvms_rouge
+    tvms_rouge_id: tvms_rouge_hub
+    output_number: 6
+    channel: 0x11
+    name: "TVMS Rouge Output 6"
+    gamma_correct: 1.0
+    default_transition_length: 0s
+  - platform: tvms_rouge
+    tvms_rouge_id: tvms_rouge_hub
+    output_number: 7
+    channel: 0x12
+    name: "TVMS Rouge Output 7"
+    gamma_correct: 1.0
+    default_transition_length: 0s
+  - platform: tvms_rouge
+    tvms_rouge_id: tvms_rouge_hub
+    output_number: 8
+    channel: 0x13
+    name: "TVMS Rouge Output 8"
+    gamma_correct: 1.0
+    default_transition_length: 0s
+  - platform: tvms_rouge
+    tvms_rouge_id: tvms_rouge_hub
+    output_number: 9
+    channel: 0x14
+    name: "TVMS Rouge Output 9"
+    gamma_correct: 1.0
+    default_transition_length: 0s
+  - platform: tvms_rouge
+    tvms_rouge_id: tvms_rouge_hub
+    output_number: 10
+    channel: 0x15
+    name: "TVMS Rouge Output 10"
+    gamma_correct: 1.0
+    default_transition_length: 0s
