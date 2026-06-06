@@ -102,6 +102,9 @@ void TVMSRougeComponent::dump_config() {
   ESP_LOGCONFIG(TAG, "  Keepalive: 0x%08X", this->keepalive_id_);
   ESP_LOGCONFIG(TAG, "  Level feedback: 0x%08X", this->level_feedback_id_);
   ESP_LOGCONFIG(TAG, "  Tank feedback: 0x%08X", this->tank_feedback_id_);
+  ESP_LOGCONFIG(TAG, "  Button status: 0x%08X", this->button_status_id_);
+  ESP_LOGCONFIG(TAG, "  Input status: 0x%08X", this->input_status_id_);
+  LOG_SENSOR("  ", "Input Voltage", this->input_voltage_sensor_);
   ESP_LOGCONFIG(TAG, "  True-off threshold: %.1f%%", this->true_off_threshold_percent_);
 }
 
@@ -209,6 +212,16 @@ void TVMSRougeComponent::handle_can_frame(uint32_t can_id, const std::vector<uin
     return;
   }
 
+  if (can_id == this->button_status_id_) {
+    this->handle_button_status_frame_(data);
+    return;
+  }
+
+  if (can_id == this->input_status_id_) {
+    this->handle_input_status_frame_(data);
+    return;
+  }
+
   if (can_id == this->output_command_id_) {
     if (data[0] == 0xCB && data[2] == 0xFF) {
       const uint8_t channel = data[3];
@@ -243,6 +256,46 @@ void TVMSRougeComponent::handle_can_frame(uint32_t can_id, const std::vector<uin
     this->set_feedback_level_(8, (float) data[1]);
     this->set_feedback_level_(9, (float) data[2]);
     this->set_feedback_level_(10, (float) data[3]);
+  }
+}
+
+void TVMSRougeComponent::handle_button_status_frame_(const std::vector<uint8_t> &data) {
+  if (data.size() < 8) return;
+
+  const uint8_t base_channel = data[0];
+  for (uint8_t i = 1; i <= 7; i++) {
+    const uint8_t channel = base_channel + i - 1;
+    if (channel < 0x0C || channel > 0x15) continue;
+
+    const uint8_t value = data[i];
+    if (value != 0x00 && value != 0x02) continue;
+
+    const uint8_t output_number = channel - 0x0B;
+    this->set_button_state_(output_number, value == 0x02);
+  }
+}
+
+void TVMSRougeComponent::handle_input_status_frame_(const std::vector<uint8_t> &data) {
+  if (data.size() < 2) return;
+  if (this->input_voltage_sensor_ == nullptr) return;
+
+  const uint16_t raw = (uint16_t) data[0] | ((uint16_t) data[1] << 8);
+  if (raw == 0x0000 || raw == 0xFFFF) return;
+
+  const float voltage = raw / 100.0f;
+  if (voltage < 0.0f || voltage > 60.0f) return;
+
+  this->input_voltage_sensor_->publish_state(voltage);
+}
+
+void TVMSRougeComponent::set_button_state_(uint8_t output_number, bool active) {
+  if (output_number < 1 || output_number > 10) return;
+  if (this->button_state_known_[output_number] && this->button_states_[output_number] == active) return;
+
+  this->button_state_known_[output_number] = true;
+  this->button_states_[output_number] = active;
+  if (this->button_sensors_[output_number] != nullptr) {
+    this->button_sensors_[output_number]->publish_state(active);
   }
 }
 

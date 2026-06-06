@@ -3,6 +3,7 @@
 #include "esphome/core/component.h"
 #include "esphome/core/log.h"
 #include "esphome/components/canbus/canbus.h"
+#include "esphome/components/binary_sensor/binary_sensor.h"
 #include "esphome/components/light/light_output.h"
 #include "esphome/components/light/light_state.h"
 #include "esphome/components/sensor/sensor.h"
@@ -49,9 +50,13 @@ class TVMSRougeComponent : public Component {
   void set_keepalive_id(uint32_t id) { this->keepalive_id_ = id; }
   void set_level_feedback_id(uint32_t id) { this->level_feedback_id_ = id; }
   void set_tank_feedback_id(uint32_t id) { this->tank_feedback_id_ = id; }
+  void set_button_status_id(uint32_t id) { this->button_status_id_ = id; }
+  void set_input_status_id(uint32_t id) { this->input_status_id_ = id; }
   void set_tank1_sensor(sensor::Sensor *s) { this->tank1_sensor_ = s; }
   void set_tank2_sensor(sensor::Sensor *s) { this->tank2_sensor_ = s; }
+  void set_input_voltage_sensor(sensor::Sensor *s) { this->input_voltage_sensor_ = s; }
   void set_level_sensor(uint8_t output, sensor::Sensor *s) { if (output >= 1 && output <= 10) this->level_sensors_[output] = s; }
+  void set_button_sensor(uint8_t output, binary_sensor::BinarySensor *s) { if (output >= 1 && output <= 10) this->button_sensors_[output] = s; }
 
   void set_true_off_threshold(float v) { this->true_off_threshold_percent_ = v; }
   void set_target_debounce_ms(uint32_t v) { this->target_debounce_ms_ = v; }
@@ -103,6 +108,9 @@ class TVMSRougeComponent : public Component {
   void set_feedback_level_(uint8_t output_number, float level);
   bool should_suppress_light_feedback_(uint8_t output_number) const;
   void publish_actual_light_level_(uint8_t output_number);
+  void set_button_state_(uint8_t output_number, bool active);
+  void handle_button_status_frame_(const std::vector<uint8_t> &data);
+  void handle_input_status_frame_(const std::vector<uint8_t> &data);
   uint8_t channel_for_output_(uint8_t output_number) const { return 0x0B + output_number; }
 
   canbus::Canbus *canbus_{nullptr};
@@ -111,12 +119,18 @@ class TVMSRougeComponent : public Component {
   uint32_t keepalive_id_{0x0FE6FF20};
   uint32_t level_feedback_id_{0x1BFD1230};
   uint32_t tank_feedback_id_{0x1BFD0230};
+  uint32_t button_status_id_{0x1BFD1430};
+  uint32_t input_status_id_{0x13F10830};
 
   std::array<float, 11> levels_{};
   std::array<TVMSRougeLight *, 11> lights_{};
   std::array<sensor::Sensor *, 11> level_sensors_{};
+  std::array<binary_sensor::BinarySensor *, 11> button_sensors_{};
+  std::array<bool, 11> button_states_{};
+  std::array<bool, 11> button_state_known_{};
   sensor::Sensor *tank1_sensor_{nullptr};
   sensor::Sensor *tank2_sensor_{nullptr};
+  sensor::Sensor *input_voltage_sensor_{nullptr};
 
   float true_off_threshold_percent_{1.0f};
   uint32_t target_debounce_ms_{600};
