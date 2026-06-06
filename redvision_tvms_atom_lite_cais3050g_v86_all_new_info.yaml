@@ -295,6 +295,15 @@ tvms_rouge:
     accuracy_decimals: 2
     filters:
       - throttle_average: ${sensor_average_interval}
+  input_current:
+    name: "TVMS Rouge Input Current"
+    unit_of_measurement: "A"
+    device_class: current
+    state_class: measurement
+    accuracy_decimals: 1
+    entity_category: diagnostic
+    filters:
+      - throttle_average: ${sensor_average_interval}
   output_levels:
     - name: "TVMS Rouge Output 1 Level"
       unit_of_measurement: "%"

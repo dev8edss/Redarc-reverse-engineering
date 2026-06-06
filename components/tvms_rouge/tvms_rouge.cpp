@@ -105,6 +105,7 @@ void TVMSRougeComponent::dump_config() {
   ESP_LOGCONFIG(TAG, "  Button status: 0x%08X", this->button_status_id_);
   ESP_LOGCONFIG(TAG, "  Input status: 0x%08X", this->input_status_id_);
   LOG_SENSOR("  ", "Input Voltage", this->input_voltage_sensor_);
+  LOG_SENSOR("  ", "Input Current", this->input_current_sensor_);
   ESP_LOGCONFIG(TAG, "  True-off threshold: %.1f%%", this->true_off_threshold_percent_);
 }
 
@@ -208,6 +209,14 @@ void TVMSRougeComponent::handle_can_frame(uint32_t can_id, const std::vector<uin
     if (data[0] == 0x09) {
       if (this->tank1_sensor_ != nullptr) this->tank1_sensor_->publish_state((float) data[1]);
       if (this->tank2_sensor_ != nullptr) this->tank2_sensor_->publish_state((float) data[2]);
+    } else if (data[0] == 0x16) {
+      // Label pages identify item 0x16 as Input Voltage and item 0x17 as
+      // Input Current. In the grouped 0x1BFD0230 status frame, D1 is the base
+      // item, so D3 carries item 0x17. Observed D3=0x2F => 4.7 A.
+      if (this->input_current_sensor_ != nullptr && data[2] != 0xFF) {
+        const float current = data[2] / 10.0f;
+        if (current >= 0.0f && current <= 25.5f) this->input_current_sensor_->publish_state(current);
+      }
     }
     return;
   }

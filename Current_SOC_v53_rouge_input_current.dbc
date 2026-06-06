@@ -56,12 +56,14 @@ BO_ 2617049648 PGN_1BFD02_TVMSRouge_WaterTankLevels: 8 TVMS_Rouge
  SG_ WaterTank_MUX M : 0|8@1+ (1,0) [0|255] "" Vector__XXX
  SG_ WaterTank1_Percent m9 : 8|8@1+ (1,0) [0|100] "%" Vector__XXX
  SG_ WaterTank2_Percent m9 : 16|8@1+ (1,0) [0|100] "%" Vector__XXX
+ SG_ TVMSRouge_Input_Current_A_Candidate m22 : 16|8@1+ (0.1,0) [0|25.5] "A" Vector__XXX
 
 CM_ BO_ 2617049648 "Confirmed TVMS_Rouge water tank levels. Raw CAN ID 0x1BFD0230, PGN 0xFD02, source address 0x30.";
 CM_ SG_ 2617049648 WaterTank_MUX "D1 message type/mux. 0x09 = water tank levels.";
 CM_ SG_ 2617049648 WaterTank1_Percent "D2 = Tank 1 level percent. 0x00 = 0%, 0x64 = 100%. Scale: raw percent.";
 CM_ SG_ 2617049648 WaterTank2_Percent "D3 = Tank 2 level percent. 0x00 = 0%, 0x64 = 100%. Scale: raw percent.";
-VAL_ 2617049648 WaterTank_MUX 9 "WaterTankLevels";
+CM_ SG_ 2617049648 TVMSRouge_Input_Current_A_Candidate "CANDIDATE: Label pages identify item 0x17 as Input Current. In 0x1BFD0230 with D1/base=0x16, D3 maps to item 0x17. Observed payloads include 16 C2 2F FF FF FF FF FF, 16 C1 2F FF FF FF FF FF, 16 BC 2F FF FF FF FF FF, so D3=0x2F likely means 4.7 A using /10 A. Needs controlled current-change confirmation before marking confirmed.";
+VAL_ 2617049648 WaterTank_MUX 9 "WaterTankLevels" 22 "InputVoltageCurrentCandidates";
 
 
 
@@ -95,6 +97,7 @@ BA_ "Decode_Status"
 
 
 CM_ "v35 update: mux 0x1A D2 renamed from TVMS1280_Tank5_Percent to TVMS1280_Tank6_Percent per confirmed physical mapping.";
+CM_ "v53 update: Added TVMS Rouge Input Current candidate. Label pages show item 0x17 = Input Current; candidate decode is 0x1BFD0230 D1=0x16, D3/10 A. Marked candidate until controlled load-current testing confirms it.";
 
 BO_ 2617049636 PGN_1BFD02_TVMS1280_TempTankStatus: 8 TVMS_1280
  SG_ TVMS1280_Status_MUX M : 0|8@1+ (1,0) [0|255] "" Vector__XXX
@@ -107,7 +110,7 @@ BO_ 2617049636 PGN_1BFD02_TVMS1280_TempTankStatus: 8 TVMS_1280
  SG_ TVMS1280_Tank6_Percent m26 : 8|8@1+ (1,0) [0|100] "%" Vector__XXX
  SG_ TVMS1280_Temp2_C m17 : 40|8@1+ (1,-100) [-100|155] "degC" Vector__XXX
 
-CM_ BO_ 2617049636 "Confirmed TVMS_1280 temp/tank status. Raw CAN ID 0x1BFD0224, PGN 0xFD02, source address 0x24.";
+CM_ BO_ 2617049636 "Confirmed TVMS_1280 temp/tank status. Raw CAN ID 0x1BFD0224, PGN 0xFD02, source address 0x24. Also a candidate frame to watch for the 3 currently unused TVMS1280 digital inputs, but no digital-input decode is confirmed.";
 CM_ SG_ 2617049636 TVMS1280_Status_MUX "D1 multiplexor. 0x11 contains Temp2. 0x14 contains Temp1, Tank1 and Tank2. 0x17 contains Tank3, Tank4 and Tank5. 0x1A contains Tank6.";
 CM_ SG_ 2617049636 TVMS1280_Temp1_C "MUX 0x14, D2. Temperature formula raw - 100.";
 CM_ SG_ 2617049636 TVMS1280_Tank1_Percent "MUX 0x14, D4. Raw percent.";
@@ -141,6 +144,7 @@ BA_ "Decode_Status" BO_ 2617049648 "CONFIRMED_CORRECT_DO_NOT_EDIT";
 BA_ "Decode_Status" SG_ 2617049648 WaterTank_MUX "CONFIRMED_CORRECT_DO_NOT_EDIT";
 BA_ "Decode_Status" SG_ 2617049648 WaterTank1_Percent "CONFIRMED_CORRECT_DO_NOT_EDIT";
 BA_ "Decode_Status" SG_ 2617049648 WaterTank2_Percent "CONFIRMED_CORRECT_DO_NOT_EDIT";
+BA_ "Decode_Status" SG_ 2617049648 TVMSRouge_Input_Current_A_Candidate "UNCONFIRMED_PENDING_TEST";
 BA_ "Decode_Status" BO_ 2617049636 "CONFIRMED_CORRECT_DO_NOT_EDIT";
 BA_ "Decode_Status" SG_ 2617049636 TVMS1280_Status_MUX "CONFIRMED_CORRECT_DO_NOT_EDIT";
 BA_ "Decode_Status" SG_ 2617049636 TVMS1280_Temp1_C "CONFIRMED_CORRECT_DO_NOT_EDIT";
@@ -500,6 +504,7 @@ BA_ "Decode_Status" SG_ 2482047496 BatterySensor_LoadCurrent_Candidate_A "UNCONF
 
 
 CM_ "v51 update: merged latest reverse-engineering results from ESPHome/log work: Manager30 solar Wh confirmed as 0x03FCD601 D1=0x00 D2-D5 uint32 Wh; Rouge 1BFD1230 level feedback corrected to base-channel grouped byte layout; Rouge 1BFD1430 identified as hardware button/dimming-active status; Rouge 1BFD0030 documented as coarse status; TVMS1280 1BFD0024 documented as output feedback; module input voltage frames 13F10830/13F10824 added.";
+CM_ "v52 update: TVMS1280 hardware has 3 digital inputs. They are currently unused in this installation and no confirmed CAN PGN/byte decode has been identified. Do not confuse them with TVMS Rouge hardware button/dimming-active status 0x1BFD1430. Candidate TVMS1280 status/input frames to test: 0x1BFD0224, 0x1BFCF024, 0x1BFCF224, 0x13F10824.";
 
 BO_ 2482047024 PGN_13F108_TVMSRouge_InputStatus: 8 TVMS_Rouge
  SG_ TVMSRouge_Input_Voltage : 0|16@1+ (0.01,0) [0|60] "V" Vector__XXX
@@ -528,7 +533,7 @@ BO_ 2482047012 PGN_13F108_TVMS1280_InputStatus: 8 TVMS_1280
  SG_ TVMS1280_Input_Status_D6 : 40|8@1+ (1,0) [0|255] "raw" Vector__XXX
  SG_ TVMS1280_Input_Status_D7 : 48|8@1+ (1,0) [0|255] "raw" Vector__XXX
  SG_ TVMS1280_Input_Status_D8 : 56|8@1+ (1,0) [0|255] "raw" Vector__XXX
-CM_ BO_ 2482047012 "PARTLY_CONFIRMED: TVMS1280 input/status frame. Raw CAN ID 0x13F10824, PGN 0x13F108, SA 0x24.";
+CM_ BO_ 2482047012 "PARTLY_CONFIRMED: TVMS1280 input/status frame. Raw CAN ID 0x13F10824, PGN 0x13F108, SA 0x24. This is a candidate frame to observe while testing the 3 unused TVMS1280 digital inputs; current confirmed decode is supply voltage only.";
 CM_ SG_ 2482047012 TVMS1280_Supply_Voltage "CONFIRMED_CORRECT_DO_NOT_EDIT: D1-D2 little-endian, scale 0.01 V/count. Example F0 04 = 12.64 V. Interpreted as TVMS1280 supply voltage / Voltage Input 2.";
 BA_ "Decode_Status" BO_ 2482047012 "PARTLY_CONFIRMED";
 BA_ "Decode_Status" SG_ 2482047012 TVMS1280_Supply_Voltage "CONFIRMED_CORRECT_DO_NOT_EDIT";
@@ -558,3 +563,5 @@ BA_ "Decode_Status" SG_ 2399481888 TVMSRouge_DimActual_D5 "CONFIRMED_CORRECT_DO_
 
 CM_ SG_ 2617049636 TVMS1280_Temp2_C "NOTE: TVMS1280 Voltage Input 1 candidate is currently decoded in ESPHome from 0x1BFD0224 page/mux 0x11 D2 / 10. It is expected to read near 0.0 V when the external voltage input is disconnected. This overlaps the temp/tank/status PGN and is kept as a diagnostic candidate until fully confirmed.";
 CM_ SG_ 2617049636 TVMS1280_Temp1_C "NOTE: TVMS1280 Voltage Input 2 candidate is currently decoded in ESPHome from 0x1BFD0224 page/mux 0x14 D2 / 10 and has appeared around 11.9-12.0 V in logs. This overlaps the temp/tank/status PGN and is kept as a diagnostic candidate until fully confirmed.";
+
+CM_ "TVMS1280_DIGITAL_INPUTS_NOTE: Hardware has 3 digital inputs, currently unused. No ESPHome entities or DBC signals should be added until a one-at-a-time input toggle capture confirms the PGN and bit/byte mapping.";

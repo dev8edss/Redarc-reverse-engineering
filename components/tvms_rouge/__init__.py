@@ -19,6 +19,7 @@ CONF_INPUT_STATUS_ID = "input_status_id"
 CONF_TANK1 = "tank1"
 CONF_TANK2 = "tank2"
 CONF_INPUT_VOLTAGE = "input_voltage"
+CONF_INPUT_CURRENT = "input_current"
 CONF_OUTPUT_LEVELS = "output_levels"
 CONF_BUTTON_STATES = "button_states"
 CONF_TRUE_OFF_THRESHOLD = "true_off_threshold"
@@ -49,6 +50,7 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Optional(CONF_TANK1): sensor.sensor_schema(),
         cv.Optional(CONF_TANK2): sensor.sensor_schema(),
         cv.Optional(CONF_INPUT_VOLTAGE): sensor.sensor_schema(),
+        cv.Optional(CONF_INPUT_CURRENT): sensor.sensor_schema(),
         cv.Optional(CONF_OUTPUT_LEVELS): cv.ensure_list(sensor.sensor_schema()),
         cv.Optional(CONF_BUTTON_STATES): cv.ensure_list(binary_sensor.binary_sensor_schema()),
         cv.Optional(CONF_TRUE_OFF_THRESHOLD, default=1.0): cv.float_range(min=0.0, max=10.0),
@@ -97,6 +99,9 @@ async def to_code(config):
     if CONF_INPUT_VOLTAGE in config:
         sens = await sensor.new_sensor(config[CONF_INPUT_VOLTAGE])
         cg.add(var.set_input_voltage_sensor(sens))
+    if CONF_INPUT_CURRENT in config:
+        sens = await sensor.new_sensor(config[CONF_INPUT_CURRENT])
+        cg.add(var.set_input_current_sensor(sens))
     if CONF_OUTPUT_LEVELS in config:
         for idx, level_conf in enumerate(config[CONF_OUTPUT_LEVELS], start=1):
             if idx > 10:

@@ -46,12 +46,13 @@ For this project, the full 29-bit CAN ID is always recorded in the DBC and ESPHo
 | Battery Sensor `0x08` | Battery shunt / BMS sensor | confirmed |
 | RedVision 1 `0x20` | Display used to press buttons and send commands | confirmed |
 | RedVision 2 `0x21` | Display / status display | confirmed |
-| TVMS1280 `0x24` | 10 relay outputs, 1 inverter output, 6 tank inputs, 2 temperature sensors, 2 voltage inputs | confirmed hardware; some voltage-input fields still diagnostic |
-| TVMS Rouge `0x30` | 10 dimmable outputs, 8 hardware button inputs, 2 analog tank sensors, input voltage | confirmed hardware |
+| TVMS1280 `0x24` | 10 relay outputs, 1 inverter output, 6 tank inputs, 2 temperature sensors, 2 voltage inputs, 3 digital inputs | confirmed hardware; voltage-input fields are partly diagnostic; digital inputs are currently unused and not decoded |
+| TVMS Rouge `0x30` | 10 dimmable outputs, 8 hardware button inputs, 2 analog tank sensors, input voltage, input current candidate | confirmed hardware; input-current decode is diagnostic/candidate |
 
 Important corrections:
 
-- TVMS1280 does **not** have hardware button inputs.
+- TVMS1280 does **not** have Rouge-style hardware button/dimming inputs.
+- TVMS1280 **does** have 3 digital inputs, but they are currently unused in this installation and no confirmed CAN state decode has been identified yet.
 - Button/dimming-active data seen so far belongs to TVMS Rouge hardware button inputs and/or RedVision display activity, not TVMS1280.
 - TVMS1280 output state should be taken from `0x1BFD0024`, not from button-style frames.
 
@@ -209,6 +210,7 @@ Component behaviour:
 | TVMS Rouge `0x30` | `0x1BFD1430` | `0x1BFD14` | D1 base | `ButtonActivity_BasePlus0..6` | D2-D8 | `0x02=active`, `0x00=inactive`, ignore others | CONFIRMED CORRECT DO NOT EDIT |
 | TVMS Rouge `0x30` | `0x1BFD0030` | `0x1BFD00` | D1 base | `CoarseStatus_BasePlus0..6` | D2-D8 | `0x00=off`, `0x01=on`, `0xF8/0xFF/special=ignore` | PARTLY CONFIRMED |
 | TVMS Rouge `0x30` | `0x13F10830` | `0x13F108` | — | `TVMSRouge_Input_Voltage` | D1-D2 | uint16 little-endian × 0.01 V | CONFIRMED CORRECT DO NOT EDIT |
+| TVMS Rouge `0x30` | `0x1BFD0230` | `0x1BFD02` | D1=`0x16` | `TVMSRouge_Input_Current_A_Candidate` | D3 | raw / 10 A | DIAGNOSTIC CANDIDATE; label pages identify item 0x17 as Input Current; needs controlled current-change test |
 | RedVision 1 `0x20` | `0x0F003020` | `0x0F0030` | — | `TVMSRouge_Output_Command` | D4/D5 | D4 channel, D5 `0x00/0x01` | CONFIRMED COMMAND PATTERN |
 | RedVision 1 `0x20` | `0x0F053020` | `0x0F0530` | — | `TVMSRouge_Dim_Command` | D1-D4 | D1 channel, D3 direction `1/100/255` | CONFIRMED COMMAND PATTERN |
 | TVMS1280 `0x24` | `0x1BFD0024` | `0x1BFD00` | D1 base | `TVMS1280_Feedback_BasePlus0..6` | D2-D8 | `0x00=off`, `0x01=on`, `0xF8/0xFF=ignore` | CONFIRMED CORRECT DO NOT EDIT |
@@ -224,6 +226,7 @@ Component behaviour:
 | TVMS1280 `0x24` | `0x1BFD0224` | `0x1BFD02` | D1=`0x11` | `TVMS1280_Voltage_Input_1_Candidate` | D2 | raw / 10 V | DIAGNOSTIC CANDIDATE; expected near 0 V when disconnected |
 | TVMS1280 `0x24` | `0x1BFD0224` | `0x1BFD02` | D1=`0x14` | `TVMS1280_Voltage_Input_2_Candidate` | D2 | raw / 10 V | DIAGNOSTIC CANDIDATE; observed around 11.9–12.0 V |
 | RedVision 1 `0x20` | `0x0F002420` | `0x0F0024` | — | `TVMS1280_Output_Command` | D4/D5 | D4 channel, D5 `0x00/0x01` | CONFIRMED COMMAND PATTERN |
+| TVMS1280 `0x24` | unknown; candidates `0x1BFD0224` / `0x1BFCF024` / `0x1BFCF224` / `0x13F10824` | unknown | — | `TVMS1280_Digital_Inputs_1_to_3` | unknown | hardware has 3 digital inputs; currently unused; no confirmed CAN decode | HARDWARE KNOWN / CAN DECODE UNKNOWN |
 
 ## Derived values
 
@@ -232,6 +235,7 @@ Component behaviour:
 | `Device_Current_A` from source nodes | `Manager_Output_Current_A - Battery_Current_A` | Battery current is positive while charging and negative while discharging. |
 | `Solar_Input_Power_W` exact/live | `Solar_Input_Current_A × Solar_Input_Voltage` | Standard DBC cannot multiply fields, so ESPHome/Home Assistant should calculate exact live watts. |
 | `Solar_Energy_Wh` | `0x03FCD601 D1=0x00 D2-D5 uint32 little-endian` | Capture showed 14 Wh through 19 Wh. |
+| `TVMS1280_Digital_Inputs_1_to_3` | CAN decode unknown | Hardware has 3 digital inputs, currently unused; capture/testing required before adding HA entities. |
 
 ## Current decoding patterns
 
@@ -263,6 +267,34 @@ raw 10,000 = 0 A
 raw 10,200 = +20 A
 raw  9,900 = -10 A
 ```
+
+
+## TVMS Rouge input current candidate
+
+Rouge text/label pages identify item `0x16` as **Input Voltage** and item `0x17` as **Input Current**. The current candidate decode is in the grouped `0x1BFD0230` frame:
+
+```text
+CAN ID: 0x1BFD0230
+D1 = 0x16
+D3 = item 0x17 Input Current candidate
+Scale: D3 / 10 = A
+```
+
+Observed payloads:
+
+```text
+16 C2 2F FF FF FF FF FF
+16 C1 2F FF FF FF FF FF
+16 BC 2F FF FF FF FF FF
+```
+
+`0x2F / 10 = 4.7 A`. Treat this as a diagnostic/candidate signal until a controlled load-current test confirms the value changes with Rouge input current.
+
+## TVMS1280 digital inputs
+
+TVMS1280 hardware has **3 digital inputs**. They are currently not used in this installation.
+
+No confirmed CAN PGN or byte mapping has been identified for these inputs yet. Do not map them to Rouge button/dimming-active frames. Future reverse-engineering should toggle one digital input at a time and compare the TVMS1280 status/input frames, especially `0x1BFD0224`, `0x1BFCF024`, `0x1BFCF224`, and `0x13F10824`.
 
 ## ESPHome device setup
 
@@ -340,6 +372,7 @@ Current full component/YAML set can publish:
 - TVMS Rouge Output 1-10 actual level sensors
 - TVMS Rouge Output 1-10 button/dimming-active binary sensors
 - TVMS Rouge input voltage
+- TVMS Rouge input current candidate
 - TVMS1280 Outputs 0-9 as switches
 - TVMS1280 inverter switch
 - TVMS1280 output feedback state from `0x1BFD0024`

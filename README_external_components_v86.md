@@ -7,8 +7,8 @@ This package splits the RedVision / TVMS CAN bridge into ESPHome external compon
 | Component | Purpose |
 |---|---|
 | `redarc_common` | Shared CAN byte helpers, source-address helpers, and current/voltage decoding helpers. |
-| `tvms_rouge` | TVMS Rouge dimmable output lights, ON/OFF commands, dim hold/ramp protocol, output level feedback, hardware-button/dimming-active binary sensors, input voltage, and tank sensors. |
-| `tvms_1280` | TVMS1280 relay output switches, inverter switch, output feedback from RedVision/display changes, tank sensors, temperature sensors, supply voltage, and voltage-input diagnostic candidates. |
+| `tvms_rouge` | TVMS Rouge dimmable output lights, ON/OFF commands, dim hold/ramp protocol, output level feedback, hardware-button/dimming-active binary sensors, input voltage, candidate input current, and tank sensors. |
+| `tvms_1280` | TVMS1280 relay output switches, inverter switch, output feedback from RedVision/display changes, tank sensors, temperature sensors, supply voltage, voltage-input diagnostic candidates, and notes for the 3 unused digital inputs. |
 | `manager30` | Manager30 output current, battery voltage, source-derived device current, solar current/voltage/power, solar Wh/yield, and AC input voltage. |
 | `battery_sensor` | Battery shunt current, voltage, SOC, and temperature. |
 | `redvision_display` | RedVision display/rebroadcast current values for display/source comparison. |
@@ -198,6 +198,35 @@ tvms_rouge:
 
 If `button_status_id`, `button_states`, `input_status_id`, or `input_voltage` are rejected as invalid YAML options, ESPHome is loading an older `tvms_rouge` schema. Push the latest component code and clear `/data/external_components/*`.
 
+
+### TVMS Rouge input current candidate
+
+The Rouge label pages identify:
+
+```text
+0x16 = Input Voltage
+0x17 = Input Current
+```
+
+The current candidate decode uses the grouped Rouge `0x1BFD0230` status frame:
+
+```text
+CAN ID: 0x1BFD0230
+When D1/base = 0x16:
+  D2 = item 0x16 Input Voltage candidate, scale still secondary to 0x13F10830
+  D3 = item 0x17 Input Current candidate, D3 / 10 = A
+```
+
+Observed examples include:
+
+```text
+1BFD0230  16 C2 2F FF FF FF FF FF
+1BFD0230  16 C1 2F FF FF FF FF FF
+1BFD0230  16 BC 2F FF FF FF FF FF
+```
+
+`0x2F / 10 = 4.7 A`. This is exposed as a diagnostic/candidate sensor until confirmed with a controlled Rouge input-current change test.
+
 ## TVMS1280
 
 ### Output channel map
@@ -265,6 +294,14 @@ Current diagnostic interpretation:
 - `1BFD0224` mux/page `0x11`, `D2 / 10` is a candidate for Voltage Input 1 and should read close to `0.0 V` if disconnected.
 - `1BFD0224` mux/page `0x14`, `D2 / 10` is a candidate voltage/status field that has appeared around `11.9-12.0 V`.
 - The voltage-input candidates overlap the existing temp/tank/status PGN and should remain diagnostic until confirmed against the RedVision app/display.
+
+### Digital inputs
+
+- TVMS1280 hardware has **3 digital inputs**.
+- In the current installation they are **not being used**.
+- No confirmed CAN PGN/byte decode for the 3 digital input states has been identified yet.
+- Do not treat these as Rouge-style hardware button inputs. The Rouge button/dimming-active state is `0x1BFD1430`; TVMS1280 digital inputs are separate hardware inputs and currently have no Home Assistant entities.
+- Candidate frames to watch during future testing are the TVMS1280 status/input frames already seen on the bus: `0x1BFD0224`, `0x1BFCF024`, `0x1BFCF224`, and `0x13F10824`.
 
 ## Manager30
 

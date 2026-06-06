@@ -116,12 +116,15 @@ cards:
         icon: mdi:thermometer
 
   - type: entities
-    title: TVMS Voltage Inputs
+    title: TVMS Voltage and Current Inputs
     show_header_toggle: false
     entities:
       - entity: sensor.redvision_can_bridge_tvms_rouge_input_voltage
         name: TVMS Rouge Input Voltage
         icon: mdi:sine-wave
+      - entity: sensor.redvision_can_bridge_tvms_rouge_input_current
+        name: TVMS Rouge Input Current
+        icon: mdi:current-dc
       - entity: sensor.redvision_can_bridge_tvms1280_supply_voltage
         name: TVMS1280 Supply Voltage
         icon: mdi:sine-wave
@@ -142,6 +145,8 @@ cards:
         name: Battery
       - entity: sensor.redvision_can_bridge_device_current_derived_from_manager_and_battery
         name: Devices
+      - entity: sensor.redvision_can_bridge_tvms_rouge_input_current
+        name: Rouge Input
 
   - type: history-graph
     title: Voltage History
