@@ -40,16 +40,35 @@ void TVMS1280Component::publish_channel_(uint8_t channel, bool state) {
   }
 }
 
+
+static bool tvms1280_valid_byte_voltage_(uint8_t value) {
+  return value != 0xF8 && value != 0xFF;
+}
+
 void TVMS1280Component::handle_can_frame(uint32_t can_id, const std::vector<uint8_t> &data) {
   can_id &= 0x1FFFFFFFUL;
   if (data.size() < 8) return;
 
+  if (can_id == this->input_status_id_) {
+    // TVMS1280 module input/status frame. Logs show D1-D2 decode as
+    // little-endian centivolts, e.g. F0 04 -> 0x04F0 / 100 = 12.64 V.
+    if (this->supply_voltage_sensor_ != nullptr) {
+      const uint16_t raw = (uint16_t) data[0] | ((uint16_t) data[1] << 8);
+      this->supply_voltage_sensor_->publish_state((float) raw / 100.0f);
+    }
+    return;
+  }
+
   if (can_id == this->temp_tank_id_) {
     if (data[0] == 0x14) {
       if (this->temp1_sensor_ != nullptr) this->temp1_sensor_->publish_state((float) data[1] - 100.0f);
+      if (this->voltage_input2_sensor_ != nullptr && tvms1280_valid_byte_voltage_(data[1]))
+        this->voltage_input2_sensor_->publish_state((float) data[1] / 10.0f);
       if (this->tank_sensors_[1] != nullptr) this->tank_sensors_[1]->publish_state((float) data[3]);
       if (this->tank_sensors_[2] != nullptr) this->tank_sensors_[2]->publish_state((float) data[5]);
     } else if (data[0] == 0x11) {
+      if (this->voltage_input1_sensor_ != nullptr && tvms1280_valid_byte_voltage_(data[1]))
+        this->voltage_input1_sensor_->publish_state((float) data[1] / 10.0f);
       if (this->temp2_sensor_ != nullptr) this->temp2_sensor_->publish_state((float) data[5] - 100.0f);
     } else if (data[0] == 0x17) {
       if (this->tank_sensors_[3] != nullptr) this->tank_sensors_[3]->publish_state((float) data[1]);

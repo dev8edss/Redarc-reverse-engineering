@@ -336,6 +336,7 @@ tvms_1280:
   temp_tank_id: 0x1BFD0224
   output_status_id: 0x1BFD0024
   channel_status_id: 0x1BFCF024
+  input_status_id: 0x13F10824
   temp1:
     name: "TVMS1280 Temperature 1"
     unit_of_measurement: "°C"
@@ -350,6 +351,33 @@ tvms_1280:
     device_class: temperature
     state_class: measurement
     accuracy_decimals: 0
+    filters:
+      - throttle_average: ${sensor_average_interval}
+  supply_voltage:
+    name: "TVMS1280 Supply Voltage"
+    unit_of_measurement: "V"
+    device_class: voltage
+    state_class: measurement
+    accuracy_decimals: 2
+    entity_category: diagnostic
+    filters:
+      - throttle_average: ${sensor_average_interval}
+  voltage_input_1:
+    name: "TVMS1280 Voltage Input 1 Candidate"
+    unit_of_measurement: "V"
+    device_class: voltage
+    state_class: measurement
+    accuracy_decimals: 1
+    entity_category: diagnostic
+    filters:
+      - throttle_average: ${sensor_average_interval}
+  voltage_input_2:
+    name: "TVMS1280 Voltage Input 2 Candidate"
+    unit_of_measurement: "V"
+    device_class: voltage
+    state_class: measurement
+    accuracy_decimals: 1
+    entity_category: diagnostic
     filters:
       - throttle_average: ${sensor_average_interval}
   tanks:

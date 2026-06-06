@@ -14,12 +14,16 @@ CONF_COMMAND_ID = "command_id"
 CONF_TEMP_TANK_ID = "temp_tank_id"
 CONF_OUTPUT_STATUS_ID = "output_status_id"
 CONF_CHANNEL_STATUS_ID = "channel_status_id"
+CONF_INPUT_STATUS_ID = "input_status_id"
 CONF_OUTPUTS = "outputs"
 CONF_INVERTER = "inverter"
 CONF_OUTPUT_NUMBER = "output_number"
 CONF_CHANNEL = "channel"
 CONF_TEMP1 = "temp1"
 CONF_TEMP2 = "temp2"
+CONF_SUPPLY_VOLTAGE = "supply_voltage"
+CONF_VOLTAGE_INPUT1 = "voltage_input_1"
+CONF_VOLTAGE_INPUT2 = "voltage_input_2"
 CONF_TANKS = "tanks"
 CONF_LAST_COMMAND_CHANNEL = "last_command_channel"
 CONF_LAST_COMMAND_STATE = "last_command_state"
@@ -45,10 +49,14 @@ CONFIG_SCHEMA = cv.Schema({
     cv.Optional(CONF_TEMP_TANK_ID, default=0x1BFD0224): cv.hex_uint32_t,
     cv.Optional(CONF_OUTPUT_STATUS_ID, default=0x1BFD0024): cv.hex_uint32_t,
     cv.Optional(CONF_CHANNEL_STATUS_ID, default=0x1BFCF024): cv.hex_uint32_t,
+    cv.Optional(CONF_INPUT_STATUS_ID, default=0x13F10824): cv.hex_uint32_t,
     cv.Optional(CONF_OUTPUTS): cv.ensure_list(OUTPUT_SCHEMA),
     cv.Optional(CONF_INVERTER): INVERTER_SCHEMA,
     cv.Optional(CONF_TEMP1): sensor.sensor_schema(),
     cv.Optional(CONF_TEMP2): sensor.sensor_schema(),
+    cv.Optional(CONF_SUPPLY_VOLTAGE): sensor.sensor_schema(),
+    cv.Optional(CONF_VOLTAGE_INPUT1): sensor.sensor_schema(),
+    cv.Optional(CONF_VOLTAGE_INPUT2): sensor.sensor_schema(),
     cv.Optional(CONF_TANKS): cv.ensure_list(sensor.sensor_schema()),
     cv.Optional(CONF_LAST_COMMAND_CHANNEL): sensor.sensor_schema(),
     cv.Optional(CONF_LAST_COMMAND_STATE): sensor.sensor_schema(),
@@ -69,9 +77,13 @@ async def to_code(config):
     cg.add(var.set_temp_tank_id(config[CONF_TEMP_TANK_ID]))
     cg.add(var.set_output_status_id(config[CONF_OUTPUT_STATUS_ID]))
     cg.add(var.set_channel_status_id(config[CONF_CHANNEL_STATUS_ID]))
+    cg.add(var.set_input_status_id(config[CONF_INPUT_STATUS_ID]))
 
     await _setup_sensor(var, config, CONF_TEMP1, "set_temp1_sensor")
     await _setup_sensor(var, config, CONF_TEMP2, "set_temp2_sensor")
+    await _setup_sensor(var, config, CONF_SUPPLY_VOLTAGE, "set_supply_voltage_sensor")
+    await _setup_sensor(var, config, CONF_VOLTAGE_INPUT1, "set_voltage_input1_sensor")
+    await _setup_sensor(var, config, CONF_VOLTAGE_INPUT2, "set_voltage_input2_sensor")
     await _setup_sensor(var, config, CONF_LAST_COMMAND_CHANNEL, "set_last_command_channel_sensor")
     await _setup_sensor(var, config, CONF_LAST_COMMAND_STATE, "set_last_command_state_sensor")
 

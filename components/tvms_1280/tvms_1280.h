@@ -38,8 +38,12 @@ class TVMS1280Component : public Component {
   void set_temp_tank_id(uint32_t id) { this->temp_tank_id_ = id; }
   void set_output_status_id(uint32_t id) { this->output_status_id_ = id; }
   void set_channel_status_id(uint32_t id) { this->channel_status_id_ = id; }
+  void set_input_status_id(uint32_t id) { this->input_status_id_ = id; }
   void set_temp1_sensor(sensor::Sensor *s) { this->temp1_sensor_ = s; }
   void set_temp2_sensor(sensor::Sensor *s) { this->temp2_sensor_ = s; }
+  void set_supply_voltage_sensor(sensor::Sensor *s) { this->supply_voltage_sensor_ = s; }
+  void set_voltage_input1_sensor(sensor::Sensor *s) { this->voltage_input1_sensor_ = s; }
+  void set_voltage_input2_sensor(sensor::Sensor *s) { this->voltage_input2_sensor_ = s; }
   void set_tank_sensor(uint8_t tank, sensor::Sensor *s) { if (tank >= 1 && tank <= 6) this->tank_sensors_[tank] = s; }
   void set_last_command_channel_sensor(sensor::Sensor *s) { this->last_command_channel_sensor_ = s; }
   void set_last_command_state_sensor(sensor::Sensor *s) { this->last_command_state_sensor_ = s; }
@@ -60,10 +64,14 @@ class TVMS1280Component : public Component {
   uint32_t temp_tank_id_{0x1BFD0224};
   uint32_t output_status_id_{0x1BFD0024};
   uint32_t channel_status_id_{0x1BFCF024};
+  uint32_t input_status_id_{0x13F10824};
   std::array<TVMS1280Switch *, 10> output_switches_{};
   TVMS1280Switch *inverter_switch_{nullptr};
   sensor::Sensor *temp1_sensor_{nullptr};
   sensor::Sensor *temp2_sensor_{nullptr};
+  sensor::Sensor *supply_voltage_sensor_{nullptr};
+  sensor::Sensor *voltage_input1_sensor_{nullptr};
+  sensor::Sensor *voltage_input2_sensor_{nullptr};
   std::array<sensor::Sensor *, 7> tank_sensors_{};
   sensor::Sensor *last_command_channel_sensor_{nullptr};
   sensor::Sensor *last_command_state_sensor_{nullptr};
