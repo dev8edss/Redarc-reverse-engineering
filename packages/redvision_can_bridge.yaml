@@ -58,7 +58,6 @@ canbus:
               id(manager30_hub).handle_can_frame(id_rx, x);
               id(battery_sensor_hub).handle_can_frame(id_rx, x);
               id(redvision1_hub).handle_can_frame(id_rx, x);
-              id(redvision2_hub).handle_can_frame(id_rx, x);
 
 battery_sensor:
   id: battery_sensor_hub
