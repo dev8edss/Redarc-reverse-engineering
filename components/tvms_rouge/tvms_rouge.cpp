@@ -227,14 +227,6 @@ void TVMSRougeComponent::handle_can_frame(uint32_t can_id, const std::vector<uin
       const uint8_t channel = data[3];
       if (channel >= 0x0C && channel <= 0x15) {
         const uint8_t output_number = channel - 0x0B;
-
-        // Do not let an echoed copy of our own HA-originated command shortcut the
-        // dimming state machine; real Rouge level feedback remains authoritative.
-        const bool local_command_in_progress =
-            (this->active_ && output_number == this->active_output_) ||
-            (this->pending_active_ && output_number == this->pending_output_);
-        if (local_command_in_progress) return;
-
         const bool on = data[4] != 0;
         if (!on) {
           this->set_feedback_level_(output_number, 0.0f);
