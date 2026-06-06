@@ -216,9 +216,6 @@ redvision_display:
       filters:
         - throttle_average: ${sensor_average_interval}
 
-  - id: redvision2_hub
-    source_address: 0x21
-    display_type: rv2
     manager_output_current_display:
       name: "Redvision 2 Manager Output Current Display"
       unit_of_measurement: "A"
