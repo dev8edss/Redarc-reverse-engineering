@@ -20,6 +20,7 @@ class Manager30Component : public Component {
   void set_solar_current_sensor(sensor::Sensor *s) { this->solar_current_sensor_ = s; }
   void set_solar_voltage_sensor(sensor::Sensor *s) { this->solar_voltage_sensor_ = s; }
   void set_solar_power_sensor(sensor::Sensor *s) { this->solar_power_sensor_ = s; }
+  void set_solar_energy_sensor(sensor::Sensor *s) { this->solar_energy_sensor_ = s; }
   void set_ac_input_voltage_sensor(sensor::Sensor *s) { this->ac_input_voltage_sensor_ = s; }
 
   void dump_config() override;
@@ -35,6 +36,7 @@ class Manager30Component : public Component {
   sensor::Sensor *solar_current_sensor_{nullptr};
   sensor::Sensor *solar_voltage_sensor_{nullptr};
   sensor::Sensor *solar_power_sensor_{nullptr};
+  sensor::Sensor *solar_energy_sensor_{nullptr};
   sensor::Sensor *ac_input_voltage_sensor_{nullptr};
 };
 

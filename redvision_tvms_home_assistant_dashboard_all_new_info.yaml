@@ -1,0 +1,491 @@
+title: RedVision TVMS
+path: redvision-tvms
+icon: mdi:caravan
+badges: []
+cards:
+  - type: markdown
+    content: |
+      # RedVision / TVMS CAN Monitor
+      Live data from the ESPHome Atom Lite CAN bridge.
+
+      **Device current** is calculated as:
+
+      `Manager30 Output Current - Battery Current`
+
+      Battery current is positive while charging and negative while discharging.
+
+  - square: false
+    type: grid
+    title: Power Summary
+    columns: 2
+    cards:
+      - type: gauge
+        name: Battery SOC
+        entity: sensor.redvision_can_bridge_battery_soc
+        min: 0
+        max: 100
+        severity:
+          green: 25
+          yellow: 10
+          red: 0
+        needle: false
+      - type: gauge
+        name: Battery Current
+        entity: sensor.redvision_can_bridge_battery_current
+        min: -250
+        max: 80
+        needle: true
+        severity:
+          green: 0
+          yellow: 500
+          red: -250
+      - type: gauge
+        name: Manager30 Output
+        entity: sensor.redvision_can_bridge_manager30_output_current
+        min: 0
+        max: 60
+        needle: true
+        severity:
+          green: 0
+          yellow: 35
+          red: 50
+      - type: gauge
+        name: Device Current
+        entity: sensor.redvision_can_bridge_device_current_derived_from_manager_and_battery
+        min: 0
+        max: 250
+        needle: true
+        severity:
+          green: 0
+          yellow: 80
+          red: 150
+      - type: gauge
+        name: AC Input Voltage
+        entity: sensor.redvision_can_bridge_ac_input_voltage
+        min: 0
+        max: 260
+        needle: true
+        severity:
+          green: 220
+          yellow: 200
+          red: 0
+      - type: gauge
+        name: Manager30 Battery Voltage
+        entity: sensor.redvision_can_bridge_manager30_battery_voltage
+        min: 10
+        max: 16
+        needle: true
+        severity:
+          green: 12.4
+          yellow: 11.8
+          red: 0
+
+  - type: entities
+    title: Battery, Manager30 and AC
+    show_header_toggle: false
+    entities:
+      - entity: sensor.redvision_can_bridge_manager30_output_current
+        name: Manager30 Output Current
+        icon: mdi:battery-charging
+      - entity: sensor.redvision_can_bridge_manager30_output_current_raw
+        name: Manager30 Output Current Raw
+        icon: mdi:counter
+      - entity: sensor.redvision_can_bridge_manager30_battery_voltage
+        name: Manager30 Battery Voltage
+        icon: mdi:car-battery
+      - entity: sensor.redvision_can_bridge_ac_input_voltage
+        name: AC Input Voltage
+        icon: mdi:power-plug
+      - entity: sensor.redvision_can_bridge_battery_current
+        name: Battery Current
+        icon: mdi:current-dc
+      - entity: sensor.redvision_can_bridge_battery_current_raw
+        name: Battery Current Raw
+        icon: mdi:counter
+      - entity: sensor.redvision_can_bridge_device_current_derived_from_manager_and_battery
+        name: Derived Device Current
+        icon: mdi:flash
+      - entity: sensor.redvision_can_bridge_battery_soc
+        name: Battery SOC
+        icon: mdi:battery
+      - entity: sensor.redvision_can_bridge_battery_voltage
+        name: Battery Voltage
+        icon: mdi:sine-wave
+      - entity: sensor.redvision_can_bridge_battery_temperature
+        name: Battery Temperature
+        icon: mdi:thermometer
+
+  - type: entities
+    title: TVMS Voltage Inputs
+    show_header_toggle: false
+    entities:
+      - entity: sensor.redvision_can_bridge_tvms_rouge_input_voltage
+        name: TVMS Rouge Input Voltage
+        icon: mdi:sine-wave
+      - entity: sensor.redvision_can_bridge_tvms1280_supply_voltage
+        name: TVMS1280 Supply Voltage
+        icon: mdi:sine-wave
+      - entity: sensor.redvision_can_bridge_tvms1280_voltage_input_1_candidate
+        name: TVMS1280 Voltage Input 1 Candidate
+        icon: mdi:meter-electric-outline
+      - entity: sensor.redvision_can_bridge_tvms1280_voltage_input_2_candidate
+        name: TVMS1280 Voltage Input 2 Candidate
+        icon: mdi:meter-electric-outline
+
+  - type: history-graph
+    title: Current History
+    hours_to_show: 6
+    entities:
+      - entity: sensor.redvision_can_bridge_manager30_output_current
+        name: Manager30
+      - entity: sensor.redvision_can_bridge_battery_current
+        name: Battery
+      - entity: sensor.redvision_can_bridge_device_current_derived_from_manager_and_battery
+        name: Devices
+
+  - type: history-graph
+    title: Voltage History
+    hours_to_show: 6
+    entities:
+      - entity: sensor.redvision_can_bridge_battery_voltage
+        name: Battery
+      - entity: sensor.redvision_can_bridge_manager30_battery_voltage
+        name: Manager30 Battery
+      - entity: sensor.redvision_can_bridge_tvms_rouge_input_voltage
+        name: Rouge Input
+      - entity: sensor.redvision_can_bridge_tvms1280_supply_voltage
+        name: TVMS1280 Supply
+      - entity: sensor.redvision_can_bridge_ac_input_voltage
+        name: AC Input
+
+  - type: grid
+    title: Solar
+    columns: 4
+    square: false
+    cards:
+      - type: gauge
+        name: Solar Power
+        entity: sensor.redvision_can_bridge_solar_input_power
+        min: 0
+        max: 300
+        needle: true
+        severity:
+          green: 20
+          yellow: 0
+          red: 0
+      - type: entity
+        name: Solar Energy
+        entity: sensor.redvision_can_bridge_solar_energy
+        icon: mdi:solar-power
+      - type: entity
+        name: Solar Voltage
+        entity: sensor.redvision_can_bridge_solar_input_voltage
+        icon: mdi:solar-power-variant
+      - type: entity
+        name: Solar Current
+        entity: sensor.redvision_can_bridge_solar_input_current
+        icon: mdi:current-dc
+
+  - type: history-graph
+    title: Solar History
+    hours_to_show: 6
+    entities:
+      - entity: sensor.redvision_can_bridge_solar_input_power
+        name: Solar W
+      - entity: sensor.redvision_can_bridge_solar_energy
+        name: Solar Wh
+      - entity: sensor.redvision_can_bridge_solar_input_voltage
+        name: Solar V
+      - entity: sensor.redvision_can_bridge_solar_input_current
+        name: Solar A
+
+  - type: grid
+    title: TVMS Rouge Outputs
+    columns: 2
+    square: false
+    cards:
+      - type: custom:mushroom-light-card
+        entity: light.redvision_can_bridge_tvms_rouge_output_1
+        name: Rouge Output 1
+        show_brightness_control: true
+        collapsible_controls: true
+        layout: vertical
+      - type: custom:mushroom-light-card
+        entity: light.redvision_can_bridge_tvms_rouge_output_2
+        name: Rouge Output 2
+        show_brightness_control: true
+        collapsible_controls: true
+        layout: vertical
+      - type: custom:mushroom-light-card
+        entity: light.redvision_can_bridge_tvms_rouge_output_3
+        name: Rouge Output 3
+        show_brightness_control: true
+        collapsible_controls: true
+        layout: vertical
+      - type: custom:mushroom-light-card
+        entity: light.redvision_can_bridge_tvms_rouge_output_4
+        name: Rouge Output 4
+        show_brightness_control: true
+        collapsible_controls: true
+        layout: vertical
+      - type: custom:mushroom-light-card
+        entity: light.redvision_can_bridge_tvms_rouge_output_5
+        name: Rouge Output 5
+        show_brightness_control: true
+        collapsible_controls: true
+        layout: vertical
+      - type: custom:mushroom-light-card
+        entity: light.redvision_can_bridge_tvms_rouge_output_6
+        name: Rouge Output 6
+        show_brightness_control: true
+        collapsible_controls: true
+        layout: vertical
+      - type: custom:mushroom-light-card
+        entity: light.redvision_can_bridge_tvms_rouge_output_7
+        name: Rouge Output 7
+        show_brightness_control: true
+        collapsible_controls: true
+        layout: vertical
+      - type: custom:mushroom-light-card
+        entity: light.redvision_can_bridge_tvms_rouge_output_8
+        name: Rouge Output 8
+        show_brightness_control: true
+        collapsible_controls: true
+        layout: vertical
+      - type: custom:mushroom-light-card
+        entity: light.redvision_can_bridge_tvms_rouge_output_9
+        name: Rouge Output 9
+        show_brightness_control: true
+        collapsible_controls: true
+        layout: vertical
+      - type: custom:mushroom-light-card
+        entity: light.redvision_can_bridge_tvms_rouge_output_10
+        name: Rouge Output 10
+        show_brightness_control: true
+        collapsible_controls: true
+        layout: vertical
+
+  - type: entities
+    title: TVMS Rouge Output Levels
+    show_header_toggle: false
+    entities:
+      - entity: sensor.redvision_can_bridge_tvms_rouge_output_1_level
+        name: Output 1 Level
+      - entity: sensor.redvision_can_bridge_tvms_rouge_output_2_level
+        name: Output 2 Level
+      - entity: sensor.redvision_can_bridge_tvms_rouge_output_3_level
+        name: Output 3 Level
+      - entity: sensor.redvision_can_bridge_tvms_rouge_output_4_level
+        name: Output 4 Level
+      - entity: sensor.redvision_can_bridge_tvms_rouge_output_5_level
+        name: Output 5 Level
+      - entity: sensor.redvision_can_bridge_tvms_rouge_output_6_level
+        name: Output 6 Level
+      - entity: sensor.redvision_can_bridge_tvms_rouge_output_7_level
+        name: Output 7 Level
+      - entity: sensor.redvision_can_bridge_tvms_rouge_output_8_level
+        name: Output 8 Level
+      - entity: sensor.redvision_can_bridge_tvms_rouge_output_9_level
+        name: Output 9 Level
+      - entity: sensor.redvision_can_bridge_tvms_rouge_output_10_level
+        name: Output 10 Level
+
+  - type: entities
+    title: TVMS Rouge Hardware Button Activity
+    show_header_toggle: false
+    state_color: true
+    entities:
+      - entity: binary_sensor.redvision_can_bridge_tvms_rouge_output_1_button_active
+        name: Output 1 Button Active
+      - entity: binary_sensor.redvision_can_bridge_tvms_rouge_output_2_button_active
+        name: Output 2 Button Active
+      - entity: binary_sensor.redvision_can_bridge_tvms_rouge_output_3_button_active
+        name: Output 3 Button Active
+      - entity: binary_sensor.redvision_can_bridge_tvms_rouge_output_4_button_active
+        name: Output 4 Button Active
+      - entity: binary_sensor.redvision_can_bridge_tvms_rouge_output_5_button_active
+        name: Output 5 Button Active
+      - entity: binary_sensor.redvision_can_bridge_tvms_rouge_output_6_button_active
+        name: Output 6 Button Active
+      - entity: binary_sensor.redvision_can_bridge_tvms_rouge_output_7_button_active
+        name: Output 7 Button Active
+      - entity: binary_sensor.redvision_can_bridge_tvms_rouge_output_8_button_active
+        name: Output 8 Button Active
+      - entity: binary_sensor.redvision_can_bridge_tvms_rouge_output_9_button_active
+        name: Output 9 Button Active
+      - entity: binary_sensor.redvision_can_bridge_tvms_rouge_output_10_button_active
+        name: Output 10 Button Active
+
+  - type: entities
+    title: TVMS1280 Outputs
+    show_header_toggle: false
+    state_color: true
+    entities:
+      - entity: switch.redvision_can_bridge_tvms1280_output_0
+        name: Output 0
+      - entity: switch.redvision_can_bridge_tvms1280_output_1
+        name: Output 1
+      - entity: switch.redvision_can_bridge_tvms1280_output_2
+        name: Output 2
+      - entity: switch.redvision_can_bridge_tvms1280_output_3
+        name: Output 3
+      - entity: switch.redvision_can_bridge_tvms1280_output_4
+        name: Output 4
+      - entity: switch.redvision_can_bridge_tvms1280_output_5
+        name: Output 5
+      - entity: switch.redvision_can_bridge_tvms1280_output_6
+        name: Output 6
+      - entity: switch.redvision_can_bridge_tvms1280_output_7
+        name: Output 7
+      - entity: switch.redvision_can_bridge_tvms1280_output_8
+        name: Output 8
+      - entity: switch.redvision_can_bridge_tvms1280_output_9
+        name: Output 9
+      - entity: switch.redvision_can_bridge_tvms1280_inverter
+        name: Inverter
+
+  - type: grid
+    title: Water Tanks
+    columns: 2
+    square: false
+    cards:
+      - type: gauge
+        name: Rouge Tank 1
+        entity: sensor.redvision_can_bridge_tvms_rouge_tank_1
+        min: 0
+        max: 100
+        severity:
+          green: 25
+          yellow: 10
+          red: 0
+        needle: false
+      - type: gauge
+        name: Rouge Tank 2
+        entity: sensor.redvision_can_bridge_tvms_rouge_tank_2
+        min: 0
+        max: 100
+        severity:
+          green: 25
+          yellow: 10
+          red: 0
+      - type: gauge
+        name: TVMS1280 Tank 1
+        entity: sensor.redvision_can_bridge_tvms1280_tank_1
+        min: 0
+        max: 100
+        severity:
+          green: 0
+          yellow: 55
+          red: 80
+        needle: false
+      - type: gauge
+        name: TVMS1280 Tank 2
+        entity: sensor.redvision_can_bridge_tvms1280_tank_2
+        min: 0
+        max: 100
+        severity:
+          green: 50
+          yellow: 20
+          red: 0
+      - type: gauge
+        name: TVMS1280 Tank 3
+        entity: sensor.redvision_can_bridge_tvms1280_tank_3
+        min: 0
+        max: 100
+        severity:
+          green: 50
+          yellow: 20
+          red: 0
+      - type: gauge
+        name: TVMS1280 Tank 4
+        entity: sensor.redvision_can_bridge_tvms1280_tank_4
+        min: 0
+        max: 100
+        severity:
+          green: 50
+          yellow: 20
+          red: 0
+      - type: gauge
+        name: TVMS1280 Tank 5
+        entity: sensor.redvision_can_bridge_tvms1280_tank_5
+        min: 0
+        max: 100
+        severity:
+          green: 50
+          yellow: 20
+          red: 0
+      - type: gauge
+        name: TVMS1280 Tank 6
+        entity: sensor.redvision_can_bridge_tvms1280_tank_6
+        min: 0
+        max: 100
+        severity:
+          green: 50
+          yellow: 20
+          red: 0
+
+  - type: entities
+    title: Temperatures
+    show_header_toggle: false
+    entities:
+      - entity: sensor.redvision_can_bridge_tvms1280_temperature_1
+        name: TVMS1280 Temperature 1
+        icon: mdi:thermometer
+      - entity: sensor.redvision_can_bridge_tvms1280_temperature_2
+        name: TVMS1280 Temperature 2
+        icon: mdi:thermometer
+      - entity: sensor.redvision_can_bridge_battery_temperature
+        name: Battery Sensor Temperature
+        icon: mdi:thermometer
+
+  - type: markdown
+    content: "# Diagnostics"
+
+  - type: markdown
+    content: >
+      # RedVision Diagnostics
+
+      These cards show the Redvision display/rebroadcast values and raw source
+      counters.
+
+      Redvision values should broadly match the source-node values, but the
+      Manager30 and Battery Sensor values are the primary measurements.
+
+  - type: entities
+    title: Redvision Display/Rebroadcast Values
+    show_header_toggle: false
+    entities:
+      - entity: sensor.redvision_can_bridge_redvision_1_battery_current_display
+        name: Redvision 1 Battery Current Display
+      - entity: sensor.redvision_can_bridge_redvision_1_device_current_display
+        name: Redvision 1 Device Current Display
+      - entity: sensor.redvision_can_bridge_redvision_2_manager_output_current_display
+        name: Redvision 2 Manager Output Current Display
+
+  - type: history-graph
+    title: Source vs Redvision Current Comparison
+    hours_to_show: 6
+    entities:
+      - entity: sensor.redvision_can_bridge_manager30_output_current
+        name: Manager Source
+      - entity: sensor.redvision_can_bridge_redvision_2_manager_output_current_display
+        name: Manager Redvision 2
+      - entity: sensor.redvision_can_bridge_battery_current
+        name: Battery Source
+      - entity: sensor.redvision_can_bridge_redvision_1_battery_current_display
+        name: Battery Redvision 1
+      - entity: sensor.redvision_can_bridge_device_current_derived_from_manager_and_battery
+        name: Device Derived
+      - entity: sensor.redvision_can_bridge_redvision_1_device_current_display
+        name: Device Redvision 1
+
+  - type: entities
+    title: Raw Values
+    show_header_toggle: false
+    entities:
+      - entity: sensor.redvision_can_bridge_manager30_output_current_raw
+        name: Manager30 Output Current Raw
+      - entity: sensor.redvision_can_bridge_battery_current_raw
+        name: Battery Current Raw
+      - entity: sensor.redvision_can_bridge_redvision_2_manager_output_current_display_raw
+        name: Redvision 2 Manager Output Current Display Raw

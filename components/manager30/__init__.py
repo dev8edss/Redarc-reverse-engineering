@@ -17,6 +17,7 @@ CONF_SOURCE_DEVICE_CURRENT = "source_device_current"
 CONF_SOLAR_CURRENT = "solar_current"
 CONF_SOLAR_VOLTAGE = "solar_voltage"
 CONF_SOLAR_POWER = "solar_power"
+CONF_SOLAR_ENERGY = "solar_energy"
 CONF_AC_INPUT_VOLTAGE = "ac_input_voltage"
 
 manager30_ns = cg.esphome_ns.namespace("manager30")
@@ -33,6 +34,7 @@ CONFIG_SCHEMA = cv.Schema({
     cv.Optional(CONF_SOLAR_CURRENT): sensor.sensor_schema(),
     cv.Optional(CONF_SOLAR_VOLTAGE): sensor.sensor_schema(),
     cv.Optional(CONF_SOLAR_POWER): sensor.sensor_schema(),
+    cv.Optional(CONF_SOLAR_ENERGY): sensor.sensor_schema(),
     cv.Optional(CONF_AC_INPUT_VOLTAGE): sensor.sensor_schema(),
 }).extend(cv.COMPONENT_SCHEMA)
 
@@ -55,4 +57,5 @@ async def to_code(config):
     await _setup_sensor(var, config, CONF_SOLAR_CURRENT, "set_solar_current_sensor")
     await _setup_sensor(var, config, CONF_SOLAR_VOLTAGE, "set_solar_voltage_sensor")
     await _setup_sensor(var, config, CONF_SOLAR_POWER, "set_solar_power_sensor")
+    await _setup_sensor(var, config, CONF_SOLAR_ENERGY, "set_solar_energy_sensor")
     await _setup_sensor(var, config, CONF_AC_INPUT_VOLTAGE, "set_ac_input_voltage_sensor")

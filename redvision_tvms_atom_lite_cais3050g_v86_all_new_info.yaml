@@ -181,6 +181,15 @@ manager30:
     accuracy_decimals: 1
     filters:
       - throttle_average: ${sensor_average_interval}
+
+  solar_energy:
+    name: "Solar Energy"
+    unit_of_measurement: "Wh"
+    device_class: energy
+    state_class: total_increasing
+    accuracy_decimals: 0
+    filters:
+      - throttle_average: ${sensor_average_interval}
   ac_input_voltage:
     name: "AC Input Voltage"
     unit_of_measurement: "V"
@@ -252,6 +261,8 @@ tvms_rouge:
   keepalive_id: 0x0FE6FF20
   level_feedback_id: 0x1BFD1230
   tank_feedback_id: 0x1BFD0230
+  button_status_id: 0x1BFD1430
+  input_status_id: 0x13F10830
   true_off_threshold: 1.0
   target_debounce: 600ms
   start_deadline: 2500ms
@@ -274,6 +285,14 @@ tvms_rouge:
     unit_of_measurement: "%"
     state_class: measurement
     accuracy_decimals: 0
+    filters:
+      - throttle_average: ${sensor_average_interval}
+  input_voltage:
+    name: "TVMS Rouge Input Voltage"
+    unit_of_measurement: "V"
+    device_class: voltage
+    state_class: measurement
+    accuracy_decimals: 2
     filters:
       - throttle_average: ${sensor_average_interval}
   output_levels:
@@ -327,6 +346,18 @@ tvms_rouge:
       state_class: measurement
       entity_category: diagnostic
       accuracy_decimals: 0
+
+  button_states:
+    - name: "TVMS Rouge Output 1 Button Active"
+    - name: "TVMS Rouge Output 2 Button Active"
+    - name: "TVMS Rouge Output 3 Button Active"
+    - name: "TVMS Rouge Output 4 Button Active"
+    - name: "TVMS Rouge Output 5 Button Active"
+    - name: "TVMS Rouge Output 6 Button Active"
+    - name: "TVMS Rouge Output 7 Button Active"
+    - name: "TVMS Rouge Output 8 Button Active"
+    - name: "TVMS Rouge Output 9 Button Active"
+    - name: "TVMS Rouge Output 10 Button Active"
 
 tvms_1280:
   id: tvms1280_hub
