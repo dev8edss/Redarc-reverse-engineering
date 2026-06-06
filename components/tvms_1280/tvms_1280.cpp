@@ -73,11 +73,16 @@ void TVMS1280Component::handle_can_frame(uint32_t can_id, const std::vector<uint
   }
 
   if (can_id == this->output_status_id_) {
-    if (data[0] == 0x08) {
-      // Confirmed by logs/user: channel 0x09 = zero-based Output 5, channel 0x0A = zero-based Output 6, inverter bit appears at D8 bit0.
-      this->publish_output_(5, (data[2] & 0x01) != 0);
-      this->publish_output_(6, (data[3] & 0x01) != 0);
-      if (this->inverter_switch_ != nullptr) this->inverter_switch_->publish_state((data[7] & 0x01) != 0);
+    // TVMS1280 output feedback. Logs show D1 is the base channel and D2-D8
+    // contain the states for base+0 through base+6.
+    // Valid states are 0x00 = OFF and 0x01 = ON. Values such as 0xF8/0xFF
+    // are unavailable/no-data markers and must not overwrite HA state.
+    const uint8_t base_channel = data[0];
+    for (uint8_t i = 1; i < 8; i++) {
+      const uint8_t value = data[i];
+      if (value != 0x00 && value != 0x01) continue;
+      const uint8_t channel = base_channel + i - 1;
+      this->publish_channel_(channel, value == 0x01);
     }
     return;
   }
