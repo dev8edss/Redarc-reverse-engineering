@@ -73,7 +73,9 @@ void TVMS1280Component::handle_can_frame(uint32_t can_id, const std::vector<uint
     } else if (data[0] == 0x17) {
       if (this->tank_sensors_[3] != nullptr) this->tank_sensors_[3]->publish_state((float) data[1]);
       if (this->tank_sensors_[4] != nullptr) this->tank_sensors_[4]->publish_state((float) data[3]);
-      if (this->tank_sensors_[5] != nullptr) this->tank_sensors_[5]->publish_state((float) data[5] * 1.25f);
+      // DBC v50 confirmed: TVMS1280_Tank5_Percent is MUX 0x17, D6, raw percent.
+      // Earlier experimental builds used x1.25; remove that now-confirmed wrong scale.
+      if (this->tank_sensors_[5] != nullptr) this->tank_sensors_[5]->publish_state((float) data[5]);
     } else if (data[0] == 0x1A) {
       if (this->tank_sensors_[6] != nullptr) this->tank_sensors_[6]->publish_state((float) data[1]);
     }

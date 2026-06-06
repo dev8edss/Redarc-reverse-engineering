@@ -15,6 +15,10 @@ void Manager30Component::handle_can_frame(uint32_t can_id, const std::vector<uin
 
   const uint32_t id_current = redarc_common::with_sa(0x03F20A00UL, this->source_address_);
   const uint32_t id_solar = redarc_common::with_sa(0x03F20800UL, this->source_address_);
+  // DBC confirmed PGN_03F204_Manager30_AC_DC_Voltage_Candidates:
+  // AC_Input_Voltage is raw CAN ID 0x03F20401, D5-D6 little-endian,
+  // scale 1 V/count. D7-D8 DC_Input_Voltage_Raw remains unconfirmed and is
+  // deliberately not exposed as a normal sensor yet.
   const uint32_t id_ac = redarc_common::with_sa(0x03F20400UL, this->source_address_);
 
   if (can_id == id_current) {
@@ -41,7 +45,10 @@ void Manager30Component::handle_can_frame(uint32_t can_id, const std::vector<uin
   }
 
   if (can_id == id_ac) {
-    if (this->ac_input_voltage_sensor_ != nullptr) this->ac_input_voltage_sensor_->publish_state((float) redarc_common::u16_le(data, 4));
+    if (this->ac_input_voltage_sensor_ != nullptr) {
+      const uint16_t ac_v = redarc_common::u16_le(data, 4);
+      this->ac_input_voltage_sensor_->publish_state((float) ac_v);
+    }
     return;
   }
 }
