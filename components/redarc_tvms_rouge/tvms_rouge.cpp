@@ -239,13 +239,13 @@ void TVMSRougeComponent::handle_can_frame(uint32_t can_id, const std::vector<uin
   if (data.size() < 8) return;
 
   const uint32_t now = millis();
-  const bool sensor_ok = (now - this->last_sensor_publish_ms_) >= this->filter_interval_ms_;
 
   if (can_id == this->tank_feedback_id_) {
-    ESP_LOGI(TAG, "tank frame d0=0x%02X sensor_ok=%d elapsed=%ums", data[0], (int)sensor_ok, (unsigned)(now - this->last_sensor_publish_ms_));
-    if (sensor_ok) {
+    const bool tank_ok = (now - this->last_tank_publish_ms_) >= this->filter_interval_ms_;
+    ESP_LOGI(TAG, "tank d0=0x%02X ok=%d elapsed=%ums", data[0], (int)tank_ok, (unsigned)(now - this->last_tank_publish_ms_));
+    if (tank_ok) {
       if (data[0] == 0x09) {
-        this->last_sensor_publish_ms_ = now;
+        this->last_tank_publish_ms_ = now;
         if (this->tank1_sensor_ != nullptr) this->tank1_sensor_->publish_state((float) data[1]);
         if (this->tank2_sensor_ != nullptr) this->tank2_sensor_->publish_state((float) data[2]);
       } else if (data[0] == 0x16) {
@@ -255,7 +255,7 @@ void TVMSRougeComponent::handle_can_frame(uint32_t can_id, const std::vector<uin
         if (this->input_current_sensor_ != nullptr && data[2] != 0xFF) {
           const float current = data[2] / 10.0f;
           if (current >= 0.0f && current <= 25.5f) {
-            this->last_sensor_publish_ms_ = now;
+            this->last_tank_publish_ms_ = now;
             this->input_current_sensor_->publish_state(current);
           }
         }
@@ -271,8 +271,9 @@ void TVMSRougeComponent::handle_can_frame(uint32_t can_id, const std::vector<uin
   }
 
   if (can_id == this->input_status_id_) {
-    if (sensor_ok) {
-      this->last_sensor_publish_ms_ = now;
+    const bool input_ok = (now - this->last_input_publish_ms_) >= this->filter_interval_ms_;
+    if (input_ok) {
+      this->last_input_publish_ms_ = now;
       this->handle_input_status_frame_(data);
     }
     return;
@@ -300,19 +301,17 @@ void TVMSRougeComponent::handle_can_frame(uint32_t can_id, const std::vector<uin
 
   if (can_id != this->level_feedback_id_) return;
 
-  ESP_LOGI(TAG, "level_feedback d0=0x%02X sensor_ok=%d elapsed=%ums", data[0], (int)sensor_ok, (unsigned)(now - this->last_sensor_publish_ms_));
+  const bool level_ok = (now - this->last_level_publish_ms_) >= this->filter_interval_ms_;
+  ESP_LOGI(TAG, "level d0=0x%02X ok=%d elapsed=%ums", data[0], (int)level_ok, (unsigned)(now - this->last_level_publish_ms_));
 
-  // publish_now_ is set per-branch so the timer is only stamped when data[0]
-  // matches a known type. Other item types on this CAN ID must not consume the
-  // throttle window or they would silently block all sensor and tank publishes.
   if (data[0] == 0x0C) {
-    this->publish_now_ = sensor_ok;
-    if (sensor_ok) this->last_sensor_publish_ms_ = now;
+    this->publish_now_ = level_ok;
+    if (level_ok) this->last_level_publish_ms_ = now;
     for (uint8_t i = 1; i <= 7; i++) this->set_feedback_level_(i, (float) data[i]);
     this->publish_now_ = false;
   } else if (data[0] == 0x13) {
-    this->publish_now_ = sensor_ok;
-    if (sensor_ok) this->last_sensor_publish_ms_ = now;
+    this->publish_now_ = level_ok;
+    if (level_ok) this->last_level_publish_ms_ = now;
     this->set_feedback_level_(8, (float) data[1]);
     this->set_feedback_level_(9, (float) data[2]);
     this->set_feedback_level_(10, (float) data[3]);
