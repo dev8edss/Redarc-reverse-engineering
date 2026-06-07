@@ -27,6 +27,7 @@ MULTI_CONF = False
 
 CONF_SOURCE_ADDRESS = "source_address"
 CONF_HOST_ADDRESS = "host_address"
+CONF_FILTER_INTERVAL = "filter_interval"
 
 ns = cg.esphome_ns.namespace("redarc_tvms_1280")
 TVMS1280Component = ns.class_("TVMS1280Component", cg.Component)
@@ -58,6 +59,7 @@ CONFIG_SCHEMA = cv.Schema({
     cv.GenerateID(): cv.declare_id(TVMS1280Component),
     cv.Optional(CONF_SOURCE_ADDRESS, default=0x24): cv.hex_uint8_t,
     cv.Optional(CONF_HOST_ADDRESS, default=0x20): cv.hex_uint8_t,
+    cv.Optional(CONF_FILTER_INTERVAL, default="5s"): cv.positive_time_period_milliseconds,
     **_AUTO_IDS,
 }).extend(cv.COMPONENT_SCHEMA)
 
@@ -88,6 +90,7 @@ async def to_code(config):
     await cg.register_component(var, config)
     cg.add(var.set_source_address(config[CONF_SOURCE_ADDRESS]))
     cg.add(var.set_host_address(config[CONF_HOST_ADDRESS]))
+    cg.add(var.set_filter_interval_ms(config[CONF_FILTER_INTERVAL]))
 
     p = config[CONF_ID].id.replace("_", " ")
 

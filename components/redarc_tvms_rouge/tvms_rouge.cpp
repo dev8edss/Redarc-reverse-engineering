@@ -238,29 +238,42 @@ void TVMSRougeComponent::handle_can_frame(uint32_t can_id, const std::vector<uin
   can_id &= 0x1FFFFFFFUL;
   if (data.size() < 8) return;
 
+  const uint32_t now = millis();
+  const bool sensor_ok = (now - this->last_sensor_publish_ms_) >= this->filter_interval_ms_;
+
   if (can_id == this->tank_feedback_id_) {
-    if (data[0] == 0x09) {
-      if (this->tank1_sensor_ != nullptr) this->tank1_sensor_->publish_state((float) data[1]);
-      if (this->tank2_sensor_ != nullptr) this->tank2_sensor_->publish_state((float) data[2]);
-    } else if (data[0] == 0x16) {
-      // Label pages identify item 0x16 as Input Voltage and item 0x17 as
-      // Input Current. In the grouped 0x1BFD0230 status frame, D1 is the base
-      // item, so D3 carries item 0x17. Observed D3=0x2F => 4.7 A.
-      if (this->input_current_sensor_ != nullptr && data[2] != 0xFF) {
-        const float current = data[2] / 10.0f;
-        if (current >= 0.0f && current <= 25.5f) this->input_current_sensor_->publish_state(current);
+    if (sensor_ok) {
+      if (data[0] == 0x09) {
+        this->last_sensor_publish_ms_ = now;
+        if (this->tank1_sensor_ != nullptr) this->tank1_sensor_->publish_state((float) data[1]);
+        if (this->tank2_sensor_ != nullptr) this->tank2_sensor_->publish_state((float) data[2]);
+      } else if (data[0] == 0x16) {
+        // Label pages identify item 0x16 as Input Voltage and item 0x17 as
+        // Input Current. In the grouped 0x1BFD0230 status frame, D1 is the base
+        // item, so D3 carries item 0x17. Observed D3=0x2F => 4.7 A.
+        if (this->input_current_sensor_ != nullptr && data[2] != 0xFF) {
+          const float current = data[2] / 10.0f;
+          if (current >= 0.0f && current <= 25.5f) {
+            this->last_sensor_publish_ms_ = now;
+            this->input_current_sensor_->publish_state(current);
+          }
+        }
       }
     }
     return;
   }
 
   if (can_id == this->button_status_id_) {
+    // Button state changes are not throttled — they are edge events.
     this->handle_button_status_frame_(data);
     return;
   }
 
   if (can_id == this->input_status_id_) {
-    this->handle_input_status_frame_(data);
+    if (sensor_ok) {
+      this->last_sensor_publish_ms_ = now;
+      this->handle_input_status_frame_(data);
+    }
     return;
   }
 
@@ -337,13 +350,17 @@ void TVMSRougeComponent::set_feedback_level_(uint8_t output_number, float level)
   if (output_number < 1 || output_number > 10) return;
   if (level < 0.0f) level = 0.0f;
   if (level > 100.0f) level = 100.0f;
-  this->levels_[output_number] = level;
-  if (this->level_sensors_[output_number] != nullptr) this->level_sensors_[output_number]->publish_state(level);
+  this->levels_[output_number] = level;  // always update for dimming loop
 
-  // During an HA-requested dimming operation, do not let the actual hardware
-  // feedback overwrite the requested brightness in the HA light entity. The
-  // diagnostic level sensor above still tracks the real ramp continuously.
-  if (!this->should_suppress_light_feedback_(output_number)) this->publish_actual_light_level_(output_number);
+  const uint32_t now = millis();
+  if ((now - this->last_sensor_publish_ms_) >= this->filter_interval_ms_) {
+    this->last_sensor_publish_ms_ = now;
+    if (this->level_sensors_[output_number] != nullptr) this->level_sensors_[output_number]->publish_state(level);
+    // During an HA-requested dimming operation, do not let the actual hardware
+    // feedback overwrite the requested brightness in the HA light entity. The
+    // diagnostic level sensor above still tracks the real ramp continuously.
+    if (!this->should_suppress_light_feedback_(output_number)) this->publish_actual_light_level_(output_number);
+  }
 }
 
 bool TVMSRougeComponent::should_suppress_light_feedback_(uint8_t output_number) const {

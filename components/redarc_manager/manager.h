@@ -31,6 +31,7 @@ class Manager30Component : public Component {
  protected:
   uint8_t source_address_{0x01};
   uint32_t filter_interval_ms_{5000};
+  uint32_t last_publish_ms_{0};
   redarc_battery_sensor::BatterySensorComponent *battery_sensor_{nullptr};
   sensor::Sensor *output_current_sensor_{nullptr};
   sensor::Sensor *output_current_raw_sensor_{nullptr};

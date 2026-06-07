@@ -36,6 +36,7 @@ MULTI_CONF = False
 
 CONF_SOURCE_ADDRESS = "source_address"
 CONF_HOST_ADDRESS = "host_address"
+CONF_FILTER_INTERVAL = "filter_interval"
 CONF_TRUE_OFF_THRESHOLD = "true_off_threshold"
 CONF_TARGET_DEBOUNCE = "target_debounce"
 CONF_START_DEADLINE = "start_deadline"
@@ -83,6 +84,7 @@ CONFIG_SCHEMA = cv.Schema(
         cv.GenerateID(): cv.declare_id(TVMSRougeComponent),
         cv.Optional(CONF_SOURCE_ADDRESS, default=0x30): cv.hex_uint8_t,
         cv.Optional(CONF_HOST_ADDRESS, default=0x20): cv.hex_uint8_t,
+        cv.Optional(CONF_FILTER_INTERVAL, default="5s"): cv.positive_time_period_milliseconds,
         cv.Optional(CONF_TRUE_OFF_THRESHOLD, default=1.0): cv.float_range(min=0.0, max=10.0),
         cv.Optional(CONF_TARGET_DEBOUNCE, default="600ms"): cv.positive_time_period_milliseconds,
         cv.Optional(CONF_START_DEADLINE, default="2500ms"): cv.positive_time_period_milliseconds,
@@ -125,6 +127,7 @@ async def to_code(config):
 
     cg.add(var.set_source_address(config[CONF_SOURCE_ADDRESS]))
     cg.add(var.set_host_address(config[CONF_HOST_ADDRESS]))
+    cg.add(var.set_filter_interval_ms(config[CONF_FILTER_INTERVAL]))
     cg.add(var.set_true_off_threshold(config[CONF_TRUE_OFF_THRESHOLD]))
     cg.add(var.set_target_debounce_ms(config[CONF_TARGET_DEBOUNCE].total_milliseconds))
     cg.add(var.set_start_deadline_ms(config[CONF_START_DEADLINE].total_milliseconds))

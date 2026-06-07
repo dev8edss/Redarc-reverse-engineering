@@ -69,6 +69,7 @@ class TVMSRougeComponent : public Component {
 
   void set_source_address(uint8_t sa) { this->source_address_ = sa; }
   void set_host_address(uint8_t ha) { this->host_address_ = ha; }
+  void set_filter_interval_ms(uint32_t ms) { this->filter_interval_ms_ = ms; }
   void set_tank1_sensor(sensor::Sensor *s) { this->tank1_sensor_ = s; }
   void set_tank2_sensor(sensor::Sensor *s) { this->tank2_sensor_ = s; }
   void set_input_voltage_sensor(sensor::Sensor *s) { this->input_voltage_sensor_ = s; }
@@ -133,6 +134,8 @@ class TVMSRougeComponent : public Component {
 
   uint8_t source_address_{0x30};
   uint8_t host_address_{0x20};
+  uint32_t filter_interval_ms_{5000};
+  uint32_t last_sensor_publish_ms_{0};
   uint32_t output_command_id_{0};
   uint32_t dim_command_id_{0};
   uint32_t keepalive_id_{0};

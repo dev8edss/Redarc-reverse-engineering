@@ -35,24 +35,30 @@ packages:
 redarc_battery_sensor:
   id: Battery
   source_address: 0x08
+  filter_interval: ${sensor_average_interval}
 
 redarc_manager:
   id: Manager30
   source_address: 0x01
+  filter_interval: ${sensor_average_interval}
 
 # Multiple redvision displays are supported — add entries as needed.
 redarc_redvision_display:
   - id: Redvision1
     source_address: 0x20
+    filter_interval: ${sensor_average_interval}
   - id: Redvision2
     source_address: 0x21
+    filter_interval: ${sensor_average_interval}
 
 redarc_tvms_rouge:
   id: TVMS_Rouge
   source_address: 0x30
   host_address: ${host_address}
+  filter_interval: ${sensor_average_interval}
 
 redarc_tvms_1280:
   id: TVMS1280
   source_address: 0x24
   host_address: ${host_address}
+  filter_interval: ${sensor_average_interval}

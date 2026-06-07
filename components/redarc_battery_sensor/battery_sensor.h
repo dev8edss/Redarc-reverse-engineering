@@ -28,6 +28,7 @@ class BatterySensorComponent : public Component {
  protected:
   uint8_t source_address_{0x08};
   uint32_t filter_interval_ms_{5000};
+  uint32_t last_publish_ms_{0};
   float current_a_{NAN};
   sensor::Sensor *current_sensor_{nullptr};
   sensor::Sensor *current_raw_sensor_{nullptr};
