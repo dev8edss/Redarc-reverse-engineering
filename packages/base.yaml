@@ -35,6 +35,9 @@ external_components:
       - battery_sensor
       - redvision_display
 
+redarc_common:
+  canbus_id: rv_can
+
 canbus:
   - platform: esp32_can
     id: rv_can

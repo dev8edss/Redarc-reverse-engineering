@@ -1,14 +1,12 @@
 import esphome.codegen as cg
 import esphome.config_validation as cv
-from esphome.components import canbus, sensor, switch
+from esphome.components import sensor, switch
 from esphome.const import CONF_ID
 
 CODEOWNERS = ["@dev8edss"]
-DEPENDENCIES = ["canbus"]
 AUTO_LOAD = ["sensor", "switch", "redarc_common"]
 MULTI_CONF = False
 
-CONF_CANBUS_ID = "canbus_id"
 CONF_SOURCE_ADDRESS = "source_address"
 CONF_HOST_ADDRESS = "host_address"
 
@@ -35,7 +33,6 @@ _AUTO_IDS[cv.GenerateID("inverter_id")] = cv.declare_id(TVMS1280Switch)
 
 CONFIG_SCHEMA = cv.Schema({
     cv.GenerateID(): cv.declare_id(TVMS1280Component),
-    cv.Required(CONF_CANBUS_ID): cv.use_id(canbus.CanbusComponent),
     cv.Optional(CONF_SOURCE_ADDRESS, default=0x24): cv.hex_uint8_t,
     cv.Optional(CONF_HOST_ADDRESS, default=0x20): cv.hex_uint8_t,
     **_AUTO_IDS,
@@ -64,8 +61,6 @@ def _make_sensor(config_id, name, unit=None, device_class=None, state_class_raw=
 async def to_code(config):
     var = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(var, config)
-    can = await cg.get_variable(config[CONF_CANBUS_ID])
-    cg.add(var.set_canbus(can))
     cg.add(var.set_source_address(config[CONF_SOURCE_ADDRESS]))
     cg.add(var.set_host_address(config[CONF_HOST_ADDRESS]))
 

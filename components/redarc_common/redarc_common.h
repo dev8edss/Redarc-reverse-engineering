@@ -2,6 +2,8 @@
 #include <cstdint>
 #include <functional>
 #include <vector>
+#include "esphome/core/component.h"
+#include "esphome/components/canbus/canbus.h"
 
 namespace esphome {
 namespace redarc_common {
@@ -12,6 +14,8 @@ class RedarcCanDispatcher {
     static RedarcCanDispatcher inst;
     return inst;
   }
+  void set_canbus(canbus::Canbus *canbus) { this->canbus_ = canbus; }
+  canbus::Canbus *canbus() { return this->canbus_; }
   void add_listener(std::function<void(uint32_t, const std::vector<uint8_t> &)> cb) {
     this->listeners_.push_back(std::move(cb));
   }
@@ -19,7 +23,17 @@ class RedarcCanDispatcher {
     for (auto &cb : this->listeners_) cb(can_id, data);
   }
  private:
+  canbus::Canbus *canbus_{nullptr};
   std::vector<std::function<void(uint32_t, const std::vector<uint8_t> &)>> listeners_;
+};
+
+class RedarcCommonComponent : public Component {
+ public:
+  void set_canbus(canbus::Canbus *canbus) { this->canbus_ = canbus; }
+  void setup() override { RedarcCanDispatcher::instance().set_canbus(this->canbus_); }
+  float get_setup_priority() const override { return setup_priority::BUS; }
+ protected:
+  canbus::Canbus *canbus_{nullptr};
 };
 
 inline uint16_t u16_le(const std::vector<uint8_t> &data, uint8_t i) {

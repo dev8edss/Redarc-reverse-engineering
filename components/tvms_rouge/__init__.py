@@ -1,6 +1,6 @@
 import esphome.codegen as cg
 import esphome.config_validation as cv
-from esphome.components import binary_sensor, button, canbus, light, number, sensor
+from esphome.components import binary_sensor, button, light, number, sensor
 from esphome.const import (
     CONF_DEFAULT_TRANSITION_LENGTH,
     CONF_GAMMA_CORRECT,
@@ -9,11 +9,9 @@ from esphome.const import (
 )
 
 CODEOWNERS = ["@dev8edss"]
-DEPENDENCIES = ["canbus"]
-AUTO_LOAD = ["binary_sensor", "button", "light", "number", "sensor"]
+AUTO_LOAD = ["binary_sensor", "button", "light", "number", "sensor", "redarc_common"]
 MULTI_CONF = False
 
-CONF_CANBUS_ID = "canbus_id"
 CONF_SOURCE_ADDRESS = "source_address"
 CONF_HOST_ADDRESS = "host_address"
 CONF_TRUE_OFF_THRESHOLD = "true_off_threshold"
@@ -56,7 +54,6 @@ _AUTO_IDS[cv.GenerateID("abort_btn_id")] = cv.declare_id(TVMSRougeButton)
 CONFIG_SCHEMA = cv.Schema(
     {
         cv.GenerateID(): cv.declare_id(TVMSRougeComponent),
-        cv.Required(CONF_CANBUS_ID): cv.use_id(canbus.CanbusComponent),
         cv.Optional(CONF_SOURCE_ADDRESS, default=0x30): cv.hex_uint8_t,
         cv.Optional(CONF_HOST_ADDRESS, default=0x20): cv.hex_uint8_t,
         cv.Optional(CONF_TRUE_OFF_THRESHOLD, default=1.0): cv.float_range(min=0.0, max=10.0),
@@ -97,8 +94,6 @@ async def to_code(config):
     var = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(var, config)
 
-    can = await cg.get_variable(config[CONF_CANBUS_ID])
-    cg.add(var.set_canbus(can))
     cg.add(var.set_source_address(config[CONF_SOURCE_ADDRESS]))
     cg.add(var.set_host_address(config[CONF_HOST_ADDRESS]))
     cg.add(var.set_true_off_threshold(config[CONF_TRUE_OFF_THRESHOLD]))
