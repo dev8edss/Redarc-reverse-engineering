@@ -26,7 +26,7 @@ external_components:
   - source:
       type: git
       url: https://github.com/dev8edss/Redarc-reverse-engineering
-      ref: d540afff9fa64b24dc64dacd3b23b70b5ab5adca
+      ref: 661a572701c17f0dc64731081855563a4ffc3e82
     refresh: always
     components:
       - redarc_common
