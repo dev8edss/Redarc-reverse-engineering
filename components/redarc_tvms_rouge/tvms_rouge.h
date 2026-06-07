@@ -135,7 +135,8 @@ class TVMSRougeComponent : public Component {
   uint8_t source_address_{0x30};
   uint8_t host_address_{0x20};
   uint32_t filter_interval_ms_{5000};
-  uint32_t last_tank_ms_{0};
+  uint8_t last_tank1_raw_{0xFF};
+  uint8_t last_tank2_raw_{0xFF};
   uint32_t last_input_current_ms_{0};
   uint32_t last_input_status_ms_{0};
   uint32_t output_command_id_{0};

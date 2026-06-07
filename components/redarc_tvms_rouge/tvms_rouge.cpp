@@ -242,9 +242,12 @@ void TVMSRougeComponent::handle_can_frame(uint32_t can_id, const std::vector<uin
 
   if (can_id == this->tank_feedback_id_) {
     if (data[0] == 0x09) {
-      if (now - this->last_tank_ms_ >= this->filter_interval_ms_) {
-        this->last_tank_ms_ = now;
+      if (data[1] != this->last_tank1_raw_) {
+        this->last_tank1_raw_ = data[1];
         if (this->tank1_sensor_ != nullptr) this->tank1_sensor_->publish_state((float) data[1]);
+      }
+      if (data[2] != this->last_tank2_raw_) {
+        this->last_tank2_raw_ = data[2];
         if (this->tank2_sensor_ != nullptr) this->tank2_sensor_->publish_state((float) data[2]);
       }
     } else if (data[0] == 0x16) {
