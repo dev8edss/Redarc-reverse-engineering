@@ -2,14 +2,12 @@ import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome.components import binary_sensor, button, light, number, sensor
 from esphome.const import (
-    CONF_DEFAULT_TRANSITION_LENGTH,
-    CONF_DISABLED_BY_DEFAULT,
-    CONF_EFFECTS,
-    CONF_FLASH_TRANSITION_LENGTH,
-    CONF_GAMMA_CORRECT,
-    CONF_ID,
-    CONF_NAME,
-    CONF_RESTORE_MODE,
+    CONF_ACCURACY_DECIMALS, CONF_DEFAULT_TRANSITION_LENGTH, CONF_DEVICE_CLASS,
+    CONF_DISABLED_BY_DEFAULT, CONF_EFFECTS, CONF_ENTITY_CATEGORY,
+    CONF_FLASH_TRANSITION_LENGTH, CONF_GAMMA_CORRECT, CONF_ICON,
+    CONF_ID, CONF_NAME, CONF_STATE_CLASS, CONF_UNIT_OF_MEASUREMENT,
+    ENTITY_CATEGORY_CONFIG, ENTITY_CATEGORY_DIAGNOSTIC, ENTITY_CATEGORY_NONE,
+    STATE_CLASS_MEASUREMENT,
 )
 
 CODEOWNERS = ["@dev8edss"]
@@ -75,23 +73,24 @@ CONFIG_SCHEMA = cv.Schema(
 ).extend(cv.COMPONENT_SCHEMA)
 
 
-def _make_sensor(config_id, name, unit=None, device_class=None, state_class_raw=None,
-                 decimals=None, entity_category_raw=None):
-    var = cg.new_Pvariable(config_id)
-    cg.add(var.set_name(name))
-    if unit:
-        cg.add(var.set_unit_of_measurement(unit))
-    if device_class:
-        cg.add(var.set_device_class(device_class))
-    if state_class_raw:
-        cg.add(var.set_state_class(cg.RawExpression(state_class_raw)))
+async def _make_sensor(config_id, name, unit=None, device_class=None,
+                       state_class=None, decimals=None, entity_category=None):
+    cfg = {
+        CONF_ID: config_id,
+        CONF_NAME: name,
+        CONF_DISABLED_BY_DEFAULT: False,
+        CONF_ICON: "",
+        CONF_ENTITY_CATEGORY: entity_category if entity_category is not None else ENTITY_CATEGORY_NONE,
+    }
+    if unit is not None:
+        cfg[CONF_UNIT_OF_MEASUREMENT] = unit
+    if device_class is not None:
+        cfg[CONF_DEVICE_CLASS] = device_class
+    if state_class is not None:
+        cfg[CONF_STATE_CLASS] = state_class
     if decimals is not None:
-        cg.add(var.set_accuracy_decimals(decimals))
-    if entity_category_raw:
-        cg.add(var.set_entity_category(cg.RawExpression(entity_category_raw)))
-    cg.add(cg.App.register_component(var))
-    cg.add(cg.App.register_sensor(var))
-    return var
+        cfg[CONF_ACCURACY_DECIMALS] = decimals
+    return await sensor.new_sensor(cfg)
 
 
 async def to_code(config):
@@ -112,39 +111,43 @@ async def to_code(config):
     cg.add(var.set_max_iterations(config[CONF_MAX_ITERATIONS]))
 
     p = config[CONF_ID].id.replace("_", " ")
-    SC = "sensor::StateClass::STATE_CLASS_MEASUREMENT"
-    DIAG = "ENTITY_CATEGORY_DIAGNOSTIC"
-    CFG = "ENTITY_CATEGORY_CONFIG"
 
     # Sensors
-    s = _make_sensor(config["tank1_id"], f"{p} Tank 1",
-                     unit="%", state_class_raw=SC, decimals=0)
+    s = await _make_sensor(config["tank1_id"], f"{p} Tank 1",
+                           unit="%", state_class=STATE_CLASS_MEASUREMENT, decimals=0)
     cg.add(var.set_tank1_sensor(s))
 
-    s = _make_sensor(config["tank2_id"], f"{p} Tank 2",
-                     unit="%", state_class_raw=SC, decimals=0)
+    s = await _make_sensor(config["tank2_id"], f"{p} Tank 2",
+                           unit="%", state_class=STATE_CLASS_MEASUREMENT, decimals=0)
     cg.add(var.set_tank2_sensor(s))
 
-    s = _make_sensor(config["input_voltage_id"], f"{p} Input Voltage",
-                     unit="V", device_class="voltage", state_class_raw=SC, decimals=2)
+    s = await _make_sensor(config["input_voltage_id"], f"{p} Input Voltage",
+                           unit="V", device_class="voltage",
+                           state_class=STATE_CLASS_MEASUREMENT, decimals=2)
     cg.add(var.set_input_voltage_sensor(s))
 
-    s = _make_sensor(config["input_current_id"], f"{p} Input Current",
-                     unit="A", device_class="current", state_class_raw=SC, decimals=1,
-                     entity_category_raw=DIAG)
+    s = await _make_sensor(config["input_current_id"], f"{p} Input Current",
+                           unit="A", device_class="current",
+                           state_class=STATE_CLASS_MEASUREMENT, decimals=1,
+                           entity_category=ENTITY_CATEGORY_DIAGNOSTIC)
     cg.add(var.set_input_current_sensor(s))
 
     # Output level sensors and button state binary sensors
     for i in range(1, 11):
-        ls = _make_sensor(config[f"level_sensor_{i}"], f"{p} Output {i} Level",
-                          unit="%", state_class_raw=SC, decimals=0,
-                          entity_category_raw=DIAG)
+        ls = await _make_sensor(config[f"level_sensor_{i}"], f"{p} Output {i} Level",
+                                unit="%", state_class=STATE_CLASS_MEASUREMENT, decimals=0,
+                                entity_category=ENTITY_CATEGORY_DIAGNOSTIC)
         cg.add(var.set_level_sensor(i, ls))
 
         bs = cg.new_Pvariable(config[f"button_sensor_{i}"])
-        cg.add(bs.set_name(f"{p} Output {i} Button Active"))
-        cg.add(cg.App.register_component(bs))
-        cg.add(cg.App.register_binary_sensor(bs))
+        bs_cfg = {
+            CONF_ID: config[f"button_sensor_{i}"],
+            CONF_NAME: f"{p} Output {i} Button Active",
+            CONF_DISABLED_BY_DEFAULT: False,
+            CONF_ICON: "",
+            CONF_ENTITY_CATEGORY: ENTITY_CATEGORY_DIAGNOSTIC,
+        }
+        await binary_sensor.register_binary_sensor(bs, bs_cfg)
         cg.add(var.set_button_sensor(i, bs))
 
     # Lights
@@ -162,7 +165,6 @@ async def to_code(config):
             CONF_DEFAULT_TRANSITION_LENGTH: 0,
             CONF_FLASH_TRANSITION_LENGTH: 250,
             CONF_DISABLED_BY_DEFAULT: False,
-            CONF_RESTORE_MODE: cg.RawExpression("light::LightRestoreMode::RESTORE_DEFAULT_OFF"),
             CONF_EFFECTS: [],
         }
         await light.register_light(light_out, light_cfg)
@@ -179,23 +181,28 @@ async def to_code(config):
     ]
     for suffix, param_idx, min_v, max_v, step, initial, unit in TUNING:
         num = cg.new_Pvariable(config[f"num_{param_idx}"])
-        cg.add(num.set_name(f"{p} {suffix}"))
-        cg.add(num.set_entity_category(cg.RawExpression(CFG)))
-        if unit:
-            cg.add(num.set_unit_of_measurement(unit))
-        cg.add(num.traits.set_min_value(min_v))
-        cg.add(num.traits.set_max_value(max_v))
-        cg.add(num.traits.set_step(step))
         cg.add(num.set_parent(var))
         cg.add(num.set_parameter(param_idx))
         cg.add(num.set_initial_value(initial))
-        cg.add(cg.App.register_component(num))
-        cg.add(cg.App.register_number(num))
+        num_cfg = {
+            CONF_ID: config[f"num_{param_idx}"],
+            CONF_NAME: f"{p} {suffix}",
+            CONF_DISABLED_BY_DEFAULT: False,
+            CONF_ICON: "",
+            CONF_ENTITY_CATEGORY: ENTITY_CATEGORY_CONFIG,
+        }
+        if unit:
+            num_cfg[CONF_UNIT_OF_MEASUREMENT] = unit
+        await number.register_number(num, num_cfg, min_value=min_v, max_value=max_v, step=step)
 
     # Abort button
     btn = cg.new_Pvariable(config["abort_btn_id"])
-    cg.add(btn.set_name(f"{p} Abort and Release"))
-    cg.add(btn.set_entity_category(cg.RawExpression(DIAG)))
     cg.add(btn.set_parent(var))
-    cg.add(cg.App.register_component(btn))
-    cg.add(cg.App.register_button(btn))
+    btn_cfg = {
+        CONF_ID: config["abort_btn_id"],
+        CONF_NAME: f"{p} Abort and Release",
+        CONF_DISABLED_BY_DEFAULT: False,
+        CONF_ICON: "",
+        CONF_ENTITY_CATEGORY: ENTITY_CATEGORY_DIAGNOSTIC,
+    }
+    await button.register_button(btn, btn_cfg)

@@ -1,5 +1,4 @@
 #include "battery_sensor.h"
-#include "esphome/components/sensor/filter.h"
 
 namespace esphome {
 namespace battery_sensor {
@@ -9,20 +8,6 @@ static const char *const TAG = "battery_sensor";
 void BatterySensorComponent::setup() {
   redarc_common::RedarcCanDispatcher::instance().add_listener(
       [this](uint32_t id, const std::vector<uint8_t> &data) { this->handle_can_frame(id, data); });
-  if (this->filter_interval_ms_ > 0) {
-    auto apply = [&](sensor::Sensor *s) {
-      if (s != nullptr) {
-        auto *f = new sensor::ThrottleAverageFilter(this->filter_interval_ms_);
-        f->setup();
-        s->add_filter(f);
-      }
-    };
-    apply(this->current_sensor_);
-    apply(this->current_raw_sensor_);
-    apply(this->voltage_sensor_);
-    apply(this->temperature_sensor_);
-    apply(this->soc_sensor_);
-  }
 }
 
 void BatterySensorComponent::dump_config() {
