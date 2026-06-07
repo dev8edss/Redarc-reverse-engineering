@@ -283,6 +283,7 @@ void TVMSRougeComponent::handle_can_frame(uint32_t can_id, const std::vector<uin
       if (channel >= 0x0C && channel <= 0x15) {
         const uint8_t output_number = channel - 0x0B;
         const bool on = data[4] != 0;
+        this->publish_now_ = true;  // command echo is a state-change event, never throttle
         if (!on) {
           this->set_feedback_level_(output_number, 0.0f);
         } else {
@@ -290,12 +291,19 @@ void TVMSRougeComponent::handle_can_frame(uint32_t can_id, const std::vector<uin
           if (std::isnan(current) || current <= this->true_off_threshold_percent_) current = 100.0f;
           this->set_feedback_level_(output_number, current);
         }
+        this->publish_now_ = false;
       }
     }
     return;
   }
 
   if (can_id != this->level_feedback_id_) return;
+
+  // Set publish_now_ once for the whole batch so every output in the loop
+  // gets the same decision. Without this, output 1 would stamp the timer and
+  // outputs 2–10 would all be throttled away.
+  this->publish_now_ = sensor_ok;
+  if (sensor_ok) this->last_sensor_publish_ms_ = now;
 
   if (data[0] == 0x0C) {
     for (uint8_t i = 1; i <= 7; i++) this->set_feedback_level_(i, (float) data[i]);
@@ -304,6 +312,7 @@ void TVMSRougeComponent::handle_can_frame(uint32_t can_id, const std::vector<uin
     this->set_feedback_level_(9, (float) data[2]);
     this->set_feedback_level_(10, (float) data[3]);
   }
+  this->publish_now_ = false;
 }
 
 void TVMSRougeComponent::handle_button_status_frame_(const std::vector<uint8_t> &data) {
@@ -352,9 +361,7 @@ void TVMSRougeComponent::set_feedback_level_(uint8_t output_number, float level)
   if (level > 100.0f) level = 100.0f;
   this->levels_[output_number] = level;  // always update for dimming loop
 
-  const uint32_t now = millis();
-  if ((now - this->last_sensor_publish_ms_) >= this->filter_interval_ms_) {
-    this->last_sensor_publish_ms_ = now;
+  if (this->publish_now_) {
     if (this->level_sensors_[output_number] != nullptr) this->level_sensors_[output_number]->publish_state(level);
     // During an HA-requested dimming operation, do not let the actual hardware
     // feedback overwrite the requested brightness in the HA light entity. The

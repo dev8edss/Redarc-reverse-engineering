@@ -136,6 +136,7 @@ class TVMSRougeComponent : public Component {
   uint8_t host_address_{0x20};
   uint32_t filter_interval_ms_{5000};
   uint32_t last_sensor_publish_ms_{0};
+  bool publish_now_{false};
   uint32_t output_command_id_{0};
   uint32_t dim_command_id_{0};
   uint32_t keepalive_id_{0};
