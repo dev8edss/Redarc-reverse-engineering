@@ -55,6 +55,11 @@ TVMSRougeButton = tvms_rouge_ns.class_("TVMSRougeButton", button.Button, cg.Comp
 
 _sensor_ns = cg.esphome_ns.namespace("sensor")
 _SensorClass = _sensor_ns.class_("Sensor")
+_StateClass = _sensor_ns.enum("StateClass")
+_SC_MAP = {
+    "measurement": _StateClass.STATE_CLASS_MEASUREMENT,
+    "total_increasing": _StateClass.STATE_CLASS_TOTAL_INCREASING,
+}
 _bs_ns = cg.esphome_ns.namespace("binary_sensor")
 _BSClass = _bs_ns.class_("BinarySensor")
 
@@ -108,7 +113,7 @@ async def _make_sensor(config_id, name, unit=None, device_class=None,
     if device_class is not None:
         cfg[CONF_DEVICE_CLASS] = device_class
     if state_class is not None:
-        cfg[CONF_STATE_CLASS] = state_class
+        cfg[CONF_STATE_CLASS] = _SC_MAP.get(state_class, state_class)
     if decimals is not None:
         cfg[CONF_ACCURACY_DECIMALS] = decimals
     return await sensor.new_sensor(cfg)

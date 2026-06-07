@@ -34,6 +34,11 @@ TVMS1280Switch = ns.class_("TVMS1280Switch", switch.Switch)
 
 _sensor_ns = cg.esphome_ns.namespace("sensor")
 _SensorClass = _sensor_ns.class_("Sensor")
+_StateClass = _sensor_ns.enum("StateClass")
+_SC_MAP = {
+    "measurement": _StateClass.STATE_CLASS_MEASUREMENT,
+    "total_increasing": _StateClass.STATE_CLASS_TOTAL_INCREASING,
+}
 
 _AUTO_IDS = {}
 for _i in range(1, 7):
@@ -72,7 +77,7 @@ async def _make_sensor(config_id, name, unit=None, device_class=None,
     if device_class is not None:
         cfg[CONF_DEVICE_CLASS] = device_class
     if state_class is not None:
-        cfg[CONF_STATE_CLASS] = state_class
+        cfg[CONF_STATE_CLASS] = _SC_MAP.get(state_class, state_class)
     if decimals is not None:
         cfg[CONF_ACCURACY_DECIMALS] = decimals
     return await sensor.new_sensor(cfg)
