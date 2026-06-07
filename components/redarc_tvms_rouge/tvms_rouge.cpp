@@ -242,6 +242,7 @@ void TVMSRougeComponent::handle_can_frame(uint32_t can_id, const std::vector<uin
   const bool sensor_ok = (now - this->last_sensor_publish_ms_) >= this->filter_interval_ms_;
 
   if (can_id == this->tank_feedback_id_) {
+    ESP_LOGI(TAG, "tank frame d0=0x%02X sensor_ok=%d elapsed=%ums", data[0], (int)sensor_ok, (unsigned)(now - this->last_sensor_publish_ms_));
     if (sensor_ok) {
       if (data[0] == 0x09) {
         this->last_sensor_publish_ms_ = now;
@@ -298,6 +299,8 @@ void TVMSRougeComponent::handle_can_frame(uint32_t can_id, const std::vector<uin
   }
 
   if (can_id != this->level_feedback_id_) return;
+
+  ESP_LOGI(TAG, "level_feedback d0=0x%02X sensor_ok=%d elapsed=%ums", data[0], (int)sensor_ok, (unsigned)(now - this->last_sensor_publish_ms_));
 
   // publish_now_ is set per-branch so the timer is only stamped when data[0]
   // matches a known type. Other item types on this CAN ID must not consume the
