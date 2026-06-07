@@ -5,10 +5,22 @@ from esphome.const import (
     CONF_ACCURACY_DECIMALS, CONF_DEFAULT_TRANSITION_LENGTH, CONF_DEVICE_CLASS,
     CONF_DISABLED_BY_DEFAULT, CONF_EFFECTS, CONF_ENTITY_CATEGORY,
     CONF_FLASH_TRANSITION_LENGTH, CONF_FORCE_UPDATE, CONF_GAMMA_CORRECT, CONF_ICON,
-    CONF_ID, CONF_NAME, CONF_STATE_CLASS, CONF_UNIT_OF_MEASUREMENT,
+    CONF_ID, CONF_NAME, CONF_RESTORE_MODE, CONF_STATE_CLASS, CONF_UNIT_OF_MEASUREMENT,
     ENTITY_CATEGORY_CONFIG, ENTITY_CATEGORY_DIAGNOSTIC, ENTITY_CATEGORY_NONE,
     STATE_CLASS_MEASUREMENT,
 )
+
+# Resolve restore mode via ESPHome's own mapping so the correct C++ enum name
+# is used regardless of ESPHome version (RESTORE_DEFAULT_OFF removed in 2026.5.x).
+try:
+    _RESTORE_MODE_OFF = (
+        light.RESTORE_MODES.get("RESTORE_DEFAULT_OFF")
+        or light.RESTORE_MODES.get("RESTORE_AND_OFF")
+        or next(iter(light.RESTORE_MODES.values()))
+    )
+except AttributeError:
+    _light_ns = cg.esphome_ns.namespace("light")
+    _RESTORE_MODE_OFF = _light_ns.enum("LightRestoreMode", is_class=True).RESTORE_AND_OFF
 
 CODEOWNERS = ["@dev8edss"]
 AUTO_LOAD = ["binary_sensor", "button", "light", "number", "sensor", "redarc_common"]
@@ -166,6 +178,7 @@ async def to_code(config):
             CONF_DEFAULT_TRANSITION_LENGTH: 0,
             CONF_FLASH_TRANSITION_LENGTH: 250,
             CONF_DISABLED_BY_DEFAULT: False,
+            CONF_RESTORE_MODE: _RESTORE_MODE_OFF,
             CONF_EFFECTS: [],
         }
         await light.register_light(light_out, light_cfg)
