@@ -299,20 +299,22 @@ void TVMSRougeComponent::handle_can_frame(uint32_t can_id, const std::vector<uin
 
   if (can_id != this->level_feedback_id_) return;
 
-  // Set publish_now_ once for the whole batch so every output in the loop
-  // gets the same decision. Without this, output 1 would stamp the timer and
-  // outputs 2–10 would all be throttled away.
-  this->publish_now_ = sensor_ok;
-  if (sensor_ok) this->last_sensor_publish_ms_ = now;
-
+  // publish_now_ is set per-branch so the timer is only stamped when data[0]
+  // matches a known type. Other item types on this CAN ID must not consume the
+  // throttle window or they would silently block all sensor and tank publishes.
   if (data[0] == 0x0C) {
+    this->publish_now_ = sensor_ok;
+    if (sensor_ok) this->last_sensor_publish_ms_ = now;
     for (uint8_t i = 1; i <= 7; i++) this->set_feedback_level_(i, (float) data[i]);
+    this->publish_now_ = false;
   } else if (data[0] == 0x13) {
+    this->publish_now_ = sensor_ok;
+    if (sensor_ok) this->last_sensor_publish_ms_ = now;
     this->set_feedback_level_(8, (float) data[1]);
     this->set_feedback_level_(9, (float) data[2]);
     this->set_feedback_level_(10, (float) data[3]);
+    this->publish_now_ = false;
   }
-  this->publish_now_ = false;
 }
 
 void TVMSRougeComponent::handle_button_status_frame_(const std::vector<uint8_t> &data) {
