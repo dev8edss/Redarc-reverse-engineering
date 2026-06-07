@@ -18,7 +18,7 @@ substitutions:
   logger_level: INFO
 
   # ESP32 source address on the REDARC network (2 hex digits, no 0x prefix). Usually matches a redvision display address.
-  host_address: "20"
+  host_address: "0x20"
 
 packages:
   # Core infrastructure — ESPHome, ESP32, Wi-Fi, CAN hardware, external components.
@@ -50,9 +50,9 @@ redvision_display:
 tvms_rouge:
   id: TVMS_Rouge
   source_address: 0x30
-  host_address: 0x${host_address}
+  host_address: ${host_address}
 
 tvms_1280:
   id: TVMS1280
   source_address: 0x24
-  host_address: 0x${host_address}
+  host_address: ${host_address}
