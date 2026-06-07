@@ -61,7 +61,7 @@ canbus:
 
 battery_sensor:
   id: battery_sensor_hub
-  source_address: 0x08
+  source_address: 0x${battery_sensor_address}
   current:
     name: "Battery Current"
     unit_of_measurement: "A"
@@ -104,7 +104,7 @@ battery_sensor:
 
 manager30:
   id: manager30_hub
-  source_address: 0x01
+  source_address: 0x${manager30_address}
   battery_sensor_id: battery_sensor_hub
   output_current:
     name: "Manager30 Output Current"
@@ -182,7 +182,7 @@ manager30:
 
 redvision_display:
   - id: redvision1_hub
-    source_address: 0x20
+    source_address: 0x${redvision_address}
     display_type: rv1
     battery_current_display:
       name: "Redvision 1 Battery Current Display"
@@ -234,13 +234,13 @@ redvision_display:
 tvms_rouge:
   id: tvms_rouge_hub
   canbus_id: rv_can
-  output_command_id: 0x0F003020
-  dim_command_id: 0x0F053020
-  keepalive_id: 0x0FE6FF20
-  level_feedback_id: 0x1BFD1230
-  tank_feedback_id: 0x1BFD0230
-  button_status_id: 0x1BFD1430
-  input_status_id: 0x13F10830
+  output_command_id: 0x0F00${tvms_rouge_address}${host_address}
+  dim_command_id: 0x0F05${tvms_rouge_address}${host_address}
+  keepalive_id: 0x0FE6FF${host_address}
+  level_feedback_id: 0x1BFD12${tvms_rouge_address}
+  tank_feedback_id: 0x1BFD02${tvms_rouge_address}
+  button_status_id: 0x1BFD14${tvms_rouge_address}
+  input_status_id: 0x13F108${tvms_rouge_address}
   true_off_threshold: 1.0
   target_debounce: 600ms
   start_deadline: 2500ms
@@ -348,12 +348,12 @@ tvms_rouge:
 tvms_1280:
   id: tvms1280_hub
   canbus_id: rv_can
-  source_address: 0x24
-  command_id: 0x0F002420
-  temp_tank_id: 0x1BFD0224
-  output_status_id: 0x1BFD0024
-  channel_status_id: 0x1BFCF024
-  input_status_id: 0x13F10824
+  source_address: 0x${tvms_1280_address}
+  command_id: 0x0F00${tvms_1280_address}${host_address}
+  temp_tank_id: 0x1BFD02${tvms_1280_address}
+  output_status_id: 0x1BFD00${tvms_1280_address}
+  channel_status_id: 0x1BFCF0${tvms_1280_address}
+  input_status_id: 0x13F108${tvms_1280_address}
   temp1:
     name: "TVMS1280 Temperature 1"
     unit_of_measurement: "°C"

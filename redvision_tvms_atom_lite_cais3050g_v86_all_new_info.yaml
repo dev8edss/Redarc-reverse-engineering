@@ -17,6 +17,14 @@ substitutions:
   board: m5stack-atom
   logger_level: INFO
 
+  # REDARC network source addresses (2 hex digits, no 0x prefix).
+  host_address: "20"
+  battery_sensor_address: "08"
+  manager30_address: "01"
+  redvision_address: "20"
+  tvms_rouge_address: "30"
+  tvms_1280_address: "24"
+
 packages:
   redvision_can_bridge:
     url: https://github.com/dev8edss/Redarc-reverse-engineering
