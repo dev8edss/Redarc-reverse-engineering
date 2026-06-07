@@ -1,4 +1,5 @@
-# vars: address (2 hex digits, TVMS Rouge SA), host_address (2 hex digits, ESP32 SA), name_prefix (must be a valid C++ identifier, no spaces)
+# vars: address (2 hex digits, TVMS Rouge SA), name_prefix (must be a valid C++ identifier, no spaces)
+# host_address comes from the global substitution in the main YAML
 tvms_rouge:
   id: ${name_prefix}
   canbus_id: rv_can

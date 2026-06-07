@@ -17,6 +17,9 @@ substitutions:
   board: m5stack-atom
   logger_level: INFO
 
+  # ESP32 source address on the REDARC network (2 hex digits, no 0x prefix).
+  host_address: "20"
+
 packages:
   # Core infrastructure — ESPHome, ESP32, Wi-Fi, CAN hardware, external components.
   base:
@@ -54,12 +57,10 @@ packages:
     file: packages/tvms_rouge.yaml
     vars:
       address: "30"
-      host_address: "20"
       name_prefix: TVMS_Rouge
 
   tvms_1280: !include
     file: packages/tvms_1280.yaml
     vars:
       address: "24"
-      host_address: "20"
       name_prefix: TVMS1280
