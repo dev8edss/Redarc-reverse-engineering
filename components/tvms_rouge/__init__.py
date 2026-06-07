@@ -14,13 +14,8 @@ AUTO_LOAD = ["binary_sensor", "button", "light", "number", "sensor"]
 MULTI_CONF = False
 
 CONF_CANBUS_ID = "canbus_id"
-CONF_OUTPUT_COMMAND_ID = "output_command_id"
-CONF_DIM_COMMAND_ID = "dim_command_id"
-CONF_KEEPALIVE_ID = "keepalive_id"
-CONF_LEVEL_FEEDBACK_ID = "level_feedback_id"
-CONF_TANK_FEEDBACK_ID = "tank_feedback_id"
-CONF_BUTTON_STATUS_ID = "button_status_id"
-CONF_INPUT_STATUS_ID = "input_status_id"
+CONF_SOURCE_ADDRESS = "source_address"
+CONF_HOST_ADDRESS = "host_address"
 CONF_TRUE_OFF_THRESHOLD = "true_off_threshold"
 CONF_TARGET_DEBOUNCE = "target_debounce"
 CONF_START_DEADLINE = "start_deadline"
@@ -62,13 +57,8 @@ CONFIG_SCHEMA = cv.Schema(
     {
         cv.GenerateID(): cv.declare_id(TVMSRougeComponent),
         cv.Required(CONF_CANBUS_ID): cv.use_id(canbus.CanbusComponent),
-        cv.Optional(CONF_OUTPUT_COMMAND_ID, default=0x0F003020): cv.hex_uint32_t,
-        cv.Optional(CONF_DIM_COMMAND_ID, default=0x0F053020): cv.hex_uint32_t,
-        cv.Optional(CONF_KEEPALIVE_ID, default=0x0FE6FF20): cv.hex_uint32_t,
-        cv.Optional(CONF_LEVEL_FEEDBACK_ID, default=0x1BFD1230): cv.hex_uint32_t,
-        cv.Optional(CONF_TANK_FEEDBACK_ID, default=0x1BFD0230): cv.hex_uint32_t,
-        cv.Optional(CONF_BUTTON_STATUS_ID, default=0x1BFD1430): cv.hex_uint32_t,
-        cv.Optional(CONF_INPUT_STATUS_ID, default=0x13F10830): cv.hex_uint32_t,
+        cv.Optional(CONF_SOURCE_ADDRESS, default=0x30): cv.hex_uint8_t,
+        cv.Optional(CONF_HOST_ADDRESS, default=0x20): cv.hex_uint8_t,
         cv.Optional(CONF_TRUE_OFF_THRESHOLD, default=1.0): cv.float_range(min=0.0, max=10.0),
         cv.Optional(CONF_TARGET_DEBOUNCE, default="600ms"): cv.positive_time_period_milliseconds,
         cv.Optional(CONF_START_DEADLINE, default="2500ms"): cv.positive_time_period_milliseconds,
@@ -109,13 +99,8 @@ async def to_code(config):
 
     can = await cg.get_variable(config[CONF_CANBUS_ID])
     cg.add(var.set_canbus(can))
-    cg.add(var.set_output_command_id(config[CONF_OUTPUT_COMMAND_ID]))
-    cg.add(var.set_dim_command_id(config[CONF_DIM_COMMAND_ID]))
-    cg.add(var.set_keepalive_id(config[CONF_KEEPALIVE_ID]))
-    cg.add(var.set_level_feedback_id(config[CONF_LEVEL_FEEDBACK_ID]))
-    cg.add(var.set_tank_feedback_id(config[CONF_TANK_FEEDBACK_ID]))
-    cg.add(var.set_button_status_id(config[CONF_BUTTON_STATUS_ID]))
-    cg.add(var.set_input_status_id(config[CONF_INPUT_STATUS_ID]))
+    cg.add(var.set_source_address(config[CONF_SOURCE_ADDRESS]))
+    cg.add(var.set_host_address(config[CONF_HOST_ADDRESS]))
     cg.add(var.set_true_off_threshold(config[CONF_TRUE_OFF_THRESHOLD]))
     cg.add(var.set_target_debounce_ms(config[CONF_TARGET_DEBOUNCE].total_milliseconds))
     cg.add(var.set_start_deadline_ms(config[CONF_START_DEADLINE].total_milliseconds))

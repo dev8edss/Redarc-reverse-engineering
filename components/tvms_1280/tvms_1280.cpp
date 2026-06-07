@@ -11,6 +11,13 @@ void TVMS1280Switch::write_state(bool state) {
 }
 
 void TVMS1280Component::setup() {
+  const uint8_t sa = this->source_address_;
+  const uint8_t ha = this->host_address_;
+  this->command_id_       = 0x0F000000UL | ((uint32_t) sa << 8) | ha;
+  this->temp_tank_id_     = 0x1BFD0200UL | sa;
+  this->output_status_id_ = 0x1BFD0000UL | sa;
+  this->channel_status_id_= 0x1BFCF000UL | sa;
+  this->input_status_id_  = 0x13F10800UL | sa;
   redarc_common::RedarcCanDispatcher::instance().add_listener(
       [this](uint32_t id, const std::vector<uint8_t> &data) { this->handle_can_frame(id, data); });
 }

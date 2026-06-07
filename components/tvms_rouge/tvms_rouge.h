@@ -69,13 +69,8 @@ class TVMSRougeComponent : public Component {
   void dump_config() override;
 
   void set_canbus(canbus::Canbus *canbus) { this->canbus_ = canbus; }
-  void set_output_command_id(uint32_t id) { this->output_command_id_ = id; }
-  void set_dim_command_id(uint32_t id) { this->dim_command_id_ = id; }
-  void set_keepalive_id(uint32_t id) { this->keepalive_id_ = id; }
-  void set_level_feedback_id(uint32_t id) { this->level_feedback_id_ = id; }
-  void set_tank_feedback_id(uint32_t id) { this->tank_feedback_id_ = id; }
-  void set_button_status_id(uint32_t id) { this->button_status_id_ = id; }
-  void set_input_status_id(uint32_t id) { this->input_status_id_ = id; }
+  void set_source_address(uint8_t sa) { this->source_address_ = sa; }
+  void set_host_address(uint8_t ha) { this->host_address_ = ha; }
   void set_tank1_sensor(sensor::Sensor *s) { this->tank1_sensor_ = s; }
   void set_tank2_sensor(sensor::Sensor *s) { this->tank2_sensor_ = s; }
   void set_input_voltage_sensor(sensor::Sensor *s) { this->input_voltage_sensor_ = s; }
@@ -139,13 +134,15 @@ class TVMSRougeComponent : public Component {
   uint8_t channel_for_output_(uint8_t output_number) const { return 0x0B + output_number; }
 
   canbus::Canbus *canbus_{nullptr};
-  uint32_t output_command_id_{0x0F003020};
-  uint32_t dim_command_id_{0x0F053020};
-  uint32_t keepalive_id_{0x0FE6FF20};
-  uint32_t level_feedback_id_{0x1BFD1230};
-  uint32_t tank_feedback_id_{0x1BFD0230};
-  uint32_t button_status_id_{0x1BFD1430};
-  uint32_t input_status_id_{0x13F10830};
+  uint8_t source_address_{0x30};
+  uint8_t host_address_{0x20};
+  uint32_t output_command_id_{0};
+  uint32_t dim_command_id_{0};
+  uint32_t keepalive_id_{0};
+  uint32_t level_feedback_id_{0};
+  uint32_t tank_feedback_id_{0};
+  uint32_t button_status_id_{0};
+  uint32_t input_status_id_{0};
 
   std::array<float, 11> levels_{};
   std::array<TVMSRougeLight *, 11> lights_{};

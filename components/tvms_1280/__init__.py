@@ -10,11 +10,7 @@ MULTI_CONF = False
 
 CONF_CANBUS_ID = "canbus_id"
 CONF_SOURCE_ADDRESS = "source_address"
-CONF_COMMAND_ID = "command_id"
-CONF_TEMP_TANK_ID = "temp_tank_id"
-CONF_OUTPUT_STATUS_ID = "output_status_id"
-CONF_CHANNEL_STATUS_ID = "channel_status_id"
-CONF_INPUT_STATUS_ID = "input_status_id"
+CONF_HOST_ADDRESS = "host_address"
 
 ns = cg.esphome_ns.namespace("tvms_1280")
 TVMS1280Component = ns.class_("TVMS1280Component", cg.Component)
@@ -41,11 +37,7 @@ CONFIG_SCHEMA = cv.Schema({
     cv.GenerateID(): cv.declare_id(TVMS1280Component),
     cv.Required(CONF_CANBUS_ID): cv.use_id(canbus.CanbusComponent),
     cv.Optional(CONF_SOURCE_ADDRESS, default=0x24): cv.hex_uint8_t,
-    cv.Optional(CONF_COMMAND_ID, default=0x0F002420): cv.hex_uint32_t,
-    cv.Optional(CONF_TEMP_TANK_ID, default=0x1BFD0224): cv.hex_uint32_t,
-    cv.Optional(CONF_OUTPUT_STATUS_ID, default=0x1BFD0024): cv.hex_uint32_t,
-    cv.Optional(CONF_CHANNEL_STATUS_ID, default=0x1BFCF024): cv.hex_uint32_t,
-    cv.Optional(CONF_INPUT_STATUS_ID, default=0x13F10824): cv.hex_uint32_t,
+    cv.Optional(CONF_HOST_ADDRESS, default=0x20): cv.hex_uint8_t,
     **_AUTO_IDS,
 }).extend(cv.COMPONENT_SCHEMA)
 
@@ -75,11 +67,7 @@ async def to_code(config):
     can = await cg.get_variable(config[CONF_CANBUS_ID])
     cg.add(var.set_canbus(can))
     cg.add(var.set_source_address(config[CONF_SOURCE_ADDRESS]))
-    cg.add(var.set_command_id(config[CONF_COMMAND_ID]))
-    cg.add(var.set_temp_tank_id(config[CONF_TEMP_TANK_ID]))
-    cg.add(var.set_output_status_id(config[CONF_OUTPUT_STATUS_ID]))
-    cg.add(var.set_channel_status_id(config[CONF_CHANNEL_STATUS_ID]))
-    cg.add(var.set_input_status_id(config[CONF_INPUT_STATUS_ID]))
+    cg.add(var.set_host_address(config[CONF_HOST_ADDRESS]))
 
     p = config[CONF_ID].id.replace("_", " ")
     SC = "sensor::StateClass::STATE_CLASS_MEASUREMENT"

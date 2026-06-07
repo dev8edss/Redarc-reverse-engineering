@@ -47,13 +47,14 @@ redvision_display:
   - id: Redvision2
     source_address: 0x21
 
-# CAN IDs default to source_address=0x30, host_address=0x20.
-# Override individual IDs below if your addresses differ.
 tvms_rouge:
   id: TVMS_Rouge
   canbus_id: rv_can
+  source_address: 0x30
+  host_address: 0x${host_address}
 
-# CAN IDs default to source_address=0x24, host_address=0x20.
 tvms_1280:
   id: TVMS1280
   canbus_id: rv_can
+  source_address: 0x24
+  host_address: 0x${host_address}

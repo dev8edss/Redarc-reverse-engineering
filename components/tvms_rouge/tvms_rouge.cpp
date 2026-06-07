@@ -93,6 +93,15 @@ void TVMSRougeLight::write_state(light::LightState *state) {
 
 void TVMSRougeComponent::setup() {
   for (auto &level : this->levels_) level = NAN;
+  const uint8_t sa = this->source_address_;
+  const uint8_t ha = this->host_address_;
+  this->output_command_id_ = 0x0F000000UL | ((uint32_t) sa << 8) | ha;
+  this->dim_command_id_    = 0x0F050000UL | ((uint32_t) sa << 8) | ha;
+  this->keepalive_id_      = 0x0FE6FF00UL | ha;
+  this->level_feedback_id_ = 0x1BFD1200UL | sa;
+  this->tank_feedback_id_  = 0x1BFD0200UL | sa;
+  this->button_status_id_  = 0x1BFD1400UL | sa;
+  this->input_status_id_   = 0x13F10800UL | sa;
   redarc_common::RedarcCanDispatcher::instance().add_listener(
       [this](uint32_t id, const std::vector<uint8_t> &data) { this->handle_can_frame(id, data); });
 }
@@ -124,14 +133,9 @@ void TVMSRougeButton::press_action() {
 }
 
 void TVMSRougeComponent::dump_config() {
-  ESP_LOGCONFIG(TAG, "TVMS Rouge external component:");
-  ESP_LOGCONFIG(TAG, "  Output command: 0x%08X", this->output_command_id_);
-  ESP_LOGCONFIG(TAG, "  Dim command: 0x%08X", this->dim_command_id_);
-  ESP_LOGCONFIG(TAG, "  Keepalive: 0x%08X", this->keepalive_id_);
-  ESP_LOGCONFIG(TAG, "  Level feedback: 0x%08X", this->level_feedback_id_);
-  ESP_LOGCONFIG(TAG, "  Tank feedback: 0x%08X", this->tank_feedback_id_);
-  ESP_LOGCONFIG(TAG, "  Button status: 0x%08X", this->button_status_id_);
-  ESP_LOGCONFIG(TAG, "  Input status: 0x%08X", this->input_status_id_);
+  ESP_LOGCONFIG(TAG, "TVMS Rouge SA=0x%02X HA=0x%02X", this->source_address_, this->host_address_);
+  ESP_LOGCONFIG(TAG, "  Output cmd: 0x%08X  Dim cmd: 0x%08X", this->output_command_id_, this->dim_command_id_);
+  ESP_LOGCONFIG(TAG, "  Keepalive: 0x%08X  Level: 0x%08X", this->keepalive_id_, this->level_feedback_id_);
   LOG_SENSOR("  ", "Input Voltage", this->input_voltage_sensor_);
   LOG_SENSOR("  ", "Input Current", this->input_current_sensor_);
   ESP_LOGCONFIG(TAG, "  True-off threshold: %.1f%%", this->true_off_threshold_percent_);
