@@ -4,9 +4,12 @@ from esphome.components import binary_sensor, button, light, number, sensor
 from esphome.const import (
     CONF_DEFAULT_TRANSITION_LENGTH,
     CONF_DISABLED_BY_DEFAULT,
+    CONF_EFFECTS,
+    CONF_FLASH_TRANSITION_LENGTH,
     CONF_GAMMA_CORRECT,
     CONF_ID,
     CONF_NAME,
+    CONF_RESTORE_MODE,
 )
 
 CODEOWNERS = ["@dev8edss"]
@@ -157,7 +160,10 @@ async def to_code(config):
             CONF_NAME: f"{p} Output {i}",
             CONF_GAMMA_CORRECT: 1.0,
             CONF_DEFAULT_TRANSITION_LENGTH: 0,
+            CONF_FLASH_TRANSITION_LENGTH: 250,
             CONF_DISABLED_BY_DEFAULT: False,
+            CONF_RESTORE_MODE: cg.RawExpression("light::LightRestoreMode::RESTORE_DEFAULT_OFF"),
+            CONF_EFFECTS: [],
         }
         await light.register_light(light_out, light_cfg)
 
