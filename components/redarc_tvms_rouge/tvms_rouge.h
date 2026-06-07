@@ -137,9 +137,7 @@ class TVMSRougeComponent : public Component {
   uint32_t filter_interval_ms_{5000};
   uint32_t last_tank_ms_{0};
   uint32_t last_input_current_ms_{0};
-  uint32_t last_level_ms_{0};
   uint32_t last_input_status_ms_{0};
-  bool level_sensor_publish_{true};
   uint32_t output_command_id_{0};
   uint32_t dim_command_id_{0};
   uint32_t keepalive_id_{0};

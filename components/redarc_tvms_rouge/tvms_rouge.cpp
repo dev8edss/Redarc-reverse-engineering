@@ -298,11 +298,6 @@ void TVMSRougeComponent::handle_can_frame(uint32_t can_id, const std::vector<uin
 
   if (can_id != this->level_feedback_id_) return;
 
-  // Level feedback is periodic — throttle the level sensor publish, but always
-  // update the light entity so physical button presses are reflected immediately.
-  const bool sensor_ok = (now - this->last_level_ms_) >= this->filter_interval_ms_;
-  if (sensor_ok) this->last_level_ms_ = now;
-  this->level_sensor_publish_ = sensor_ok;
   if (data[0] == 0x0C) {
     for (uint8_t i = 1; i <= 7; i++) this->set_feedback_level_(i, (float) data[i]);
   } else if (data[0] == 0x13) {
@@ -310,7 +305,6 @@ void TVMSRougeComponent::handle_can_frame(uint32_t can_id, const std::vector<uin
     this->set_feedback_level_(9, (float) data[2]);
     this->set_feedback_level_(10, (float) data[3]);
   }
-  this->level_sensor_publish_ = true;
 }
 
 void TVMSRougeComponent::handle_button_status_frame_(const std::vector<uint8_t> &data) {
@@ -357,8 +351,9 @@ void TVMSRougeComponent::set_feedback_level_(uint8_t output_number, float level)
   if (output_number < 1 || output_number > 10) return;
   if (level < 0.0f) level = 0.0f;
   if (level > 100.0f) level = 100.0f;
+  const bool changed = this->levels_[output_number] != level;
   this->levels_[output_number] = level;
-  if (this->level_sensor_publish_ && this->level_sensors_[output_number] != nullptr)
+  if (changed && this->level_sensors_[output_number] != nullptr)
     this->level_sensors_[output_number]->publish_state(level);
   // During an HA-requested dimming operation, do not let the actual hardware
   // feedback overwrite the requested brightness in the HA light entity. The
