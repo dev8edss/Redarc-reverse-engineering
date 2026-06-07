@@ -30,14 +30,6 @@ _SC_MAP = {
     "measurement": _StateClass.STATE_CLASS_MEASUREMENT,
     "total_increasing": _StateClass.STATE_CLASS_TOTAL_INCREASING,
 }
-_ThrottleAverageFilter = _sensor_ns.class_("ThrottleAverageFilter")
-
-
-def _add_throttle_filter(config_id, sens, filter_ms):
-    from esphome.core import ID as _ID
-    fid = _ID(f"{config_id.id}_throttle", is_declaration=True, type=_ThrottleAverageFilter)
-    cg.add(sens.add_filter(cg.new_Pvariable(fid, filter_ms)))
-
 
 CONFIG_SCHEMA = cv.Schema({
     cv.GenerateID(): cv.declare_id(Manager30Component),
@@ -56,7 +48,7 @@ CONFIG_SCHEMA = cv.Schema({
 }).extend(cv.COMPONENT_SCHEMA)
 
 
-async def _make_sensor(config_id, name, filter_ms=None, unit=None, device_class=None,
+async def _make_sensor(config_id, name, unit=None, device_class=None,
                        state_class=None, decimals=None, entity_category=None):
     cfg = {
         CONF_ID: config_id,
@@ -74,67 +66,64 @@ async def _make_sensor(config_id, name, filter_ms=None, unit=None, device_class=
         cfg[CONF_STATE_CLASS] = _SC_MAP.get(state_class, state_class)
     if decimals is not None:
         cfg[CONF_ACCURACY_DECIMALS] = decimals
-    s = await sensor.new_sensor(cfg)
-    if filter_ms is not None:
-        _add_throttle_filter(config_id, s, filter_ms)
-    return s
+    return await sensor.new_sensor(cfg)
 
 
 async def to_code(config):
     var = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(var, config)
     cg.add(var.set_source_address(config[CONF_SOURCE_ADDRESS]))
+    cg.add(var.set_filter_interval_ms(config[CONF_FILTER_INTERVAL]))
 
     if CONF_BATTERY_SENSOR in config:
         battery = await cg.get_variable(config[CONF_BATTERY_SENSOR])
         cg.add(var.set_battery_sensor(battery))
 
     p = config[CONF_ID].id.replace("_", " ")
-    fi = config[CONF_FILTER_INTERVAL]
 
     s = await _make_sensor(config["output_current_id"], f"{p} Output Current",
-                           filter_ms=fi, unit="A", device_class="current",
+                           unit="A", device_class="current",
                            state_class=STATE_CLASS_MEASUREMENT, decimals=3)
     cg.add(var.set_output_current_sensor(s))
 
     s = await _make_sensor(config["output_current_raw_id"], f"{p} Output Current Raw",
-                           filter_ms=fi, state_class=STATE_CLASS_MEASUREMENT, decimals=0,
+                           state_class=STATE_CLASS_MEASUREMENT, decimals=0,
                            entity_category=ENTITY_CATEGORY_DIAGNOSTIC)
     cg.add(var.set_output_current_raw_sensor(s))
 
     s = await _make_sensor(config["battery_voltage_id"], f"{p} Battery Voltage",
-                           filter_ms=fi, unit="V", device_class="voltage",
+                           unit="V", device_class="voltage",
                            state_class=STATE_CLASS_MEASUREMENT, decimals=3)
     cg.add(var.set_battery_voltage_sensor(s))
 
     s = await _make_sensor(config["source_device_current_id"], f"{p} Device Current",
-                           filter_ms=fi, unit="A", device_class="current",
+                           unit="A", device_class="current",
                            state_class=STATE_CLASS_MEASUREMENT, decimals=3)
     cg.add(var.set_source_device_current_sensor(s))
 
     s = await _make_sensor(config["solar_current_id"], f"{p} Solar Current",
-                           filter_ms=fi, unit="A", device_class="current",
+                           unit="A", device_class="current",
                            state_class=STATE_CLASS_MEASUREMENT, decimals=3,
                            entity_category=ENTITY_CATEGORY_DIAGNOSTIC)
     cg.add(var.set_solar_current_sensor(s))
 
     s = await _make_sensor(config["solar_voltage_id"], f"{p} Solar Voltage",
-                           filter_ms=fi, unit="V", device_class="voltage",
+                           unit="V", device_class="voltage",
                            state_class=STATE_CLASS_MEASUREMENT, decimals=3,
                            entity_category=ENTITY_CATEGORY_DIAGNOSTIC)
     cg.add(var.set_solar_voltage_sensor(s))
 
     s = await _make_sensor(config["solar_power_id"], f"{p} Solar Power",
-                           filter_ms=fi, unit="W", device_class="power",
+                           unit="W", device_class="power",
                            state_class=STATE_CLASS_MEASUREMENT, decimals=1)
     cg.add(var.set_solar_power_sensor(s))
 
     s = await _make_sensor(config["solar_energy_id"], f"{p} Solar Energy",
-                           filter_ms=fi, unit="Wh", device_class="energy",
+                           unit="Wh", device_class="energy",
                            state_class=STATE_CLASS_TOTAL_INCREASING, decimals=0)
     cg.add(var.set_solar_energy_sensor(s))
 
     s = await _make_sensor(config["ac_input_voltage_id"], f"{p} AC Input Voltage",
-                           filter_ms=fi, unit="V", device_class="voltage",
+                           unit="V", device_class="voltage",
                            state_class=STATE_CLASS_MEASUREMENT, decimals=0)
     cg.add(var.set_ac_input_voltage_sensor(s))

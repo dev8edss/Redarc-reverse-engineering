@@ -40,14 +40,6 @@ _SC_MAP = {
     "measurement": _StateClass.STATE_CLASS_MEASUREMENT,
     "total_increasing": _StateClass.STATE_CLASS_TOTAL_INCREASING,
 }
-_ThrottleAverageFilter = _sensor_ns.class_("ThrottleAverageFilter")
-
-
-def _add_throttle_filter(config_id, sens, filter_ms):
-    from esphome.core import ID as _ID
-    fid = _ID(f"{config_id.id}_throttle", is_declaration=True, type=_ThrottleAverageFilter)
-    cg.add(sens.add_filter(cg.new_Pvariable(fid, filter_ms)))
-
 
 _AUTO_IDS = {}
 for _i in range(1, 7):
@@ -72,7 +64,7 @@ CONFIG_SCHEMA = cv.Schema({
 }).extend(cv.COMPONENT_SCHEMA)
 
 
-async def _make_sensor(config_id, name, filter_ms=None, unit=None, device_class=None,
+async def _make_sensor(config_id, name, unit=None, device_class=None,
                        state_class=None, decimals=None, entity_category=None):
     cfg = {
         CONF_ID: config_id,
@@ -90,10 +82,7 @@ async def _make_sensor(config_id, name, filter_ms=None, unit=None, device_class=
         cfg[CONF_STATE_CLASS] = _SC_MAP.get(state_class, state_class)
     if decimals is not None:
         cfg[CONF_ACCURACY_DECIMALS] = decimals
-    s = await sensor.new_sensor(cfg)
-    if filter_ms is not None:
-        _add_throttle_filter(config_id, s, filter_ms)
-    return s
+    return await sensor.new_sensor(cfg)
 
 
 async def to_code(config):
@@ -101,54 +90,54 @@ async def to_code(config):
     await cg.register_component(var, config)
     cg.add(var.set_source_address(config[CONF_SOURCE_ADDRESS]))
     cg.add(var.set_host_address(config[CONF_HOST_ADDRESS]))
+    cg.add(var.set_filter_interval_ms(config[CONF_FILTER_INTERVAL]))
 
     p = config[CONF_ID].id.replace("_", " ")
-    fi = config[CONF_FILTER_INTERVAL]
 
     s = await _make_sensor(config["temp1_id"], f"{p} Temperature 1",
-                           filter_ms=fi, unit="°C", device_class="temperature",
+                           unit="°C", device_class="temperature",
                            state_class=STATE_CLASS_MEASUREMENT, decimals=0)
     cg.add(var.set_temp1_sensor(s))
 
     s = await _make_sensor(config["temp2_id"], f"{p} Temperature 2",
-                           filter_ms=fi, unit="°C", device_class="temperature",
+                           unit="°C", device_class="temperature",
                            state_class=STATE_CLASS_MEASUREMENT, decimals=0)
     cg.add(var.set_temp2_sensor(s))
 
     s = await _make_sensor(config["supply_voltage_id"], f"{p} Supply Voltage",
-                           filter_ms=fi, unit="V", device_class="voltage",
+                           unit="V", device_class="voltage",
                            state_class=STATE_CLASS_MEASUREMENT, decimals=2,
                            entity_category=ENTITY_CATEGORY_DIAGNOSTIC)
     cg.add(var.set_supply_voltage_sensor(s))
 
     s = await _make_sensor(config["voltage_input1_id"], f"{p} Voltage Input 1 Candidate",
-                           filter_ms=fi, unit="V", device_class="voltage",
+                           unit="V", device_class="voltage",
                            state_class=STATE_CLASS_MEASUREMENT, decimals=1,
                            entity_category=ENTITY_CATEGORY_DIAGNOSTIC)
     cg.add(var.set_voltage_input1_sensor(s))
 
     s = await _make_sensor(config["voltage_input2_id"], f"{p} Voltage Input 2 Candidate",
-                           filter_ms=fi, unit="V", device_class="voltage",
+                           unit="V", device_class="voltage",
                            state_class=STATE_CLASS_MEASUREMENT, decimals=1,
                            entity_category=ENTITY_CATEGORY_DIAGNOSTIC)
     cg.add(var.set_voltage_input2_sensor(s))
 
     s = await _make_sensor(config["last_cmd_channel_id"], f"{p} Last Output Command Channel",
-                           filter_ms=fi, state_class=STATE_CLASS_MEASUREMENT, decimals=0,
+                           state_class=STATE_CLASS_MEASUREMENT, decimals=0,
                            entity_category=ENTITY_CATEGORY_DIAGNOSTIC)
     cg.add(var.set_last_command_channel_sensor(s))
 
     s = await _make_sensor(config["last_cmd_state_id"], f"{p} Last Output Command State",
-                           filter_ms=fi, state_class=STATE_CLASS_MEASUREMENT, decimals=0,
+                           state_class=STATE_CLASS_MEASUREMENT, decimals=0,
                            entity_category=ENTITY_CATEGORY_DIAGNOSTIC)
     cg.add(var.set_last_command_state_sensor(s))
 
     for i in range(1, 7):
         s = await _make_sensor(config[f"tank_{i}_id"], f"{p} Tank {i}",
-                               filter_ms=fi, unit="%", state_class=STATE_CLASS_MEASUREMENT, decimals=0)
+                               unit="%", state_class=STATE_CLASS_MEASUREMENT, decimals=0)
         cg.add(var.set_tank_sensor(i, s))
 
-    # Output switches (channels 0x04–0x0D) — no throttle filter, not sensors
+    # Output switches (channels 0x04–0x0D)
     for i in range(10):
         sw = cg.new_Pvariable(config[f"output_{i}_id"])
         cg.add(sw.set_parent(var))
@@ -166,7 +155,7 @@ async def to_code(config):
         await switch.register_switch(sw, sw_cfg)
         cg.add(var.register_output_switch(sw))
 
-    # Inverter switch (channel 0x0E) — no throttle filter, not a sensor
+    # Inverter switch (channel 0x0E)
     inv = cg.new_Pvariable(config["inverter_id"])
     cg.add(inv.set_parent(var))
     cg.add(inv.set_output_number(0))

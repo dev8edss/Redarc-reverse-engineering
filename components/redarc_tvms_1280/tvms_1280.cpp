@@ -62,7 +62,11 @@ void TVMS1280Component::handle_can_frame(uint32_t can_id, const std::vector<uint
   can_id &= 0x1FFFFFFFUL;
   if (data.size() < 8) return;
 
+  const uint32_t now = millis();
+
   if (can_id == this->input_status_id_) {
+    if (now - this->last_input_status_ms_ < this->filter_interval_ms_) return;
+    this->last_input_status_ms_ = now;
     if (this->supply_voltage_sensor_ != nullptr) {
       // TVMS1280 module input/status frame. Logs show D1-D2 decode as
       // little-endian centivolts, e.g. F0 04 -> 0x04F0 / 100 = 12.64 V.
@@ -74,22 +78,30 @@ void TVMS1280Component::handle_can_frame(uint32_t can_id, const std::vector<uint
 
   if (can_id == this->temp_tank_id_) {
     if (data[0] == 0x14) {
+      if (now - this->last_mux_0x14_ms_ < this->filter_interval_ms_) return;
+      this->last_mux_0x14_ms_ = now;
       if (this->temp1_sensor_ != nullptr) this->temp1_sensor_->publish_state((float) data[1] - 100.0f);
       if (this->voltage_input2_sensor_ != nullptr && tvms1280_valid_byte_voltage_(data[1]))
         this->voltage_input2_sensor_->publish_state((float) data[1] / 10.0f);
       if (this->tank_sensors_[1] != nullptr) this->tank_sensors_[1]->publish_state((float) data[3]);
       if (this->tank_sensors_[2] != nullptr) this->tank_sensors_[2]->publish_state((float) data[5]);
     } else if (data[0] == 0x11) {
+      if (now - this->last_mux_0x11_ms_ < this->filter_interval_ms_) return;
+      this->last_mux_0x11_ms_ = now;
       if (this->voltage_input1_sensor_ != nullptr && tvms1280_valid_byte_voltage_(data[1]))
         this->voltage_input1_sensor_->publish_state((float) data[1] / 10.0f);
       if (this->temp2_sensor_ != nullptr) this->temp2_sensor_->publish_state((float) data[5] - 100.0f);
     } else if (data[0] == 0x17) {
+      if (now - this->last_mux_0x17_ms_ < this->filter_interval_ms_) return;
+      this->last_mux_0x17_ms_ = now;
       if (this->tank_sensors_[3] != nullptr) this->tank_sensors_[3]->publish_state((float) data[1]);
       if (this->tank_sensors_[4] != nullptr) this->tank_sensors_[4]->publish_state((float) data[3]);
       // DBC v50 confirmed: TVMS1280_Tank5_Percent is MUX 0x17, D6, raw percent.
       // Earlier experimental builds used x1.25; remove that now-confirmed wrong scale.
       if (this->tank_sensors_[5] != nullptr) this->tank_sensors_[5]->publish_state((float) data[5]);
     } else if (data[0] == 0x1A) {
+      if (now - this->last_mux_0x1A_ms_ < this->filter_interval_ms_) return;
+      this->last_mux_0x1A_ms_ = now;
       if (this->tank_sensors_[6] != nullptr) this->tank_sensors_[6]->publish_state((float) data[1]);
     }
     return;

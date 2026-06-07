@@ -31,7 +31,11 @@ void Manager30Component::handle_can_frame(uint32_t can_id, const std::vector<uin
   // deliberately not exposed as a normal sensor yet.
   const uint32_t id_ac = redarc_common::with_sa(0x03F20400UL, this->source_address_);
 
+  const uint32_t now = millis();
+
   if (can_id == id_current) {
+    if (now - this->last_current_ms_ < this->filter_interval_ms_) return;
+    this->last_current_ms_ = now;
     const uint32_t raw = redarc_common::u32_le(data, 0);
     const float amps = redarc_common::current_32_centered(raw);
     if (this->output_current_sensor_ != nullptr) this->output_current_sensor_->publish_state(amps);
@@ -44,6 +48,8 @@ void Manager30Component::handle_can_frame(uint32_t can_id, const std::vector<uin
   }
 
   if (can_id == id_solar) {
+    if (now - this->last_solar_ms_ < this->filter_interval_ms_) return;
+    this->last_solar_ms_ = now;
     const uint32_t raw_current = redarc_common::u32_le(data, 0);
     const uint16_t raw_voltage = redarc_common::u16_le(data, 4);
     const float solar_a = redarc_common::current_32_centered(raw_current);
@@ -55,6 +61,8 @@ void Manager30Component::handle_can_frame(uint32_t can_id, const std::vector<uin
   }
 
   if (can_id == id_solar_energy) {
+    if (now - this->last_solar_energy_ms_ < this->filter_interval_ms_) return;
+    this->last_solar_energy_ms_ = now;
     if (this->solar_energy_sensor_ != nullptr && data[0] == 0x00) {
       const uint32_t wh = redarc_common::u32_le(data, 1);
       this->solar_energy_sensor_->publish_state((float) wh);
@@ -63,6 +71,8 @@ void Manager30Component::handle_can_frame(uint32_t can_id, const std::vector<uin
   }
 
   if (can_id == id_ac) {
+    if (now - this->last_ac_ms_ < this->filter_interval_ms_) return;
+    this->last_ac_ms_ = now;
     if (this->ac_input_voltage_sensor_ != nullptr) {
       this->ac_input_voltage_sensor_->publish_state((float) redarc_common::u16_le(data, 4));
     }
