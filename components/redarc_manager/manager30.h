@@ -7,7 +7,7 @@
 #include <vector>
 
 namespace esphome {
-namespace redarc_manager30 {
+namespace redarc_manager {
 
 class Manager30Component : public Component {
  public:
@@ -43,5 +43,5 @@ class Manager30Component : public Component {
   sensor::Sensor *ac_input_voltage_sensor_{nullptr};
 };
 
-}  // namespace redarc_manager30
+}  // namespace redarc_manager
 }  // namespace esphome

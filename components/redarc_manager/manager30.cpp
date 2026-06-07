@@ -1,9 +1,9 @@
 #include "manager30.h"
 
 namespace esphome {
-namespace redarc_manager30 {
+namespace redarc_manager {
 
-static const char *const TAG = "redarc_manager30";
+static const char *const TAG = "redarc_manager";
 
 void Manager30Component::setup() {
   redarc_common::RedarcCanDispatcher::instance().add_listener(
@@ -71,5 +71,5 @@ void Manager30Component::handle_can_frame(uint32_t can_id, const std::vector<uin
   }
 }
 
-}  // namespace redarc_manager30
+}  // namespace redarc_manager
 }  // namespace esphome

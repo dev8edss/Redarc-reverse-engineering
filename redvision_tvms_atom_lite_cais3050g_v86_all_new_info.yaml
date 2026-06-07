@@ -36,7 +36,7 @@ redarc_battery_sensor:
   id: Battery
   source_address: 0x08
 
-redarc_manager30:
+redarc_manager:
   id: Manager30
   source_address: 0x01
 

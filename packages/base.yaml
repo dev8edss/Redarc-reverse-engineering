@@ -32,7 +32,7 @@ external_components:
       - redarc_common
       - redarc_tvms_rouge
       - redarc_tvms_1280
-      - redarc_manager30
+      - redarc_manager
       - redarc_battery_sensor
       - redarc_redvision_display
 
