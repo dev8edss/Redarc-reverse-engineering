@@ -45,3 +45,10 @@ canbus:
     bit_rate: ${can_bit_rate}
     mode: ${can_mode}
     rx_queue_len: 64
+    on_frame:
+      - can_id: 0x00000000
+        can_id_mask: 0x00000000
+        use_extended_id: true
+        remote_transmission_request: false
+        then:
+          - lambda: esphome::redarc_common::RedarcCanDispatcher::instance().dispatch(can_id & 0x1FFFFFFFUL, x);

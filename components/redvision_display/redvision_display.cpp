@@ -1,9 +1,30 @@
 #include "redvision_display.h"
+#include "esphome/components/sensor/filter.h"
 
 namespace esphome {
 namespace redvision_display {
 
 static const char *const TAG = "redvision_display";
+
+void RedvisionDisplayComponent::setup() {
+  redarc_common::RedarcCanDispatcher::instance().add_listener(
+      [this](uint32_t id, const std::vector<uint8_t> &data) { this->handle_can_frame(id, data); });
+  if (this->filter_interval_ms_ > 0) {
+    auto apply = [&](sensor::Sensor *s) {
+      if (s != nullptr) {
+        auto *f = new sensor::ThrottleAverageFilter(this->filter_interval_ms_);
+        f->setup();
+        s->add_filter(f);
+      }
+    };
+    apply(this->battery_current_display_sensor_);
+    apply(this->device_current_display_sensor_);
+    apply(this->manager_output_current_display_sensor_);
+    apply(this->battery_current_display_raw_sensor_);
+    apply(this->device_current_display_raw_sensor_);
+    apply(this->manager_output_current_display_raw_sensor_);
+  }
+}
 
 void RedvisionDisplayComponent::dump_config() {
   ESP_LOGCONFIG(TAG, "Redvision display SA 0x%02X type %u", this->source_address_, this->display_type_);

@@ -1,9 +1,26 @@
 #pragma once
 #include <cstdint>
+#include <functional>
 #include <vector>
 
 namespace esphome {
 namespace redarc_common {
+
+class RedarcCanDispatcher {
+ public:
+  static RedarcCanDispatcher &instance() {
+    static RedarcCanDispatcher inst;
+    return inst;
+  }
+  void add_listener(std::function<void(uint32_t, const std::vector<uint8_t> &)> cb) {
+    this->listeners_.push_back(std::move(cb));
+  }
+  void dispatch(uint32_t can_id, const std::vector<uint8_t> &data) {
+    for (auto &cb : this->listeners_) cb(can_id, data);
+  }
+ private:
+  std::vector<std::function<void(uint32_t, const std::vector<uint8_t> &)>> listeners_;
+};
 
 inline uint16_t u16_le(const std::vector<uint8_t> &data, uint8_t i) {
   if (data.size() <= i + 1) return 0;

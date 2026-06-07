@@ -28,43 +28,32 @@ packages:
     files: [packages/base.yaml]
     refresh: 0s
 
-  # Include only the devices present on your bus.
-  # Remove any block for devices you don't have.
-  # Duplicate a block with a unique key for multiple instances of the same device type.
-  # name_prefix becomes the C++ component ID — no spaces allowed; use underscores instead.
+# Include only the devices present on your bus.
+# Remove any block for devices you don't have.
+# id becomes the entity name prefix — no spaces, use underscores.
 
-  battery_sensor: !include
-    file: packages/battery_sensor.yaml
-    vars:
-      address: "08"
-      name_prefix: Battery
+battery_sensor:
+  id: Battery
+  source_address: 0x08
 
-  manager30: !include
-    file: packages/manager30.yaml
-    vars:
-      address: "01"
-      name_prefix: Manager30
+manager30:
+  id: Manager30
+  source_address: 0x01
 
-  redvision_display_1: !include
-    file: packages/redvision_display.yaml
-    vars:
-      address: "20"
-      name_prefix: Redvision1
+# Multiple redvision displays are supported — add entries as needed.
+redvision_display:
+  - id: Redvision1
+    source_address: 0x20
+  - id: Redvision2
+    source_address: 0x21
 
-  redvision_display_2: !include
-    file: packages/redvision_display.yaml
-    vars:
-      address: "21"
-      name_prefix: Redvision2
+# CAN IDs default to source_address=0x30, host_address=0x20.
+# Override individual IDs below if your addresses differ.
+tvms_rouge:
+  id: TVMS_Rouge
+  canbus_id: rv_can
 
-  tvms_rouge: !include
-    file: packages/tvms_rouge.yaml
-    vars:
-      address: "30"
-      name_prefix: TVMS_Rouge
-
-  tvms_1280: !include
-    file: packages/tvms_1280.yaml
-    vars:
-      address: "24"
-      name_prefix: TVMS1280
+# CAN IDs default to source_address=0x24, host_address=0x20.
+tvms_1280:
+  id: TVMS1280
+  canbus_id: rv_can

@@ -93,6 +93,34 @@ void TVMSRougeLight::write_state(light::LightState *state) {
 
 void TVMSRougeComponent::setup() {
   for (auto &level : this->levels_) level = NAN;
+  redarc_common::RedarcCanDispatcher::instance().add_listener(
+      [this](uint32_t id, const std::vector<uint8_t> &data) { this->handle_can_frame(id, data); });
+}
+
+void TVMSRougeNumber::setup() {
+  if (!std::isnan(this->initial_value_)) {
+    this->publish_state(this->initial_value_);
+    this->control(this->initial_value_);
+  }
+}
+
+void TVMSRougeNumber::control(float value) {
+  this->publish_state(value);
+  if (this->parent_ == nullptr) return;
+  switch (this->param_) {
+    case 0: this->parent_->set_deadband(value); break;
+    case 1: this->parent_->set_initial_rate(value); break;
+    case 2: this->parent_->set_learning_gain_percent(value); break;
+    case 3: this->parent_->set_approach_percent(value); break;
+    case 4: this->parent_->set_max_pulse(value); break;
+    case 5: this->parent_->set_settle_time(value); break;
+    case 6: this->parent_->set_max_iterations_float(value); break;
+    default: break;
+  }
+}
+
+void TVMSRougeButton::press_action() {
+  if (this->parent_ != nullptr) this->parent_->abort_and_release();
 }
 
 void TVMSRougeComponent::dump_config() {

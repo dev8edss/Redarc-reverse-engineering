@@ -4,9 +4,12 @@
 #include "esphome/core/log.h"
 #include "esphome/components/canbus/canbus.h"
 #include "esphome/components/binary_sensor/binary_sensor.h"
+#include "esphome/components/button/button.h"
 #include "esphome/components/light/light_output.h"
 #include "esphome/components/light/light_state.h"
+#include "esphome/components/number/number.h"
 #include "esphome/components/sensor/sensor.h"
+#include "esphome/components/redarc_common/redarc_common.h"
 #include <array>
 #include <cmath>
 #include <vector>
@@ -15,6 +18,27 @@ namespace esphome {
 namespace tvms_rouge {
 
 class TVMSRougeComponent;
+
+class TVMSRougeNumber : public number::Number, public Component {
+ public:
+  void set_parent(TVMSRougeComponent *p) { this->parent_ = p; }
+  void set_parameter(uint8_t param) { this->param_ = param; }
+  void set_initial_value(float v) { this->initial_value_ = v; }
+  void setup() override;
+ protected:
+  void control(float value) override;
+  TVMSRougeComponent *parent_{nullptr};
+  uint8_t param_{0};
+  float initial_value_{NAN};
+};
+
+class TVMSRougeButton : public button::Button, public Component {
+ public:
+  void set_parent(TVMSRougeComponent *p) { this->parent_ = p; }
+ protected:
+  void press_action() override;
+  TVMSRougeComponent *parent_{nullptr};
+};
 
 class TVMSRougeLight : public light::LightOutput {
  public:

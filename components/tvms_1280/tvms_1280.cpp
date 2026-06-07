@@ -10,6 +10,11 @@ void TVMS1280Switch::write_state(bool state) {
   this->publish_state(state);
 }
 
+void TVMS1280Component::setup() {
+  redarc_common::RedarcCanDispatcher::instance().add_listener(
+      [this](uint32_t id, const std::vector<uint8_t> &data) { this->handle_can_frame(id, data); });
+}
+
 void TVMS1280Component::dump_config() {
   ESP_LOGCONFIG(TAG, "TVMS1280 SA 0x%02X", this->source_address_);
 }

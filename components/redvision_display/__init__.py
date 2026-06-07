@@ -8,44 +8,77 @@ AUTO_LOAD = ["sensor", "redarc_common"]
 MULTI_CONF = True
 
 CONF_SOURCE_ADDRESS = "source_address"
-CONF_DISPLAY_TYPE = "display_type"
-CONF_BATTERY_CURRENT_DISPLAY = "battery_current_display"
-CONF_DEVICE_CURRENT_DISPLAY = "device_current_display"
-CONF_MANAGER_OUTPUT_CURRENT_DISPLAY = "manager_output_current_display"
-CONF_BATTERY_CURRENT_DISPLAY_RAW = "battery_current_display_raw"
-CONF_DEVICE_CURRENT_DISPLAY_RAW = "device_current_display_raw"
-CONF_MANAGER_OUTPUT_CURRENT_DISPLAY_RAW = "manager_output_current_display_raw"
+CONF_FILTER_INTERVAL = "filter_interval"
 
 ns = cg.esphome_ns.namespace("redvision_display")
 RedvisionDisplayComponent = ns.class_("RedvisionDisplayComponent", cg.Component)
 
-DISPLAY_TYPE = cv.enum({"rv1": 1, "rv2": 2}, lower=True)
+_sensor_ns = cg.esphome_ns.namespace("sensor")
+_SensorClass = _sensor_ns.class_("Sensor")
 
 CONFIG_SCHEMA = cv.Schema({
     cv.GenerateID(): cv.declare_id(RedvisionDisplayComponent),
     cv.Required(CONF_SOURCE_ADDRESS): cv.hex_uint8_t,
-    cv.Required(CONF_DISPLAY_TYPE): DISPLAY_TYPE,
-    cv.Optional(CONF_BATTERY_CURRENT_DISPLAY): sensor.sensor_schema(),
-    cv.Optional(CONF_DEVICE_CURRENT_DISPLAY): sensor.sensor_schema(),
-    cv.Optional(CONF_MANAGER_OUTPUT_CURRENT_DISPLAY): sensor.sensor_schema(),
-    cv.Optional(CONF_BATTERY_CURRENT_DISPLAY_RAW): sensor.sensor_schema(),
-    cv.Optional(CONF_DEVICE_CURRENT_DISPLAY_RAW): sensor.sensor_schema(),
-    cv.Optional(CONF_MANAGER_OUTPUT_CURRENT_DISPLAY_RAW): sensor.sensor_schema(),
+    cv.Optional(CONF_FILTER_INTERVAL, default="5s"): cv.positive_time_period_milliseconds,
+    cv.GenerateID("batt_current_id"): cv.declare_id(_SensorClass),
+    cv.GenerateID("device_current_id"): cv.declare_id(_SensorClass),
+    cv.GenerateID("batt_current_raw_id"): cv.declare_id(_SensorClass),
+    cv.GenerateID("device_current_raw_id"): cv.declare_id(_SensorClass),
+    cv.GenerateID("mgr_output_current_id"): cv.declare_id(_SensorClass),
+    cv.GenerateID("mgr_output_current_raw_id"): cv.declare_id(_SensorClass),
 }).extend(cv.COMPONENT_SCHEMA)
 
-async def _setup_sensor(var, config, key, setter):
-    if key in config:
-        sens = await sensor.new_sensor(config[key])
-        cg.add(getattr(var, setter)(sens))
+
+def _make_sensor(config_id, name, unit=None, device_class=None, state_class_raw=None,
+                 decimals=None, entity_category_raw=None):
+    var = cg.new_Pvariable(config_id)
+    cg.add(var.set_name(name))
+    if unit:
+        cg.add(var.set_unit_of_measurement(unit))
+    if device_class:
+        cg.add(var.set_device_class(device_class))
+    if state_class_raw:
+        cg.add(var.set_state_class(cg.RawExpression(state_class_raw)))
+    if decimals is not None:
+        cg.add(var.set_accuracy_decimals(decimals))
+    if entity_category_raw:
+        cg.add(var.set_entity_category(cg.RawExpression(entity_category_raw)))
+    cg.add(cg.App.register_component(var))
+    cg.add(cg.App.register_sensor(var))
+    return var
+
 
 async def to_code(config):
     var = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(var, config)
     cg.add(var.set_source_address(config[CONF_SOURCE_ADDRESS]))
-    cg.add(var.set_display_type(config[CONF_DISPLAY_TYPE]))
-    await _setup_sensor(var, config, CONF_BATTERY_CURRENT_DISPLAY, "set_battery_current_display_sensor")
-    await _setup_sensor(var, config, CONF_DEVICE_CURRENT_DISPLAY, "set_device_current_display_sensor")
-    await _setup_sensor(var, config, CONF_MANAGER_OUTPUT_CURRENT_DISPLAY, "set_manager_output_current_display_sensor")
-    await _setup_sensor(var, config, CONF_BATTERY_CURRENT_DISPLAY_RAW, "set_battery_current_display_raw_sensor")
-    await _setup_sensor(var, config, CONF_DEVICE_CURRENT_DISPLAY_RAW, "set_device_current_display_raw_sensor")
-    await _setup_sensor(var, config, CONF_MANAGER_OUTPUT_CURRENT_DISPLAY_RAW, "set_manager_output_current_display_raw_sensor")
+    cg.add(var.set_display_type(1))  # rv1 — all RedVision displays are the same type
+    cg.add(var.set_filter_interval_ms(config[CONF_FILTER_INTERVAL].total_milliseconds))
+
+    p = config[CONF_ID].id.replace("_", " ")
+    SC = "sensor::StateClass::STATE_CLASS_MEASUREMENT"
+    DIAG = "ENTITY_CATEGORY_DIAGNOSTIC"
+
+    s = _make_sensor(config["batt_current_id"], f"{p} Battery Current Display",
+                     unit="A", device_class="current", state_class_raw=SC, decimals=1)
+    cg.add(var.set_battery_current_display_sensor(s))
+
+    s = _make_sensor(config["device_current_id"], f"{p} Device Current Display",
+                     unit="A", device_class="current", state_class_raw=SC, decimals=1)
+    cg.add(var.set_device_current_display_sensor(s))
+
+    s = _make_sensor(config["batt_current_raw_id"], f"{p} Battery Current Display Raw",
+                     state_class_raw=SC, decimals=0, entity_category_raw=DIAG)
+    cg.add(var.set_battery_current_display_raw_sensor(s))
+
+    s = _make_sensor(config["device_current_raw_id"], f"{p} Device Current Display Raw",
+                     state_class_raw=SC, decimals=0, entity_category_raw=DIAG)
+    cg.add(var.set_device_current_display_raw_sensor(s))
+
+    s = _make_sensor(config["mgr_output_current_id"], f"{p} Manager Output Current Display",
+                     unit="A", device_class="current", state_class_raw=SC, decimals=1)
+    cg.add(var.set_manager_output_current_display_sensor(s))
+
+    s = _make_sensor(config["mgr_output_current_raw_id"], f"{p} Manager Output Current Display Raw",
+                     state_class_raw=SC, decimals=0, entity_category_raw=DIAG)
+    cg.add(var.set_manager_output_current_display_raw_sensor(s))

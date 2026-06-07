@@ -1,9 +1,33 @@
 #include "manager30.h"
+#include "esphome/components/sensor/filter.h"
 
 namespace esphome {
 namespace manager30 {
 
 static const char *const TAG = "manager30";
+
+void Manager30Component::setup() {
+  redarc_common::RedarcCanDispatcher::instance().add_listener(
+      [this](uint32_t id, const std::vector<uint8_t> &data) { this->handle_can_frame(id, data); });
+  if (this->filter_interval_ms_ > 0) {
+    auto apply = [&](sensor::Sensor *s) {
+      if (s != nullptr) {
+        auto *f = new sensor::ThrottleAverageFilter(this->filter_interval_ms_);
+        f->setup();
+        s->add_filter(f);
+      }
+    };
+    apply(this->output_current_sensor_);
+    apply(this->output_current_raw_sensor_);
+    apply(this->battery_voltage_sensor_);
+    apply(this->source_device_current_sensor_);
+    apply(this->solar_current_sensor_);
+    apply(this->solar_voltage_sensor_);
+    apply(this->solar_power_sensor_);
+    apply(this->solar_energy_sensor_);
+    apply(this->ac_input_voltage_sensor_);
+  }
+}
 
 void Manager30Component::dump_config() {
   ESP_LOGCONFIG(TAG, "Manager30 SA 0x%02X", this->source_address_);

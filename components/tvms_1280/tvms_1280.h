@@ -48,6 +48,7 @@ class TVMS1280Component : public Component {
   void set_last_command_channel_sensor(sensor::Sensor *s) { this->last_command_channel_sensor_ = s; }
   void set_last_command_state_sensor(sensor::Sensor *s) { this->last_command_state_sensor_ = s; }
 
+  void setup() override;
   void register_output_switch(TVMS1280Switch *sw);
   void register_inverter_switch(TVMS1280Switch *sw) { this->inverter_switch_ = sw; }
   void send_channel(uint8_t channel, bool state);

@@ -15,31 +15,27 @@ CONF_TEMP_TANK_ID = "temp_tank_id"
 CONF_OUTPUT_STATUS_ID = "output_status_id"
 CONF_CHANNEL_STATUS_ID = "channel_status_id"
 CONF_INPUT_STATUS_ID = "input_status_id"
-CONF_OUTPUTS = "outputs"
-CONF_INVERTER = "inverter"
-CONF_OUTPUT_NUMBER = "output_number"
-CONF_CHANNEL = "channel"
-CONF_TEMP1 = "temp1"
-CONF_TEMP2 = "temp2"
-CONF_SUPPLY_VOLTAGE = "supply_voltage"
-CONF_VOLTAGE_INPUT1 = "voltage_input_1"
-CONF_VOLTAGE_INPUT2 = "voltage_input_2"
-CONF_TANKS = "tanks"
-CONF_LAST_COMMAND_CHANNEL = "last_command_channel"
-CONF_LAST_COMMAND_STATE = "last_command_state"
 
 ns = cg.esphome_ns.namespace("tvms_1280")
 TVMS1280Component = ns.class_("TVMS1280Component", cg.Component)
 TVMS1280Switch = ns.class_("TVMS1280Switch", switch.Switch)
 
-OUTPUT_SCHEMA = switch.switch_schema(TVMS1280Switch).extend({
-    cv.Required(CONF_OUTPUT_NUMBER): cv.int_range(min=0, max=9),
-    cv.Optional(CONF_CHANNEL): cv.hex_uint8_t,
-})
+_sensor_ns = cg.esphome_ns.namespace("sensor")
+_SensorClass = _sensor_ns.class_("Sensor")
 
-INVERTER_SCHEMA = switch.switch_schema(TVMS1280Switch).extend({
-    cv.Optional(CONF_CHANNEL, default=0x0E): cv.hex_uint8_t,
-})
+_AUTO_IDS = {}
+for _i in range(1, 7):
+    _AUTO_IDS[cv.GenerateID(f"tank_{_i}_id")] = cv.declare_id(_SensorClass)
+for _i in range(10):
+    _AUTO_IDS[cv.GenerateID(f"output_{_i}_id")] = cv.declare_id(TVMS1280Switch)
+_AUTO_IDS[cv.GenerateID("temp1_id")] = cv.declare_id(_SensorClass)
+_AUTO_IDS[cv.GenerateID("temp2_id")] = cv.declare_id(_SensorClass)
+_AUTO_IDS[cv.GenerateID("supply_voltage_id")] = cv.declare_id(_SensorClass)
+_AUTO_IDS[cv.GenerateID("voltage_input1_id")] = cv.declare_id(_SensorClass)
+_AUTO_IDS[cv.GenerateID("voltage_input2_id")] = cv.declare_id(_SensorClass)
+_AUTO_IDS[cv.GenerateID("last_cmd_channel_id")] = cv.declare_id(_SensorClass)
+_AUTO_IDS[cv.GenerateID("last_cmd_state_id")] = cv.declare_id(_SensorClass)
+_AUTO_IDS[cv.GenerateID("inverter_id")] = cv.declare_id(TVMS1280Switch)
 
 CONFIG_SCHEMA = cv.Schema({
     cv.GenerateID(): cv.declare_id(TVMS1280Component),
@@ -50,22 +46,28 @@ CONFIG_SCHEMA = cv.Schema({
     cv.Optional(CONF_OUTPUT_STATUS_ID, default=0x1BFD0024): cv.hex_uint32_t,
     cv.Optional(CONF_CHANNEL_STATUS_ID, default=0x1BFCF024): cv.hex_uint32_t,
     cv.Optional(CONF_INPUT_STATUS_ID, default=0x13F10824): cv.hex_uint32_t,
-    cv.Optional(CONF_OUTPUTS): cv.ensure_list(OUTPUT_SCHEMA),
-    cv.Optional(CONF_INVERTER): INVERTER_SCHEMA,
-    cv.Optional(CONF_TEMP1): sensor.sensor_schema(),
-    cv.Optional(CONF_TEMP2): sensor.sensor_schema(),
-    cv.Optional(CONF_SUPPLY_VOLTAGE): sensor.sensor_schema(),
-    cv.Optional(CONF_VOLTAGE_INPUT1): sensor.sensor_schema(),
-    cv.Optional(CONF_VOLTAGE_INPUT2): sensor.sensor_schema(),
-    cv.Optional(CONF_TANKS): cv.ensure_list(sensor.sensor_schema()),
-    cv.Optional(CONF_LAST_COMMAND_CHANNEL): sensor.sensor_schema(),
-    cv.Optional(CONF_LAST_COMMAND_STATE): sensor.sensor_schema(),
+    **_AUTO_IDS,
 }).extend(cv.COMPONENT_SCHEMA)
 
-async def _setup_sensor(var, config, key, setter):
-    if key in config:
-        sens = await sensor.new_sensor(config[key])
-        cg.add(getattr(var, setter)(sens))
+
+def _make_sensor(config_id, name, unit=None, device_class=None, state_class_raw=None,
+                 decimals=None, entity_category_raw=None):
+    var = cg.new_Pvariable(config_id)
+    cg.add(var.set_name(name))
+    if unit:
+        cg.add(var.set_unit_of_measurement(unit))
+    if device_class:
+        cg.add(var.set_device_class(device_class))
+    if state_class_raw:
+        cg.add(var.set_state_class(cg.RawExpression(state_class_raw)))
+    if decimals is not None:
+        cg.add(var.set_accuracy_decimals(decimals))
+    if entity_category_raw:
+        cg.add(var.set_entity_category(cg.RawExpression(entity_category_raw)))
+    cg.add(cg.App.register_component(var))
+    cg.add(cg.App.register_sensor(var))
+    return var
+
 
 async def to_code(config):
     var = cg.new_Pvariable(config[CONF_ID])
@@ -79,34 +81,65 @@ async def to_code(config):
     cg.add(var.set_channel_status_id(config[CONF_CHANNEL_STATUS_ID]))
     cg.add(var.set_input_status_id(config[CONF_INPUT_STATUS_ID]))
 
-    await _setup_sensor(var, config, CONF_TEMP1, "set_temp1_sensor")
-    await _setup_sensor(var, config, CONF_TEMP2, "set_temp2_sensor")
-    await _setup_sensor(var, config, CONF_SUPPLY_VOLTAGE, "set_supply_voltage_sensor")
-    await _setup_sensor(var, config, CONF_VOLTAGE_INPUT1, "set_voltage_input1_sensor")
-    await _setup_sensor(var, config, CONF_VOLTAGE_INPUT2, "set_voltage_input2_sensor")
-    await _setup_sensor(var, config, CONF_LAST_COMMAND_CHANNEL, "set_last_command_channel_sensor")
-    await _setup_sensor(var, config, CONF_LAST_COMMAND_STATE, "set_last_command_state_sensor")
+    p = config[CONF_ID].id.replace("_", " ")
+    SC = "sensor::StateClass::STATE_CLASS_MEASUREMENT"
+    DIAG = "ENTITY_CATEGORY_DIAGNOSTIC"
 
-    if CONF_TANKS in config:
-        for idx, tank_conf in enumerate(config[CONF_TANKS][:6], start=1):
-            sens = await sensor.new_sensor(tank_conf)
-            cg.add(var.set_tank_sensor(idx, sens))
+    s = _make_sensor(config["temp1_id"], f"{p} Temperature 1",
+                     unit="°C", device_class="temperature", state_class_raw=SC, decimals=0)
+    cg.add(var.set_temp1_sensor(s))
 
-    for out_conf in config.get(CONF_OUTPUTS, []):
-        sw = await switch.new_switch(out_conf)
-        output_number = out_conf[CONF_OUTPUT_NUMBER]
-        channel = out_conf.get(CONF_CHANNEL, 0x04 + output_number)
+    s = _make_sensor(config["temp2_id"], f"{p} Temperature 2",
+                     unit="°C", device_class="temperature", state_class_raw=SC, decimals=0)
+    cg.add(var.set_temp2_sensor(s))
+
+    s = _make_sensor(config["supply_voltage_id"], f"{p} Supply Voltage",
+                     unit="V", device_class="voltage", state_class_raw=SC, decimals=2,
+                     entity_category_raw=DIAG)
+    cg.add(var.set_supply_voltage_sensor(s))
+
+    s = _make_sensor(config["voltage_input1_id"], f"{p} Voltage Input 1 Candidate",
+                     unit="V", device_class="voltage", state_class_raw=SC, decimals=1,
+                     entity_category_raw=DIAG)
+    cg.add(var.set_voltage_input1_sensor(s))
+
+    s = _make_sensor(config["voltage_input2_id"], f"{p} Voltage Input 2 Candidate",
+                     unit="V", device_class="voltage", state_class_raw=SC, decimals=1,
+                     entity_category_raw=DIAG)
+    cg.add(var.set_voltage_input2_sensor(s))
+
+    s = _make_sensor(config["last_cmd_channel_id"], f"{p} Last Output Command Channel",
+                     state_class_raw=SC, decimals=0, entity_category_raw=DIAG)
+    cg.add(var.set_last_command_channel_sensor(s))
+
+    s = _make_sensor(config["last_cmd_state_id"], f"{p} Last Output Command State",
+                     state_class_raw=SC, decimals=0, entity_category_raw=DIAG)
+    cg.add(var.set_last_command_state_sensor(s))
+
+    for i in range(1, 7):
+        s = _make_sensor(config[f"tank_{i}_id"], f"{p} Tank {i}",
+                         unit="%", state_class_raw=SC, decimals=0)
+        cg.add(var.set_tank_sensor(i, s))
+
+    # Output switches (channels 0x04–0x0D)
+    for i in range(10):
+        sw = cg.new_Pvariable(config[f"output_{i}_id"])
+        cg.add(sw.set_name(f"{p} Output {i}"))
         cg.add(sw.set_parent(var))
-        cg.add(sw.set_output_number(output_number))
-        cg.add(sw.set_channel(channel))
+        cg.add(sw.set_output_number(i))
+        cg.add(sw.set_channel(0x04 + i))
         cg.add(sw.set_is_inverter(False))
+        cg.add(cg.App.register_component(sw))
+        cg.add(cg.App.register_switch(sw))
         cg.add(var.register_output_switch(sw))
 
-    if CONF_INVERTER in config:
-        inv_conf = config[CONF_INVERTER]
-        sw = await switch.new_switch(inv_conf)
-        cg.add(sw.set_parent(var))
-        cg.add(sw.set_output_number(0))
-        cg.add(sw.set_channel(inv_conf[CONF_CHANNEL]))
-        cg.add(sw.set_is_inverter(True))
-        cg.add(var.register_inverter_switch(sw))
+    # Inverter switch (channel 0x0E)
+    inv = cg.new_Pvariable(config["inverter_id"])
+    cg.add(inv.set_name(f"{p} Inverter"))
+    cg.add(inv.set_parent(var))
+    cg.add(inv.set_output_number(0))
+    cg.add(inv.set_channel(0x0E))
+    cg.add(inv.set_is_inverter(True))
+    cg.add(cg.App.register_component(inv))
+    cg.add(cg.App.register_switch(inv))
+    cg.add(var.register_inverter_switch(inv))
