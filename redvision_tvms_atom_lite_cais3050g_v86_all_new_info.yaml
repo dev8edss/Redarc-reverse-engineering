@@ -49,7 +49,6 @@ packages:
     file: packages/redvision_display.yaml
     vars:
       address: "20"
-      display_type: rv1
       name_prefix: Redvision
 
   tvms_rouge: !include

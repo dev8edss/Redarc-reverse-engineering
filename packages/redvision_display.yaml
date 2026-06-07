@@ -1,8 +1,8 @@
-# vars: address (2 hex digits), display_type (rv1 or rv2), name_prefix (must be a valid C++ identifier, no spaces)
+# vars: address (2 hex digits), name_prefix (must be a valid C++ identifier, no spaces)
 redvision_display:
   - id: ${name_prefix}
     source_address: 0x${address}
-    display_type: ${display_type}
+    display_type: rv1
     battery_current_display:
       name: "${name_prefix} Battery Current Display"
       unit_of_measurement: "A"
