@@ -3,7 +3,7 @@ import esphome.config_validation as cv
 from esphome.components import sensor
 from esphome.const import (
     CONF_ACCURACY_DECIMALS, CONF_DEVICE_CLASS, CONF_DISABLED_BY_DEFAULT,
-    CONF_ENTITY_CATEGORY, CONF_ICON, CONF_ID, CONF_NAME,
+    CONF_ENTITY_CATEGORY, CONF_FORCE_UPDATE, CONF_ICON, CONF_ID, CONF_NAME,
     CONF_STATE_CLASS, CONF_UNIT_OF_MEASUREMENT,
     ENTITY_CATEGORY_DIAGNOSTIC, ENTITY_CATEGORY_NONE,
     STATE_CLASS_MEASUREMENT,
@@ -41,6 +41,7 @@ async def _make_sensor(config_id, name, unit=None, device_class=None,
         CONF_ID: config_id,
         CONF_NAME: name,
         CONF_DISABLED_BY_DEFAULT: False,
+        CONF_FORCE_UPDATE: False,
         CONF_ICON: "",
         CONF_ENTITY_CATEGORY: entity_category if entity_category is not None else ENTITY_CATEGORY_NONE,
     }
