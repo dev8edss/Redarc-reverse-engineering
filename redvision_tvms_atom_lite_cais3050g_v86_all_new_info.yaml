@@ -17,7 +17,7 @@ substitutions:
   board: m5stack-atom
   logger_level: INFO
 
-  # ESP32 source address on the REDARC network (2 hex digits, no 0x prefix).
+  # ESP32 source address on the REDARC network (2 hex digits, no 0x prefix). Usually matches a redvision display address.
   host_address: "20"
 
 packages:
