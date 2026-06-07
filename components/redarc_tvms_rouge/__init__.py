@@ -61,8 +61,16 @@ _SC_MAP = {
     "measurement": _StateClass.STATE_CLASS_MEASUREMENT,
     "total_increasing": _StateClass.STATE_CLASS_TOTAL_INCREASING,
 }
+_ThrottleAverageFilter = _sensor_ns.class_("ThrottleAverageFilter")
 _bs_ns = cg.esphome_ns.namespace("binary_sensor")
 _BSClass = _bs_ns.class_("BinarySensor")
+
+
+def _add_throttle_filter(config_id, sens, filter_ms):
+    from esphome.core import ID as _ID
+    fid = _ID(f"{config_id.id}_throttle", is_declaration=True, type=_ThrottleAverageFilter)
+    cg.add(sens.add_filter(cg.new_Pvariable(fid, filter_ms)))
+
 
 # Auto-generated IDs for sensors, lights, numbers, and the abort button
 _AUTO_IDS = {}
@@ -100,7 +108,7 @@ CONFIG_SCHEMA = cv.Schema(
 ).extend(cv.COMPONENT_SCHEMA)
 
 
-async def _make_sensor(config_id, name, unit=None, device_class=None,
+async def _make_sensor(config_id, name, filter_ms=None, unit=None, device_class=None,
                        state_class=None, decimals=None, entity_category=None):
     cfg = {
         CONF_ID: config_id,
@@ -118,7 +126,10 @@ async def _make_sensor(config_id, name, unit=None, device_class=None,
         cfg[CONF_STATE_CLASS] = _SC_MAP.get(state_class, state_class)
     if decimals is not None:
         cfg[CONF_ACCURACY_DECIMALS] = decimals
-    return await sensor.new_sensor(cfg)
+    s = await sensor.new_sensor(cfg)
+    if filter_ms is not None:
+        _add_throttle_filter(config_id, s, filter_ms)
+    return s
 
 
 async def to_code(config):
@@ -127,7 +138,6 @@ async def to_code(config):
 
     cg.add(var.set_source_address(config[CONF_SOURCE_ADDRESS]))
     cg.add(var.set_host_address(config[CONF_HOST_ADDRESS]))
-    cg.add(var.set_filter_interval_ms(config[CONF_FILTER_INTERVAL]))
     cg.add(var.set_true_off_threshold(config[CONF_TRUE_OFF_THRESHOLD]))
     cg.add(var.set_target_debounce_ms(config[CONF_TARGET_DEBOUNCE].total_milliseconds))
     cg.add(var.set_start_deadline_ms(config[CONF_START_DEADLINE].total_milliseconds))
@@ -140,23 +150,24 @@ async def to_code(config):
     cg.add(var.set_max_iterations(config[CONF_MAX_ITERATIONS]))
 
     p = config[CONF_ID].id.replace("_", " ")
+    fi = config[CONF_FILTER_INTERVAL]
 
     # Sensors
     s = await _make_sensor(config["tank1_id"], f"{p} Tank 1",
-                           unit="%", state_class=STATE_CLASS_MEASUREMENT, decimals=0)
+                           filter_ms=fi, unit="%", state_class=STATE_CLASS_MEASUREMENT, decimals=0)
     cg.add(var.set_tank1_sensor(s))
 
     s = await _make_sensor(config["tank2_id"], f"{p} Tank 2",
-                           unit="%", state_class=STATE_CLASS_MEASUREMENT, decimals=0)
+                           filter_ms=fi, unit="%", state_class=STATE_CLASS_MEASUREMENT, decimals=0)
     cg.add(var.set_tank2_sensor(s))
 
     s = await _make_sensor(config["input_voltage_id"], f"{p} Input Voltage",
-                           unit="V", device_class="voltage",
+                           filter_ms=fi, unit="V", device_class="voltage",
                            state_class=STATE_CLASS_MEASUREMENT, decimals=2)
     cg.add(var.set_input_voltage_sensor(s))
 
     s = await _make_sensor(config["input_current_id"], f"{p} Input Current",
-                           unit="A", device_class="current",
+                           filter_ms=fi, unit="A", device_class="current",
                            state_class=STATE_CLASS_MEASUREMENT, decimals=1,
                            entity_category=ENTITY_CATEGORY_DIAGNOSTIC)
     cg.add(var.set_input_current_sensor(s))
@@ -164,7 +175,7 @@ async def to_code(config):
     # Output level sensors and button state binary sensors
     for i in range(1, 11):
         ls = await _make_sensor(config[f"level_sensor_{i}"], f"{p} Output {i} Level",
-                                unit="%", state_class=STATE_CLASS_MEASUREMENT, decimals=0,
+                                filter_ms=fi, unit="%", state_class=STATE_CLASS_MEASUREMENT, decimals=0,
                                 entity_category=ENTITY_CATEGORY_DIAGNOSTIC)
         cg.add(var.set_level_sensor(i, ls))
 
@@ -179,7 +190,7 @@ async def to_code(config):
         await binary_sensor.register_binary_sensor(bs, bs_cfg)
         cg.add(var.set_button_sensor(i, bs))
 
-    # Lights
+    # Lights — no throttle filter, LightState bypasses sensor filter chain
     for i in range(1, 11):
         channel = 0x0B + i  # 0x0C .. 0x15
         light_out = cg.new_Pvariable(config[f"light_out_{i}"])
@@ -199,7 +210,7 @@ async def to_code(config):
         }
         await light.register_light(light_out, light_cfg)
 
-    # Tuning number entities
+    # Tuning number entities — not sensors, no throttle filter
     TUNING = [
         ("Deadband", 0, 0.5, 10.0, 0.5, 3.0, "%"),
         ("Initial Ramp Rate", 1, 20.0, 160.0, 1.0, 50.0, "ms/%"),
@@ -226,7 +237,7 @@ async def to_code(config):
             num_cfg[CONF_UNIT_OF_MEASUREMENT] = unit
         await number.register_number(num, num_cfg, min_value=min_v, max_value=max_v, step=step)
 
-    # Abort button
+    # Abort button — not a sensor, no throttle filter
     btn = cg.new_Pvariable(config["abort_btn_id"])
     cg.add(btn.set_parent(var))
     btn_cfg = {

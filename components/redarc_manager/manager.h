@@ -12,7 +12,6 @@ namespace redarc_manager {
 class Manager30Component : public Component {
  public:
   void set_source_address(uint8_t source_address) { this->source_address_ = source_address; }
-  void set_filter_interval_ms(uint32_t ms) { this->filter_interval_ms_ = ms; }
   void set_battery_sensor(redarc_battery_sensor::BatterySensorComponent *b) { this->battery_sensor_ = b; }
   void set_output_current_sensor(sensor::Sensor *s) { this->output_current_sensor_ = s; }
   void set_output_current_raw_sensor(sensor::Sensor *s) { this->output_current_raw_sensor_ = s; }
@@ -30,11 +29,6 @@ class Manager30Component : public Component {
 
  protected:
   uint8_t source_address_{0x01};
-  uint32_t filter_interval_ms_{5000};
-  uint32_t last_current_publish_ms_{0};
-  uint32_t last_solar_publish_ms_{0};
-  uint32_t last_solar_energy_publish_ms_{0};
-  uint32_t last_ac_publish_ms_{0};
   redarc_battery_sensor::BatterySensorComponent *battery_sensor_{nullptr};
   sensor::Sensor *output_current_sensor_{nullptr};
   sensor::Sensor *output_current_raw_sensor_{nullptr};

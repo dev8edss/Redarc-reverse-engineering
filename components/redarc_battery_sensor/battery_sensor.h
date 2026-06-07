@@ -12,7 +12,6 @@ namespace redarc_battery_sensor {
 class BatterySensorComponent : public Component {
  public:
   void set_source_address(uint8_t source_address) { this->source_address_ = source_address; }
-  void set_filter_interval_ms(uint32_t ms) { this->filter_interval_ms_ = ms; }
   void set_current_sensor(sensor::Sensor *s) { this->current_sensor_ = s; }
   void set_current_raw_sensor(sensor::Sensor *s) { this->current_raw_sensor_ = s; }
   void set_voltage_sensor(sensor::Sensor *s) { this->voltage_sensor_ = s; }
@@ -27,8 +26,6 @@ class BatterySensorComponent : public Component {
 
  protected:
   uint8_t source_address_{0x08};
-  uint32_t filter_interval_ms_{5000};
-  uint32_t last_publish_ms_{0};
   float current_a_{NAN};
   sensor::Sensor *current_sensor_{nullptr};
   sensor::Sensor *current_raw_sensor_{nullptr};
