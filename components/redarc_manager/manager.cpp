@@ -1,4 +1,4 @@
-#include "manager30.h"
+#include "manager.h"
 
 namespace esphome {
 namespace redarc_manager {
