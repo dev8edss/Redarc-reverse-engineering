@@ -3,6 +3,7 @@ import esphome.config_validation as cv
 from esphome.components import binary_sensor, button, light, number, sensor
 from esphome.const import (
     CONF_DEFAULT_TRANSITION_LENGTH,
+    CONF_DISABLED_BY_DEFAULT,
     CONF_GAMMA_CORRECT,
     CONF_ID,
     CONF_NAME,
@@ -156,6 +157,7 @@ async def to_code(config):
             CONF_NAME: f"{p} Output {i}",
             CONF_GAMMA_CORRECT: 1.0,
             CONF_DEFAULT_TRANSITION_LENGTH: 0,
+            CONF_DISABLED_BY_DEFAULT: False,
         }
         await light.register_light(light_out, light_cfg)
 
