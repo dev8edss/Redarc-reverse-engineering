@@ -4,10 +4,22 @@ from esphome.components import sensor, switch
 from esphome.const import (
     CONF_ACCURACY_DECIMALS, CONF_DEVICE_CLASS, CONF_DISABLED_BY_DEFAULT,
     CONF_ENTITY_CATEGORY, CONF_FORCE_UPDATE, CONF_ICON, CONF_ID, CONF_NAME,
-    CONF_STATE_CLASS, CONF_UNIT_OF_MEASUREMENT,
+    CONF_RESTORE_MODE, CONF_STATE_CLASS, CONF_UNIT_OF_MEASUREMENT,
     ENTITY_CATEGORY_DIAGNOSTIC, ENTITY_CATEGORY_NONE,
     STATE_CLASS_MEASUREMENT,
 )
+
+# Resolve switch restore mode via ESPHome's own mapping.
+try:
+    _SWITCH_RESTORE_MODE_OFF = (
+        switch.RESTORE_MODES.get("RESTORE_DEFAULT_OFF")
+        or switch.RESTORE_MODES.get("RESTORE_AND_OFF")
+        or switch.RESTORE_MODES.get("ALWAYS_OFF")
+        or next(iter(switch.RESTORE_MODES.values()))
+    )
+except AttributeError:
+    _switch_ns = cg.esphome_ns.namespace("switch_")
+    _SWITCH_RESTORE_MODE_OFF = _switch_ns.enum("SwitchRestoreMode", is_class=True).SWITCH_RESTORE_DEFAULT_OFF
 
 CODEOWNERS = ["@dev8edss"]
 AUTO_LOAD = ["sensor", "switch", "redarc_common"]
@@ -130,6 +142,7 @@ async def to_code(config):
             CONF_DISABLED_BY_DEFAULT: False,
             CONF_ICON: "",
             CONF_ENTITY_CATEGORY: ENTITY_CATEGORY_NONE,
+            CONF_RESTORE_MODE: _SWITCH_RESTORE_MODE_OFF,
         }
         await switch.register_switch(sw, sw_cfg)
         cg.add(var.register_output_switch(sw))
@@ -146,6 +159,7 @@ async def to_code(config):
         CONF_DISABLED_BY_DEFAULT: False,
         CONF_ICON: "",
         CONF_ENTITY_CATEGORY: ENTITY_CATEGORY_NONE,
+        CONF_RESTORE_MODE: _SWITCH_RESTORE_MODE_OFF,
     }
     await switch.register_switch(inv, inv_cfg)
     cg.add(var.register_inverter_switch(inv))
