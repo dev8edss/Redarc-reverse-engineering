@@ -41,6 +41,7 @@ redarc_manager:
   id: Manager30
   source_address: 0x01
   filter_interval: ${sensor_average_interval}
+  battery_sensor_id: Battery
 
 # Multiple redvision displays are supported — add entries as needed.
 redarc_redvision_display:

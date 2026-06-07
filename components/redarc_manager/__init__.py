@@ -15,9 +15,13 @@ MULTI_CONF = False
 
 CONF_SOURCE_ADDRESS = "source_address"
 CONF_FILTER_INTERVAL = "filter_interval"
+CONF_BATTERY_SENSOR = "battery_sensor_id"
 
 manager30_ns = cg.esphome_ns.namespace("redarc_manager")
 Manager30Component = manager30_ns.class_("Manager30Component", cg.Component)
+
+_battery_sensor_ns = cg.esphome_ns.namespace("redarc_battery_sensor")
+_BatterySensorComponent = _battery_sensor_ns.class_("BatterySensorComponent", cg.Component)
 
 _sensor_ns = cg.esphome_ns.namespace("sensor")
 _SensorClass = _sensor_ns.class_("Sensor")
@@ -31,9 +35,11 @@ CONFIG_SCHEMA = cv.Schema({
     cv.GenerateID(): cv.declare_id(Manager30Component),
     cv.Optional(CONF_SOURCE_ADDRESS, default=0x01): cv.hex_uint8_t,
     cv.Optional(CONF_FILTER_INTERVAL, default="5s"): cv.positive_time_period_milliseconds,
+    cv.Optional(CONF_BATTERY_SENSOR): cv.use_id(_BatterySensorComponent),
     cv.GenerateID("output_current_id"): cv.declare_id(_SensorClass),
     cv.GenerateID("output_current_raw_id"): cv.declare_id(_SensorClass),
     cv.GenerateID("battery_voltage_id"): cv.declare_id(_SensorClass),
+    cv.GenerateID("source_device_current_id"): cv.declare_id(_SensorClass),
     cv.GenerateID("solar_current_id"): cv.declare_id(_SensorClass),
     cv.GenerateID("solar_voltage_id"): cv.declare_id(_SensorClass),
     cv.GenerateID("solar_power_id"): cv.declare_id(_SensorClass),
@@ -69,6 +75,10 @@ async def to_code(config):
     cg.add(var.set_source_address(config[CONF_SOURCE_ADDRESS]))
     cg.add(var.set_filter_interval_ms(config[CONF_FILTER_INTERVAL]))
 
+    if CONF_BATTERY_SENSOR in config:
+        battery = await cg.get_variable(config[CONF_BATTERY_SENSOR])
+        cg.add(var.set_battery_sensor(battery))
+
     p = config[CONF_ID].id.replace("_", " ")
 
     s = await _make_sensor(config["output_current_id"], f"{p} Output Current",
@@ -85,6 +95,11 @@ async def to_code(config):
                            unit="V", device_class="voltage",
                            state_class=STATE_CLASS_MEASUREMENT, decimals=3)
     cg.add(var.set_battery_voltage_sensor(s))
+
+    s = await _make_sensor(config["source_device_current_id"], f"{p} Device Current",
+                           unit="A", device_class="current",
+                           state_class=STATE_CLASS_MEASUREMENT, decimals=3)
+    cg.add(var.set_source_device_current_sensor(s))
 
     s = await _make_sensor(config["solar_current_id"], f"{p} Solar Current",
                            unit="A", device_class="current",
