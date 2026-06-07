@@ -242,7 +242,6 @@ void TVMSRougeComponent::handle_can_frame(uint32_t can_id, const std::vector<uin
 
   if (can_id == this->tank_feedback_id_) {
     const bool tank_ok = (now - this->last_tank_publish_ms_) >= this->filter_interval_ms_;
-    ESP_LOGI(TAG, "tank d0=0x%02X ok=%d elapsed=%ums", data[0], (int)tank_ok, (unsigned)(now - this->last_tank_publish_ms_));
     if (tank_ok) {
       if (data[0] == 0x09) {
         this->last_tank_publish_ms_ = now;
@@ -302,7 +301,6 @@ void TVMSRougeComponent::handle_can_frame(uint32_t can_id, const std::vector<uin
   if (can_id != this->level_feedback_id_) return;
 
   const bool level_ok = (now - this->last_level_publish_ms_) >= this->filter_interval_ms_;
-  ESP_LOGI(TAG, "level d0=0x%02X ok=%d elapsed=%ums", data[0], (int)level_ok, (unsigned)(now - this->last_level_publish_ms_));
 
   if (data[0] == 0x0C) {
     this->publish_now_ = level_ok;
