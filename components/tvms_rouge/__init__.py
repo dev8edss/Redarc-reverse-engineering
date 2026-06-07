@@ -5,7 +5,8 @@ from esphome.const import (
     CONF_ACCURACY_DECIMALS, CONF_DEFAULT_TRANSITION_LENGTH, CONF_DEVICE_CLASS,
     CONF_DISABLED_BY_DEFAULT, CONF_EFFECTS, CONF_ENTITY_CATEGORY,
     CONF_FLASH_TRANSITION_LENGTH, CONF_FORCE_UPDATE, CONF_GAMMA_CORRECT, CONF_ICON,
-    CONF_ID, CONF_NAME, CONF_RESTORE_MODE, CONF_STATE_CLASS, CONF_UNIT_OF_MEASUREMENT,
+    CONF_ID, CONF_MODE, CONF_NAME, CONF_RESTORE_MODE, CONF_STATE_CLASS,
+    CONF_UNIT_OF_MEASUREMENT,
     ENTITY_CATEGORY_CONFIG, ENTITY_CATEGORY_DIAGNOSTIC, ENTITY_CATEGORY_NONE,
     STATE_CLASS_MEASUREMENT,
 )
@@ -21,6 +22,13 @@ try:
 except AttributeError:
     _light_ns = cg.esphome_ns.namespace("light")
     _RESTORE_MODE_OFF = _light_ns.enum("LightRestoreMode", is_class=True).RESTORE_AND_OFF
+
+# Resolve number mode AUTO via ESPHome's own mapping.
+try:
+    _NUMBER_MODE_AUTO = number.NUMBER_MODES.get("AUTO")
+except AttributeError:
+    _number_ns = cg.esphome_ns.namespace("number")
+    _NUMBER_MODE_AUTO = _number_ns.enum("NumberMode", is_class=True).NUMBER_MODE_AUTO
 
 CODEOWNERS = ["@dev8edss"]
 AUTO_LOAD = ["binary_sensor", "button", "light", "number", "sensor", "redarc_common"]
@@ -204,6 +212,7 @@ async def to_code(config):
             CONF_DISABLED_BY_DEFAULT: False,
             CONF_ICON: "",
             CONF_ENTITY_CATEGORY: ENTITY_CATEGORY_CONFIG,
+            CONF_MODE: _NUMBER_MODE_AUTO,
         }
         if unit:
             num_cfg[CONF_UNIT_OF_MEASUREMENT] = unit
