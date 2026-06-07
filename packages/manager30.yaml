@@ -1,8 +1,8 @@
-# vars: hub_id, address (2 hex digits), name_prefix, battery_hub_id
+# vars: address (2 hex digits), name_prefix, battery_name_prefix
 manager30:
-  id: ${hub_id}
+  id: ${name_prefix}
   source_address: 0x${address}
-  battery_sensor_id: ${battery_hub_id}
+  battery_sensor_id: ${battery_name_prefix}
   output_current:
     name: "${name_prefix} Output Current"
     unit_of_measurement: "A"
@@ -85,4 +85,4 @@ canbus:
         use_extended_id: true
         remote_transmission_request: false
         then:
-          - lambda: id(${hub_id}).handle_can_frame(can_id & 0x1FFFFFFFUL, x);
+          - lambda: id(${name_prefix}).handle_can_frame(can_id & 0x1FFFFFFFUL, x);

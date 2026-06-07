@@ -1,6 +1,6 @@
-# vars: hub_id, address (2 hex digits, TVMS Rouge SA), host_address (2 hex digits, ESP32 SA), name_prefix
+# vars: address (2 hex digits, TVMS Rouge SA), host_address (2 hex digits, ESP32 SA), name_prefix (must be a valid C++ identifier, no spaces)
 tvms_rouge:
-  id: ${hub_id}
+  id: ${name_prefix}
   canbus_id: rv_can
   output_command_id: 0x0F00${address}${host_address}
   dim_command_id: 0x0F05${address}${host_address}
@@ -125,7 +125,7 @@ number:
     unit_of_measurement: "%"
     entity_category: config
     set_action:
-      - lambda: id(${hub_id}).set_deadband(x);
+      - lambda: id(${name_prefix}).set_deadband(x);
   - platform: template
     name: "${name_prefix} Initial Ramp Rate"
     min_value: 20
@@ -137,7 +137,7 @@ number:
     unit_of_measurement: "ms/%"
     entity_category: config
     set_action:
-      - lambda: id(${hub_id}).set_initial_rate(x);
+      - lambda: id(${name_prefix}).set_initial_rate(x);
   - platform: template
     name: "${name_prefix} Learning Gain"
     min_value: 1
@@ -149,7 +149,7 @@ number:
     unit_of_measurement: "%"
     entity_category: config
     set_action:
-      - lambda: id(${hub_id}).set_learning_gain_percent(x);
+      - lambda: id(${name_prefix}).set_learning_gain_percent(x);
   - platform: template
     name: "${name_prefix} Approach"
     min_value: 25
@@ -161,7 +161,7 @@ number:
     unit_of_measurement: "%"
     entity_category: config
     set_action:
-      - lambda: id(${hub_id}).set_approach_percent(x);
+      - lambda: id(${name_prefix}).set_approach_percent(x);
   - platform: template
     name: "${name_prefix} Max Pulse"
     min_value: 200
@@ -173,7 +173,7 @@ number:
     unit_of_measurement: "ms"
     entity_category: config
     set_action:
-      - lambda: id(${hub_id}).set_max_pulse(x);
+      - lambda: id(${name_prefix}).set_max_pulse(x);
   - platform: template
     name: "${name_prefix} Settle Time"
     min_value: 200
@@ -185,7 +185,7 @@ number:
     unit_of_measurement: "ms"
     entity_category: config
     set_action:
-      - lambda: id(${hub_id}).set_settle_time(x);
+      - lambda: id(${name_prefix}).set_settle_time(x);
   - platform: template
     name: "${name_prefix} Max Iterations"
     min_value: 1
@@ -196,81 +196,81 @@ number:
     restore_value: true
     entity_category: config
     set_action:
-      - lambda: id(${hub_id}).set_max_iterations_float(x);
+      - lambda: id(${name_prefix}).set_max_iterations_float(x);
 
 button:
   - platform: template
     name: "${name_prefix} Abort and Release"
     entity_category: diagnostic
     on_press:
-      - lambda: id(${hub_id}).abort_and_release();
+      - lambda: id(${name_prefix}).abort_and_release();
 
 light:
   - platform: tvms_rouge
-    tvms_rouge_id: ${hub_id}
+    tvms_rouge_id: ${name_prefix}
     output_number: 1
     channel: 0x0C
     name: "${name_prefix} Output 1"
     gamma_correct: 1.0
     default_transition_length: 0s
   - platform: tvms_rouge
-    tvms_rouge_id: ${hub_id}
+    tvms_rouge_id: ${name_prefix}
     output_number: 2
     channel: 0x0D
     name: "${name_prefix} Output 2"
     gamma_correct: 1.0
     default_transition_length: 0s
   - platform: tvms_rouge
-    tvms_rouge_id: ${hub_id}
+    tvms_rouge_id: ${name_prefix}
     output_number: 3
     channel: 0x0E
     name: "${name_prefix} Output 3"
     gamma_correct: 1.0
     default_transition_length: 0s
   - platform: tvms_rouge
-    tvms_rouge_id: ${hub_id}
+    tvms_rouge_id: ${name_prefix}
     output_number: 4
     channel: 0x0F
     name: "${name_prefix} Output 4"
     gamma_correct: 1.0
     default_transition_length: 0s
   - platform: tvms_rouge
-    tvms_rouge_id: ${hub_id}
+    tvms_rouge_id: ${name_prefix}
     output_number: 5
     channel: 0x10
     name: "${name_prefix} Output 5"
     gamma_correct: 1.0
     default_transition_length: 0s
   - platform: tvms_rouge
-    tvms_rouge_id: ${hub_id}
+    tvms_rouge_id: ${name_prefix}
     output_number: 6
     channel: 0x11
     name: "${name_prefix} Output 6"
     gamma_correct: 1.0
     default_transition_length: 0s
   - platform: tvms_rouge
-    tvms_rouge_id: ${hub_id}
+    tvms_rouge_id: ${name_prefix}
     output_number: 7
     channel: 0x12
     name: "${name_prefix} Output 7"
     gamma_correct: 1.0
     default_transition_length: 0s
   - platform: tvms_rouge
-    tvms_rouge_id: ${hub_id}
+    tvms_rouge_id: ${name_prefix}
     output_number: 8
     channel: 0x13
     name: "${name_prefix} Output 8"
     gamma_correct: 1.0
     default_transition_length: 0s
   - platform: tvms_rouge
-    tvms_rouge_id: ${hub_id}
+    tvms_rouge_id: ${name_prefix}
     output_number: 9
     channel: 0x14
     name: "${name_prefix} Output 9"
     gamma_correct: 1.0
     default_transition_length: 0s
   - platform: tvms_rouge
-    tvms_rouge_id: ${hub_id}
+    tvms_rouge_id: ${name_prefix}
     output_number: 10
     channel: 0x15
     name: "${name_prefix} Output 10"
@@ -285,4 +285,4 @@ canbus:
         use_extended_id: true
         remote_transmission_request: false
         then:
-          - lambda: id(${hub_id}).handle_can_frame(can_id & 0x1FFFFFFFUL, x);
+          - lambda: id(${name_prefix}).handle_can_frame(can_id & 0x1FFFFFFFUL, x);

@@ -1,6 +1,6 @@
-# vars: hub_id, address (2 hex digits, TVMS1280 SA), host_address (2 hex digits, ESP32 SA), name_prefix
+# vars: address (2 hex digits, TVMS1280 SA), host_address (2 hex digits, ESP32 SA), name_prefix (must be a valid C++ identifier, no spaces)
 tvms_1280:
-  id: ${hub_id}
+  id: ${name_prefix}
   canbus_id: rv_can
   source_address: 0x${address}
   command_id: 0x0F00${address}${host_address}
@@ -139,4 +139,4 @@ canbus:
         use_extended_id: true
         remote_transmission_request: false
         then:
-          - lambda: id(${hub_id}).handle_can_frame(can_id & 0x1FFFFFFFUL, x);
+          - lambda: id(${name_prefix}).handle_can_frame(can_id & 0x1FFFFFFFUL, x);

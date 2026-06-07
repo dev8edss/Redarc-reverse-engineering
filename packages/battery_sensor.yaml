@@ -1,6 +1,6 @@
-# vars: hub_id, address (2 hex digits), name_prefix
+# vars: address (2 hex digits), name_prefix (must be a valid C++ identifier, no spaces)
 battery_sensor:
-  id: ${hub_id}
+  id: ${name_prefix}
   source_address: 0x${address}
   current:
     name: "${name_prefix} Current"
@@ -50,4 +50,4 @@ canbus:
         use_extended_id: true
         remote_transmission_request: false
         then:
-          - lambda: id(${hub_id}).handle_can_frame(can_id & 0x1FFFFFFFUL, x);
+          - lambda: id(${name_prefix}).handle_can_frame(can_id & 0x1FFFFFFFUL, x);

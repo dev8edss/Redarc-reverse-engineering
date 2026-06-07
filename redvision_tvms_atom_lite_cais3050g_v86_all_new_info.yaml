@@ -28,42 +28,38 @@ packages:
   # Include only the devices present on your bus.
   # Remove any block for devices you don't have.
   # Duplicate a block with a unique key for multiple instances of the same device type.
+  # name_prefix becomes the C++ component ID — no spaces allowed; use underscores instead.
 
   battery_sensor: !include
     file: packages/battery_sensor.yaml
     vars:
-      hub_id: battery_sensor_hub
       address: "08"
-      name_prefix: "Battery"
+      name_prefix: Battery
 
   manager30: !include
     file: packages/manager30.yaml
     vars:
-      hub_id: manager30_hub
       address: "01"
-      name_prefix: "Manager30"
-      battery_hub_id: battery_sensor_hub
+      name_prefix: Manager30
+      battery_name_prefix: Battery
 
   redvision_display: !include
     file: packages/redvision_display.yaml
     vars:
-      hub_id: redvision1_hub
       address: "20"
       display_type: rv1
-      name_prefix: "Redvision"
+      name_prefix: Redvision
 
   tvms_rouge: !include
     file: packages/tvms_rouge.yaml
     vars:
-      hub_id: tvms_rouge_hub
       address: "30"
       host_address: "20"
-      name_prefix: "TVMS Rouge"
+      name_prefix: TVMS_Rouge
 
   tvms_1280: !include
     file: packages/tvms_1280.yaml
     vars:
-      hub_id: tvms1280_hub
       address: "24"
       host_address: "20"
-      name_prefix: "TVMS1280"
+      name_prefix: TVMS1280

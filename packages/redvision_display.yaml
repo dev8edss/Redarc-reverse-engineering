@@ -1,6 +1,6 @@
-# vars: hub_id, address (2 hex digits), display_type (rv1 or rv2), name_prefix
+# vars: address (2 hex digits), display_type (rv1 or rv2), name_prefix (must be a valid C++ identifier, no spaces)
 redvision_display:
-  - id: ${hub_id}
+  - id: ${name_prefix}
     source_address: 0x${address}
     display_type: ${display_type}
     battery_current_display:
@@ -57,4 +57,4 @@ canbus:
         use_extended_id: true
         remote_transmission_request: false
         then:
-          - lambda: id(${hub_id}).handle_can_frame(can_id & 0x1FFFFFFFUL, x);
+          - lambda: id(${name_prefix}).handle_can_frame(can_id & 0x1FFFFFFFUL, x);
