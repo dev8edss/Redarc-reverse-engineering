@@ -7,7 +7,7 @@
 #include <cmath>
 
 namespace esphome {
-namespace battery_sensor {
+namespace redarc_battery_sensor {
 
 class BatterySensorComponent : public Component {
  public:
@@ -36,5 +36,5 @@ class BatterySensorComponent : public Component {
   sensor::Sensor *soc_sensor_{nullptr};
 };
 
-}  // namespace battery_sensor
+}  // namespace redarc_battery_sensor
 }  // namespace esphome

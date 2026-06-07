@@ -28,7 +28,7 @@ MULTI_CONF = False
 CONF_SOURCE_ADDRESS = "source_address"
 CONF_HOST_ADDRESS = "host_address"
 
-ns = cg.esphome_ns.namespace("tvms_1280")
+ns = cg.esphome_ns.namespace("redarc_tvms_1280")
 TVMS1280Component = ns.class_("TVMS1280Component", cg.Component)
 TVMS1280Switch = ns.class_("TVMS1280Switch", switch.Switch)
 

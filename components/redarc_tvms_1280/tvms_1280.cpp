@@ -1,9 +1,9 @@
 #include "tvms_1280.h"
 
 namespace esphome {
-namespace tvms_1280 {
+namespace redarc_tvms_1280 {
 
-static const char *const TAG = "tvms_1280";
+static const char *const TAG = "redarc_tvms_1280";
 
 void TVMS1280Switch::write_state(bool state) {
   if (this->parent_ != nullptr) this->parent_->send_channel(this->channel_, state);
@@ -127,5 +127,5 @@ void TVMS1280Component::handle_can_frame(uint32_t can_id, const std::vector<uint
   }
 }
 
-}  // namespace tvms_1280
+}  // namespace redarc_tvms_1280
 }  // namespace esphome

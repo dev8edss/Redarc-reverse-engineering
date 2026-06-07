@@ -6,7 +6,7 @@
 #include <vector>
 
 namespace esphome {
-namespace redvision_display {
+namespace redarc_redvision_display {
 
 class RedvisionDisplayComponent : public Component {
  public:
@@ -35,5 +35,5 @@ class RedvisionDisplayComponent : public Component {
   sensor::Sensor *manager_output_current_display_raw_sensor_{nullptr};
 };
 
-}  // namespace redvision_display
+}  // namespace redarc_redvision_display
 }  // namespace esphome

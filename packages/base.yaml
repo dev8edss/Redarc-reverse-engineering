@@ -30,11 +30,11 @@ external_components:
     refresh: always
     components:
       - redarc_common
-      - tvms_rouge
-      - tvms_1280
-      - manager30
-      - battery_sensor
-      - redvision_display
+      - redarc_tvms_rouge
+      - redarc_tvms_1280
+      - redarc_manager30
+      - redarc_battery_sensor
+      - redarc_redvision_display
 
 redarc_common:
   canbus_id: rv_can

@@ -16,7 +16,7 @@ MULTI_CONF = False
 CONF_SOURCE_ADDRESS = "source_address"
 CONF_FILTER_INTERVAL = "filter_interval"
 
-battery_sensor_ns = cg.esphome_ns.namespace("battery_sensor")
+battery_sensor_ns = cg.esphome_ns.namespace("redarc_battery_sensor")
 BatterySensorComponent = battery_sensor_ns.class_("BatterySensorComponent", cg.Component)
 
 _sensor_ns = cg.esphome_ns.namespace("sensor")

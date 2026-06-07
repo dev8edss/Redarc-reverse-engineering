@@ -16,7 +16,7 @@ MULTI_CONF = True
 CONF_SOURCE_ADDRESS = "source_address"
 CONF_FILTER_INTERVAL = "filter_interval"
 
-ns = cg.esphome_ns.namespace("redvision_display")
+ns = cg.esphome_ns.namespace("redarc_redvision_display")
 RedvisionDisplayComponent = ns.class_("RedvisionDisplayComponent", cg.Component)
 
 _sensor_ns = cg.esphome_ns.namespace("sensor")

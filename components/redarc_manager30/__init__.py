@@ -16,7 +16,7 @@ MULTI_CONF = False
 CONF_SOURCE_ADDRESS = "source_address"
 CONF_FILTER_INTERVAL = "filter_interval"
 
-manager30_ns = cg.esphome_ns.namespace("manager30")
+manager30_ns = cg.esphome_ns.namespace("redarc_manager30")
 Manager30Component = manager30_ns.class_("Manager30Component", cg.Component)
 
 _sensor_ns = cg.esphome_ns.namespace("sensor")

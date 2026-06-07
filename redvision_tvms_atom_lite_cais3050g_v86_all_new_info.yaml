@@ -32,27 +32,27 @@ packages:
 # Remove any block for devices you don't have.
 # id becomes the entity name prefix — no spaces, use underscores.
 
-battery_sensor:
+redarc_battery_sensor:
   id: Battery
   source_address: 0x08
 
-manager30:
+redarc_manager30:
   id: Manager30
   source_address: 0x01
 
 # Multiple redvision displays are supported — add entries as needed.
-redvision_display:
+redarc_redvision_display:
   - id: Redvision1
     source_address: 0x20
   - id: Redvision2
     source_address: 0x21
 
-tvms_rouge:
+redarc_tvms_rouge:
   id: TVMS_Rouge
   source_address: 0x30
   host_address: ${host_address}
 
-tvms_1280:
+redarc_tvms_1280:
   id: TVMS1280
   source_address: 0x24
   host_address: ${host_address}

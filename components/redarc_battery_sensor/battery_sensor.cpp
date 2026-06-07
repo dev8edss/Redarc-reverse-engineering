@@ -1,9 +1,9 @@
 #include "battery_sensor.h"
 
 namespace esphome {
-namespace battery_sensor {
+namespace redarc_battery_sensor {
 
-static const char *const TAG = "battery_sensor";
+static const char *const TAG = "redarc_battery_sensor";
 
 void BatterySensorComponent::setup() {
   redarc_common::RedarcCanDispatcher::instance().add_listener(
@@ -38,5 +38,5 @@ void BatterySensorComponent::handle_can_frame(uint32_t can_id, const std::vector
   }
 }
 
-}  // namespace battery_sensor
+}  // namespace redarc_battery_sensor
 }  // namespace esphome

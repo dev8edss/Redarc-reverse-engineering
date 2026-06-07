@@ -1,9 +1,9 @@
 #include "redvision_display.h"
 
 namespace esphome {
-namespace redvision_display {
+namespace redarc_redvision_display {
 
-static const char *const TAG = "redvision_display";
+static const char *const TAG = "redarc_redvision_display";
 
 void RedvisionDisplayComponent::setup() {
   redarc_common::RedarcCanDispatcher::instance().add_listener(
@@ -40,5 +40,5 @@ void RedvisionDisplayComponent::handle_can_frame(uint32_t can_id, const std::vec
   }
 }
 
-}  // namespace redvision_display
+}  // namespace redarc_redvision_display
 }  // namespace esphome

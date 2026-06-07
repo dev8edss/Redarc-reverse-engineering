@@ -8,7 +8,7 @@
 #include <vector>
 
 namespace esphome {
-namespace tvms_1280 {
+namespace redarc_tvms_1280 {
 
 class TVMS1280Component;
 
@@ -72,5 +72,5 @@ class TVMS1280Component : public Component {
   sensor::Sensor *last_command_state_sensor_{nullptr};
 };
 
-}  // namespace tvms_1280
+}  // namespace redarc_tvms_1280
 }  // namespace esphome

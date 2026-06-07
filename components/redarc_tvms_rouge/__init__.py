@@ -47,7 +47,7 @@ CONF_MAX_PULSE = "max_pulse"
 CONF_SETTLE_TIME = "settle_time"
 CONF_MAX_ITERATIONS = "max_iterations"
 
-tvms_rouge_ns = cg.esphome_ns.namespace("tvms_rouge")
+tvms_rouge_ns = cg.esphome_ns.namespace("redarc_tvms_rouge")
 TVMSRougeComponent = tvms_rouge_ns.class_("TVMSRougeComponent", cg.Component)
 TVMSRougeLight = tvms_rouge_ns.class_("TVMSRougeLight", light.LightOutput)
 TVMSRougeNumber = tvms_rouge_ns.class_("TVMSRougeNumber", number.Number, cg.Component)

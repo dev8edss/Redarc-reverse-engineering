@@ -14,7 +14,7 @@
 #include <vector>
 
 namespace esphome {
-namespace tvms_rouge {
+namespace redarc_tvms_rouge {
 
 class TVMSRougeComponent;
 
@@ -187,5 +187,5 @@ class TVMSRougeComponent : public Component {
   bool learning_pending_{false};
 };
 
-}  // namespace tvms_rouge
+}  // namespace redarc_tvms_rouge
 }  // namespace esphome

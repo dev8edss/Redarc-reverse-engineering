@@ -1,9 +1,9 @@
 #include "tvms_rouge.h"
 
 namespace esphome {
-namespace tvms_rouge {
+namespace redarc_tvms_rouge {
 
-static const char *const TAG = "tvms_rouge";
+static const char *const TAG = "redarc_tvms_rouge";
 
 light::LightTraits TVMSRougeLight::get_traits() {
   auto traits = light::LightTraits();
@@ -508,5 +508,5 @@ void TVMSRougeComponent::loop() {
   this->publish_actual_light_level_(out);
 }
 
-}  // namespace tvms_rouge
+}  // namespace redarc_tvms_rouge
 }  // namespace esphome
