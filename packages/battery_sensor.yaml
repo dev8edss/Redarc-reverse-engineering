@@ -1,0 +1,53 @@
+# vars: hub_id, address (2 hex digits), name_prefix
+battery_sensor:
+  id: ${hub_id}
+  source_address: 0x${address}
+  current:
+    name: "${name_prefix} Current"
+    unit_of_measurement: "A"
+    device_class: current
+    state_class: measurement
+    accuracy_decimals: 3
+    filters:
+      - throttle_average: ${sensor_average_interval}
+  current_raw:
+    name: "${name_prefix} Current Raw"
+    state_class: measurement
+    entity_category: diagnostic
+    accuracy_decimals: 0
+    filters:
+      - throttle_average: ${sensor_average_interval}
+  voltage:
+    name: "${name_prefix} Voltage"
+    unit_of_measurement: "V"
+    device_class: voltage
+    state_class: measurement
+    accuracy_decimals: 3
+    filters:
+      - throttle_average: ${sensor_average_interval}
+  temperature:
+    name: "${name_prefix} Temperature"
+    unit_of_measurement: "°C"
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 0
+    filters:
+      - throttle_average: ${sensor_average_interval}
+  soc:
+    name: "${name_prefix} SOC"
+    unit_of_measurement: "%"
+    device_class: battery
+    state_class: measurement
+    accuracy_decimals: 0
+    filters:
+      - throttle_average: ${sensor_average_interval}
+
+canbus:
+  - !extend rv_can
+    on_frame:
+      - can_id: 0x00000000
+        can_id_mask: 0x00000000
+        use_extended_id: true
+        remote_transmission_request: false
+        then:
+          - lambda: id(${hub_id}).handle_can_frame(can_id & 0x1FFFFFFFUL, x);

@@ -1,0 +1,288 @@
+# vars: hub_id, address (2 hex digits, TVMS Rouge SA), host_address (2 hex digits, ESP32 SA), name_prefix
+tvms_rouge:
+  id: ${hub_id}
+  canbus_id: rv_can
+  output_command_id: 0x0F00${address}${host_address}
+  dim_command_id: 0x0F05${address}${host_address}
+  keepalive_id: 0x0FE6FF${host_address}
+  level_feedback_id: 0x1BFD12${address}
+  tank_feedback_id: 0x1BFD02${address}
+  button_status_id: 0x1BFD14${address}
+  input_status_id: 0x13F108${address}
+  true_off_threshold: 1.0
+  target_debounce: 600ms
+  start_deadline: 2500ms
+  default_deadband: 3.0
+  initial_rate_ms_per_percent: 50.0
+  learning_gain: 0.25
+  approach: 0.80
+  max_pulse: 1200ms
+  settle_time: 700ms
+  max_iterations: 12
+  tank1:
+    name: "${name_prefix} Tank 1"
+    unit_of_measurement: "%"
+    state_class: measurement
+    accuracy_decimals: 0
+    filters:
+      - throttle_average: ${sensor_average_interval}
+  tank2:
+    name: "${name_prefix} Tank 2"
+    unit_of_measurement: "%"
+    state_class: measurement
+    accuracy_decimals: 0
+    filters:
+      - throttle_average: ${sensor_average_interval}
+  input_voltage:
+    name: "${name_prefix} Input Voltage"
+    unit_of_measurement: "V"
+    device_class: voltage
+    state_class: measurement
+    accuracy_decimals: 2
+    filters:
+      - throttle_average: ${sensor_average_interval}
+  input_current:
+    name: "${name_prefix} Input Current"
+    unit_of_measurement: "A"
+    device_class: current
+    state_class: measurement
+    accuracy_decimals: 1
+    entity_category: diagnostic
+    filters:
+      - throttle_average: ${sensor_average_interval}
+  output_levels:
+    - name: "${name_prefix} Output 1 Level"
+      unit_of_measurement: "%"
+      state_class: measurement
+      entity_category: diagnostic
+      accuracy_decimals: 0
+    - name: "${name_prefix} Output 2 Level"
+      unit_of_measurement: "%"
+      state_class: measurement
+      entity_category: diagnostic
+      accuracy_decimals: 0
+    - name: "${name_prefix} Output 3 Level"
+      unit_of_measurement: "%"
+      state_class: measurement
+      entity_category: diagnostic
+      accuracy_decimals: 0
+    - name: "${name_prefix} Output 4 Level"
+      unit_of_measurement: "%"
+      state_class: measurement
+      entity_category: diagnostic
+      accuracy_decimals: 0
+    - name: "${name_prefix} Output 5 Level"
+      unit_of_measurement: "%"
+      state_class: measurement
+      entity_category: diagnostic
+      accuracy_decimals: 0
+    - name: "${name_prefix} Output 6 Level"
+      unit_of_measurement: "%"
+      state_class: measurement
+      entity_category: diagnostic
+      accuracy_decimals: 0
+    - name: "${name_prefix} Output 7 Level"
+      unit_of_measurement: "%"
+      state_class: measurement
+      entity_category: diagnostic
+      accuracy_decimals: 0
+    - name: "${name_prefix} Output 8 Level"
+      unit_of_measurement: "%"
+      state_class: measurement
+      entity_category: diagnostic
+      accuracy_decimals: 0
+    - name: "${name_prefix} Output 9 Level"
+      unit_of_measurement: "%"
+      state_class: measurement
+      entity_category: diagnostic
+      accuracy_decimals: 0
+    - name: "${name_prefix} Output 10 Level"
+      unit_of_measurement: "%"
+      state_class: measurement
+      entity_category: diagnostic
+      accuracy_decimals: 0
+  button_states:
+    - name: "${name_prefix} Output 1 Button Active"
+    - name: "${name_prefix} Output 2 Button Active"
+    - name: "${name_prefix} Output 3 Button Active"
+    - name: "${name_prefix} Output 4 Button Active"
+    - name: "${name_prefix} Output 5 Button Active"
+    - name: "${name_prefix} Output 6 Button Active"
+    - name: "${name_prefix} Output 7 Button Active"
+    - name: "${name_prefix} Output 8 Button Active"
+    - name: "${name_prefix} Output 9 Button Active"
+    - name: "${name_prefix} Output 10 Button Active"
+
+number:
+  - platform: template
+    name: "${name_prefix} Deadband"
+    min_value: 0.5
+    max_value: 10
+    step: 0.5
+    initial_value: 3
+    optimistic: true
+    restore_value: true
+    unit_of_measurement: "%"
+    entity_category: config
+    set_action:
+      - lambda: id(${hub_id}).set_deadband(x);
+  - platform: template
+    name: "${name_prefix} Initial Ramp Rate"
+    min_value: 20
+    max_value: 160
+    step: 1
+    initial_value: 50
+    optimistic: true
+    restore_value: true
+    unit_of_measurement: "ms/%"
+    entity_category: config
+    set_action:
+      - lambda: id(${hub_id}).set_initial_rate(x);
+  - platform: template
+    name: "${name_prefix} Learning Gain"
+    min_value: 1
+    max_value: 100
+    step: 1
+    initial_value: 25
+    optimistic: true
+    restore_value: true
+    unit_of_measurement: "%"
+    entity_category: config
+    set_action:
+      - lambda: id(${hub_id}).set_learning_gain_percent(x);
+  - platform: template
+    name: "${name_prefix} Approach"
+    min_value: 25
+    max_value: 100
+    step: 5
+    initial_value: 80
+    optimistic: true
+    restore_value: true
+    unit_of_measurement: "%"
+    entity_category: config
+    set_action:
+      - lambda: id(${hub_id}).set_approach_percent(x);
+  - platform: template
+    name: "${name_prefix} Max Pulse"
+    min_value: 200
+    max_value: 5000
+    step: 50
+    initial_value: 1200
+    optimistic: true
+    restore_value: true
+    unit_of_measurement: "ms"
+    entity_category: config
+    set_action:
+      - lambda: id(${hub_id}).set_max_pulse(x);
+  - platform: template
+    name: "${name_prefix} Settle Time"
+    min_value: 200
+    max_value: 3000
+    step: 50
+    initial_value: 700
+    optimistic: true
+    restore_value: true
+    unit_of_measurement: "ms"
+    entity_category: config
+    set_action:
+      - lambda: id(${hub_id}).set_settle_time(x);
+  - platform: template
+    name: "${name_prefix} Max Iterations"
+    min_value: 1
+    max_value: 30
+    step: 1
+    initial_value: 12
+    optimistic: true
+    restore_value: true
+    entity_category: config
+    set_action:
+      - lambda: id(${hub_id}).set_max_iterations_float(x);
+
+button:
+  - platform: template
+    name: "${name_prefix} Abort and Release"
+    entity_category: diagnostic
+    on_press:
+      - lambda: id(${hub_id}).abort_and_release();
+
+light:
+  - platform: tvms_rouge
+    tvms_rouge_id: ${hub_id}
+    output_number: 1
+    channel: 0x0C
+    name: "${name_prefix} Output 1"
+    gamma_correct: 1.0
+    default_transition_length: 0s
+  - platform: tvms_rouge
+    tvms_rouge_id: ${hub_id}
+    output_number: 2
+    channel: 0x0D
+    name: "${name_prefix} Output 2"
+    gamma_correct: 1.0
+    default_transition_length: 0s
+  - platform: tvms_rouge
+    tvms_rouge_id: ${hub_id}
+    output_number: 3
+    channel: 0x0E
+    name: "${name_prefix} Output 3"
+    gamma_correct: 1.0
+    default_transition_length: 0s
+  - platform: tvms_rouge
+    tvms_rouge_id: ${hub_id}
+    output_number: 4
+    channel: 0x0F
+    name: "${name_prefix} Output 4"
+    gamma_correct: 1.0
+    default_transition_length: 0s
+  - platform: tvms_rouge
+    tvms_rouge_id: ${hub_id}
+    output_number: 5
+    channel: 0x10
+    name: "${name_prefix} Output 5"
+    gamma_correct: 1.0
+    default_transition_length: 0s
+  - platform: tvms_rouge
+    tvms_rouge_id: ${hub_id}
+    output_number: 6
+    channel: 0x11
+    name: "${name_prefix} Output 6"
+    gamma_correct: 1.0
+    default_transition_length: 0s
+  - platform: tvms_rouge
+    tvms_rouge_id: ${hub_id}
+    output_number: 7
+    channel: 0x12
+    name: "${name_prefix} Output 7"
+    gamma_correct: 1.0
+    default_transition_length: 0s
+  - platform: tvms_rouge
+    tvms_rouge_id: ${hub_id}
+    output_number: 8
+    channel: 0x13
+    name: "${name_prefix} Output 8"
+    gamma_correct: 1.0
+    default_transition_length: 0s
+  - platform: tvms_rouge
+    tvms_rouge_id: ${hub_id}
+    output_number: 9
+    channel: 0x14
+    name: "${name_prefix} Output 9"
+    gamma_correct: 1.0
+    default_transition_length: 0s
+  - platform: tvms_rouge
+    tvms_rouge_id: ${hub_id}
+    output_number: 10
+    channel: 0x15
+    name: "${name_prefix} Output 10"
+    gamma_correct: 1.0
+    default_transition_length: 0s
+
+canbus:
+  - !extend rv_can
+    on_frame:
+      - can_id: 0x00000000
+        can_id_mask: 0x00000000
+        use_extended_id: true
+        remote_transmission_request: false
+        then:
+          - lambda: id(${hub_id}).handle_can_frame(can_id & 0x1FFFFFFFUL, x);
