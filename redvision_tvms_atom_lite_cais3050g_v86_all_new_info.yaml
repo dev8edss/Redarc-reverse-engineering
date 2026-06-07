@@ -45,11 +45,17 @@ packages:
       address: "01"
       name_prefix: Manager30
 
-  redvision_display: !include
+  redvision_display_1: !include
     file: packages/redvision_display.yaml
     vars:
       address: "20"
-      name_prefix: Redvision
+      name_prefix: Redvision1
+
+  redvision_display_2: !include
+    file: packages/redvision_display.yaml
+    vars:
+      address: "21"
+      name_prefix: Redvision2
 
   tvms_rouge: !include
     file: packages/tvms_rouge.yaml
