@@ -44,7 +44,6 @@ packages:
     vars:
       address: "01"
       name_prefix: Manager30
-      battery_name_prefix: Battery
 
   redvision_display: !include
     file: packages/redvision_display.yaml

@@ -1,8 +1,7 @@
-# vars: address (2 hex digits), name_prefix, battery_name_prefix
+# vars: address (2 hex digits), name_prefix (must be a valid C++ identifier, no spaces)
 manager30:
   id: ${name_prefix}
   source_address: 0x${address}
-  battery_sensor_id: ${battery_name_prefix}
   output_current:
     name: "${name_prefix} Output Current"
     unit_of_measurement: "A"
@@ -22,14 +21,6 @@ manager30:
     name: "${name_prefix} Battery Voltage"
     unit_of_measurement: "V"
     device_class: voltage
-    state_class: measurement
-    accuracy_decimals: 3
-    filters:
-      - throttle_average: ${sensor_average_interval}
-  source_device_current:
-    name: "${name_prefix} Device Current"
-    unit_of_measurement: "A"
-    device_class: current
     state_class: measurement
     accuracy_decimals: 3
     filters:
