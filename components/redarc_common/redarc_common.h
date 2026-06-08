@@ -1,8 +1,10 @@
 #pragma once
 #include <cstdint>
+#include <cstdio>
 #include <functional>
 #include <vector>
 #include "esphome/core/component.h"
+#include "esphome/core/log.h"
 #include "esphome/components/canbus/canbus.h"
 
 namespace esphome {
@@ -20,6 +22,15 @@ class RedarcCanDispatcher {
     this->listeners_.push_back(std::move(cb));
   }
   void dispatch(uint32_t can_id, const std::vector<uint8_t> &data) {
+#if ESPHOME_LOG_LEVEL >= ESPHOME_LOG_LEVEL_VERBOSE
+    {
+      char hex[25] = {};
+      size_t n = data.size() < 8 ? data.size() : 8;
+      for (size_t i = 0; i < n; i++) snprintf(hex + i * 3, 4, "%02X ", data[i]);
+      if (n > 0) hex[n * 3 - 1] = '\0';
+      ESP_LOGV("redarc_common", "RX 0x%08X [%s]", (unsigned) can_id, hex);
+    }
+#endif
     for (auto &cb : this->listeners_) cb(can_id, data);
   }
  private:
