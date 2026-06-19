@@ -27,7 +27,7 @@ external_components:
       type: git
       url: https://github.com/dev8edss/Redarc-reverse-engineering
       ref: main
-    refresh: always
+    refresh: 0s
     components:
       - redarc_common
       - redarc_tvms_rouge
