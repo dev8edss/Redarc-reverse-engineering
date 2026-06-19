@@ -65,7 +65,6 @@ async def to_code(config):
     var = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(var, config)
     cg.add(var.set_source_address(config[CONF_SOURCE_ADDRESS]))
-    cg.add(var.set_display_type(1))
     cg.add(var.set_filter_interval_ms(config[CONF_FILTER_INTERVAL]))
 
     p = config[CONF_ID].id.replace("_", " ")

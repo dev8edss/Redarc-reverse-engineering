@@ -15,25 +15,12 @@ void Manager30Component::dump_config() {
 }
 
 void Manager30Component::handle_can_frame(uint32_t can_id, const std::vector<uint8_t> &data) {
-  can_id &= 0x1FFFFFFFUL;
+  can_id = redarc_common::rvc_id(can_id);
   if (data.size() < 8) return;
-
-  const uint32_t id_current = redarc_common::with_sa(0x03F20A00UL, this->source_address_);
-  const uint32_t id_solar = redarc_common::with_sa(0x03F20800UL, this->source_address_);
-  // Manager30 solar energy/yield counter. Logs show 0x03FCD601 with D1=0x00
-  // increments D2-D5 little-endian in Wh; example: 14 -> 19 Wh while solar
-  // power was about 87 W. D1=0x01/0x02 companion frames were observed but
-  // remain unknown and are ignored.
-  const uint32_t id_solar_energy = redarc_common::with_sa(0x03FCD600UL, this->source_address_);
-  // DBC confirmed PGN_03F204_Manager30_AC_DC_Voltage_Candidates:
-  // AC_Input_Voltage is raw CAN ID 0x03F20401, D5-D6 little-endian,
-  // scale 1 V/count. D7-D8 DC_Input_Voltage_Raw remains unconfirmed and is
-  // deliberately not exposed as a normal sensor yet.
-  const uint32_t id_ac = redarc_common::with_sa(0x03F20400UL, this->source_address_);
 
   const uint32_t now = millis();
 
-  if (can_id == id_current) {
+  if (redarc_common::rvc_matches(can_id, 0x1F20AUL, this->source_address_)) {
     if (now - this->last_current_ms_ < this->filter_interval_ms_) return;
     this->last_current_ms_ = now;
     const uint32_t raw = redarc_common::u32_le(data, 0);
@@ -47,7 +34,7 @@ void Manager30Component::handle_can_frame(uint32_t can_id, const std::vector<uin
     return;
   }
 
-  if (can_id == id_solar) {
+  if (redarc_common::rvc_matches(can_id, 0x1F208UL, this->source_address_)) {
     if (now - this->last_solar_ms_ < this->filter_interval_ms_) return;
     this->last_solar_ms_ = now;
     const uint32_t raw_current = redarc_common::u32_le(data, 0);
@@ -60,7 +47,11 @@ void Manager30Component::handle_can_frame(uint32_t can_id, const std::vector<uin
     return;
   }
 
-  if (can_id == id_solar_energy) {
+  // Manager30 solar energy/yield counter. Logs show 0x03FCD601 with D1=0x00
+  // increments D2-D5 little-endian in Wh; example: 14 -> 19 Wh while solar
+  // power was about 87 W. D1=0x01/0x02 companion frames were observed but
+  // remain unknown and are ignored.
+  if (redarc_common::rvc_matches(can_id, 0x1FCD6UL, this->source_address_)) {
     if (now - this->last_solar_energy_ms_ < this->filter_interval_ms_) return;
     this->last_solar_energy_ms_ = now;
     if (this->solar_energy_sensor_ != nullptr && data[0] == 0x00) {
@@ -70,7 +61,9 @@ void Manager30Component::handle_can_frame(uint32_t can_id, const std::vector<uin
     return;
   }
 
-  if (can_id == id_ac) {
+  // DBC confirmed PGN_03F204_Manager30_AC_DC_Voltage_Candidates:
+  // AC_Input_Voltage is D5-D6 little-endian, scale 1 V/count.
+  if (redarc_common::rvc_matches(can_id, 0x1F204UL, this->source_address_)) {
     if (now - this->last_ac_ms_ < this->filter_interval_ms_) return;
     this->last_ac_ms_ = now;
     if (this->ac_input_voltage_sensor_ != nullptr) {

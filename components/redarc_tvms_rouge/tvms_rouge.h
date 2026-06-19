@@ -83,10 +83,6 @@ class TVMSRougeComponent : public Component {
   uint32_t last_input_current_ms_{0};
   uint32_t last_input_status_ms_{0};
   uint32_t output_command_id_{0};
-  uint32_t level_feedback_id_{0};
-  uint32_t tank_feedback_id_{0};
-  uint32_t button_status_id_{0};
-  uint32_t input_status_id_{0};
 
   std::array<float, 11> levels_{};
   std::array<TVMSRougeLight *, 11> lights_{};

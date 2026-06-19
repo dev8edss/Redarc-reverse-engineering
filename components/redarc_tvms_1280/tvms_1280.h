@@ -63,10 +63,6 @@ class TVMS1280Component : public Component {
   uint32_t last_mux_0x17_ms_{0};
   uint32_t last_mux_0x1A_ms_{0};
   uint32_t command_id_{0};
-  uint32_t temp_tank_id_{0};
-  uint32_t output_status_id_{0};
-  uint32_t channel_status_id_{0};
-  uint32_t input_status_id_{0};
   std::array<TVMS1280Switch *, 10> output_switches_{};
   TVMS1280Switch *inverter_switch_{nullptr};
   sensor::Sensor *temp1_sensor_{nullptr};

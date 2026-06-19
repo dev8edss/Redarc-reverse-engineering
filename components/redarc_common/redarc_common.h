@@ -64,6 +64,22 @@ inline uint32_t with_sa(uint32_t id_base, uint8_t source_address) {
   return (id_base & 0x1FFFFF00UL) | source_address;
 }
 
+inline uint32_t rvc_id(uint32_t can_id) {
+  return can_id & 0x1FFFFFFFUL;
+}
+
+inline uint32_t rvc_dgn(uint32_t can_id) {
+  return (rvc_id(can_id) >> 8) & 0x1FFFFUL;
+}
+
+inline uint8_t rvc_source_address(uint32_t can_id) {
+  return (uint8_t) (rvc_id(can_id) & 0xFFU);
+}
+
+inline bool rvc_matches(uint32_t can_id, uint32_t dgn, uint8_t source_address) {
+  return rvc_dgn(can_id) == dgn && rvc_source_address(can_id) == source_address;
+}
+
 inline float current_32_centered(uint32_t raw) {
   return ((float) raw / 1000.0f) - 1000.0f;
 }

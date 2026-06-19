@@ -92,17 +92,13 @@ void TVMSRougeComponent::setup() {
   const uint8_t sa = this->source_address_;
   const uint8_t ha = this->host_address_;
   this->output_command_id_ = 0x0F000000UL | ((uint32_t) sa << 8) | ha;
-  this->level_feedback_id_ = 0x1BFD1200UL | sa;
-  this->tank_feedback_id_  = 0x1BFD0200UL | sa;
-  this->button_status_id_  = 0x1BFD1400UL | sa;
-  this->input_status_id_   = 0x13F10800UL | sa;
   redarc_common::RedarcCanDispatcher::instance().add_listener(
       [this](uint32_t id, const std::vector<uint8_t> &data) { this->handle_can_frame(id, data); });
 }
 
 void TVMSRougeComponent::dump_config() {
   ESP_LOGCONFIG(TAG, "TVMS Rouge SA=0x%02X HA=0x%02X", this->source_address_, this->host_address_);
-  ESP_LOGCONFIG(TAG, "  Output cmd: 0x%08X  Level: 0x%08X", this->output_command_id_, this->level_feedback_id_);
+  ESP_LOGCONFIG(TAG, "  Output cmd: 0x%08X  DGN: 0x1F108, 0x1FD02, 0x1FD12, 0x1FD14", this->output_command_id_);
   LOG_SENSOR("  ", "Input Voltage", this->input_voltage_sensor_);
   LOG_SENSOR("  ", "Input Current", this->input_current_sensor_);
   ESP_LOGCONFIG(TAG, "  True-off threshold: %.1f%%", this->true_off_threshold_percent_);
@@ -165,12 +161,12 @@ void TVMSRougeComponent::set_target(uint8_t output_number, uint8_t channel, floa
 }
 
 void TVMSRougeComponent::handle_can_frame(uint32_t can_id, const std::vector<uint8_t> &data) {
-  can_id &= 0x1FFFFFFFUL;
+  can_id = redarc_common::rvc_id(can_id);
   if (data.size() < 8) return;
 
   const uint32_t now = millis();
 
-  if (can_id == this->tank_feedback_id_) {
+  if (redarc_common::rvc_matches(can_id, 0x1FD02UL, this->source_address_)) {
     if (data[0] == 0x09) {
       if (now - this->last_tank_ms_ >= this->filter_interval_ms_) {
         this->last_tank_ms_ = now;
@@ -193,13 +189,13 @@ void TVMSRougeComponent::handle_can_frame(uint32_t can_id, const std::vector<uin
     return;
   }
 
-  if (can_id == this->button_status_id_) {
+  if (redarc_common::rvc_matches(can_id, 0x1FD14UL, this->source_address_)) {
     // Button state changes are not throttled; they are edge events.
     this->handle_button_status_frame_(data);
     return;
   }
 
-  if (can_id == this->input_status_id_) {
+  if (redarc_common::rvc_matches(can_id, 0x1F108UL, this->source_address_)) {
     if (now - this->last_input_status_ms_ >= this->filter_interval_ms_) {
       this->last_input_status_ms_ = now;
       this->handle_input_status_frame_(data);
@@ -232,7 +228,7 @@ void TVMSRougeComponent::handle_can_frame(uint32_t can_id, const std::vector<uin
     return;
   }
 
-  if (can_id != this->level_feedback_id_) return;
+  if (!redarc_common::rvc_matches(can_id, 0x1FD12UL, this->source_address_)) return;
 
   if (data[0] == 0x0C) {
     for (uint8_t i = 1; i <= 7; i++) this->set_feedback_level_(i, (float) data[i]);

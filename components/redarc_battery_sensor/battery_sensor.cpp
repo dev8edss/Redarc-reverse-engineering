@@ -15,13 +15,10 @@ void BatterySensorComponent::dump_config() {
 }
 
 void BatterySensorComponent::handle_can_frame(uint32_t can_id, const std::vector<uint8_t> &data) {
-  can_id &= 0x1FFFFFFFUL;
+  can_id = redarc_common::rvc_id(can_id);
   if (data.size() < 8) return;
 
-  const uint32_t id_current = redarc_common::with_sa(0x13F10200UL, this->source_address_);
-  const uint32_t id_soc = redarc_common::with_sa(0x13F10400UL, this->source_address_);
-
-  if (can_id == id_current) {
+  if (redarc_common::rvc_matches(can_id, 0x1F102UL, this->source_address_)) {
     const uint32_t raw = redarc_common::u32_le(data, 0);
     const float amps = redarc_common::current_32_centered(raw);
     this->current_a_ = amps;
@@ -36,7 +33,7 @@ void BatterySensorComponent::handle_can_frame(uint32_t can_id, const std::vector
     return;
   }
 
-  if (can_id == id_soc) {
+  if (redarc_common::rvc_matches(can_id, 0x1F104UL, this->source_address_)) {
     const uint32_t now = millis();
     if (now - this->last_soc_ms_ >= this->filter_interval_ms_) {
       this->last_soc_ms_ = now;

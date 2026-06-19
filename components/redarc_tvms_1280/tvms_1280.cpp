@@ -14,10 +14,6 @@ void TVMS1280Component::setup() {
   const uint8_t sa = this->source_address_;
   const uint8_t ha = this->host_address_;
   this->command_id_       = 0x0F000000UL | ((uint32_t) sa << 8) | ha;
-  this->temp_tank_id_     = 0x1BFD0200UL | sa;
-  this->output_status_id_ = 0x1BFD0000UL | sa;
-  this->channel_status_id_= 0x1BFCF000UL | sa;
-  this->input_status_id_  = 0x13F10800UL | sa;
   redarc_common::RedarcCanDispatcher::instance().add_listener(
       [this](uint32_t id, const std::vector<uint8_t> &data) { this->handle_can_frame(id, data); });
 }
@@ -59,12 +55,12 @@ static bool tvms1280_valid_byte_voltage_(uint8_t value) {
 }
 
 void TVMS1280Component::handle_can_frame(uint32_t can_id, const std::vector<uint8_t> &data) {
-  can_id &= 0x1FFFFFFFUL;
+  can_id = redarc_common::rvc_id(can_id);
   if (data.size() < 8) return;
 
   const uint32_t now = millis();
 
-  if (can_id == this->input_status_id_) {
+  if (redarc_common::rvc_matches(can_id, 0x1F108UL, this->source_address_)) {
     if (now - this->last_input_status_ms_ < this->filter_interval_ms_) return;
     this->last_input_status_ms_ = now;
     if (this->supply_voltage_sensor_ != nullptr) {
@@ -76,7 +72,7 @@ void TVMS1280Component::handle_can_frame(uint32_t can_id, const std::vector<uint
     return;
   }
 
-  if (can_id == this->temp_tank_id_) {
+  if (redarc_common::rvc_matches(can_id, 0x1FD02UL, this->source_address_)) {
     if (data[0] == 0x14) {
       if (now - this->last_mux_0x14_ms_ < this->filter_interval_ms_) return;
       this->last_mux_0x14_ms_ = now;
@@ -114,7 +110,7 @@ void TVMS1280Component::handle_can_frame(uint32_t can_id, const std::vector<uint
     return;
   }
 
-  if (can_id == this->output_status_id_) {
+  if (redarc_common::rvc_matches(can_id, 0x1FD00UL, this->source_address_)) {
     // TVMS1280 output feedback. Logs show D1 is the base channel and D2-D8
     // contain the states for base+0 through base+6.
     // Valid states are 0x00 = OFF and 0x01 = ON. Values such as 0xF8/0xFF
@@ -129,7 +125,7 @@ void TVMS1280Component::handle_can_frame(uint32_t can_id, const std::vector<uint
     return;
   }
 
-  if (can_id == this->channel_status_id_) {
+  if (redarc_common::rvc_matches(can_id, 0x1FCF0UL, this->source_address_)) {
     if (data[1] == 0x0E && this->inverter_switch_ != nullptr) this->inverter_switch_->publish_state(data[0] != 0);
     return;
   }

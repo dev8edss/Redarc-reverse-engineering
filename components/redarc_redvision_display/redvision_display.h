@@ -11,7 +11,6 @@ namespace redarc_redvision_display {
 class RedvisionDisplayComponent : public Component {
  public:
   void set_source_address(uint8_t source_address) { this->source_address_ = source_address; }
-  void set_display_type(uint8_t display_type) { this->display_type_ = display_type; }
   void set_filter_interval_ms(uint32_t ms) { this->filter_interval_ms_ = ms; }
   void set_battery_current_display_sensor(sensor::Sensor *s) { this->battery_current_display_sensor_ = s; }
   void set_device_current_display_sensor(sensor::Sensor *s) { this->device_current_display_sensor_ = s; }
@@ -25,7 +24,6 @@ class RedvisionDisplayComponent : public Component {
 
  protected:
   uint8_t source_address_{0x20};
-  uint8_t display_type_{1};
   uint32_t filter_interval_ms_{5000};
   uint32_t last_display_ms_{0};
   sensor::Sensor *battery_current_display_sensor_{nullptr};

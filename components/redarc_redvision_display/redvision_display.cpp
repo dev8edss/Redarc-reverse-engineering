@@ -11,19 +11,20 @@ void RedvisionDisplayComponent::setup() {
 }
 
 void RedvisionDisplayComponent::dump_config() {
-  ESP_LOGCONFIG(TAG, "Redvision display SA 0x%02X type %u", this->source_address_, this->display_type_);
+  ESP_LOGCONFIG(TAG, "Redvision display SA 0x%02X", this->source_address_);
 }
 
 void RedvisionDisplayComponent::handle_can_frame(uint32_t can_id, const std::vector<uint8_t> &data) {
-  can_id &= 0x1FFFFFFFUL;
+  can_id = redarc_common::rvc_id(can_id);
   if (data.size() < 8) return;
+
+  if (redarc_common::rvc_source_address(can_id) != this->source_address_) return;
 
   const uint32_t now = millis();
   const bool ok = (now - this->last_display_ms_) >= this->filter_interval_ms_;
 
-  if (this->display_type_ == 1) {
-    const uint32_t id = redarc_common::with_sa(0x13F28000UL, this->source_address_);
-    if (can_id != id) return;
+  switch (redarc_common::rvc_dgn(can_id)) {
+  case 0x1F280UL: {
     if (!ok) return;
     this->last_display_ms_ = now;
     const uint16_t raw_batt = redarc_common::u16_le(data, 0);
@@ -35,14 +36,16 @@ void RedvisionDisplayComponent::handle_can_frame(uint32_t can_id, const std::vec
     return;
   }
 
-  if (this->display_type_ == 2) {
-    const uint32_t id = redarc_common::with_sa(0x13F28200UL, this->source_address_);
-    if (can_id != id) return;
+  case 0x1F282UL: {
     if (!ok) return;
     this->last_display_ms_ = now;
     const uint16_t raw_mgr = redarc_common::u16_le(data, 6);
     if (this->manager_output_current_display_sensor_ != nullptr) this->manager_output_current_display_sensor_->publish_state(redarc_common::current_display_16_centered(raw_mgr));
     if (this->manager_output_current_display_raw_sensor_ != nullptr) this->manager_output_current_display_raw_sensor_->publish_state((float) raw_mgr);
+    return;
+  }
+
+  default:
     return;
   }
 }
