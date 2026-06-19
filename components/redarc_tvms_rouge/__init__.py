@@ -65,6 +65,7 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Optional(CONF_HOST_ADDRESS, default=0x20): cv.hex_uint8_t,
         cv.Optional(CONF_FILTER_INTERVAL, default="5s"): cv.positive_time_period_milliseconds,
         cv.Optional(CONF_TRUE_OFF_THRESHOLD, default=1.0): cv.float_range(min=0.0, max=10.0),
+        cv.Optional(CONF_DEFAULT_TRANSITION_LENGTH, default="0s"): cv.positive_time_period_milliseconds,
         **_AUTO_IDS,
     }
 ).extend(cv.COMPONENT_SCHEMA)
@@ -152,7 +153,7 @@ async def to_code(config):
             CONF_ID: config[f"light_state_{i}"],
             CONF_NAME: f"{p} Output {i}",
             CONF_GAMMA_CORRECT: 1.0,
-            CONF_DEFAULT_TRANSITION_LENGTH: 0,
+            CONF_DEFAULT_TRANSITION_LENGTH: config[CONF_DEFAULT_TRANSITION_LENGTH],
             CONF_FLASH_TRANSITION_LENGTH: 250,
             CONF_DISABLED_BY_DEFAULT: False,
             CONF_RESTORE_MODE: _RESTORE_MODE_OFF,

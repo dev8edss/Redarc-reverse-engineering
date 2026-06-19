@@ -561,6 +561,26 @@ BA_ "Decode_Status" SG_ 2399481888 TVMSRouge_DimActual_Direction "CONFIRMED_CORR
 BA_ "Decode_Status" SG_ 2399481888 TVMSRouge_DimActual_DurationHint "CONFIRMED_CORRECT_DO_NOT_EDIT";
 BA_ "Decode_Status" SG_ 2399481888 TVMSRouge_DimActual_D5 "CONFIRMED_CORRECT_DO_NOT_EDIT";
 
+BO_ 2549941296 TVMSRouge_Label_Page: 8 TVMS_Rouge
+ SG_ TVMSRouge_Label_Item : 0|8@1+ (1,0) [0|255] "item" Vector__XXX
+ SG_ TVMSRouge_Label_Segment : 8|8@1+ (1,0) [0|255] "segment" Vector__XXX
+ SG_ TVMSRouge_Label_TextByte1 : 16|8@1+ (1,0) [0|255] "ascii" Vector__XXX
+ SG_ TVMSRouge_Label_TextByte2 : 24|8@1+ (1,0) [0|255] "ascii" Vector__XXX
+ SG_ TVMSRouge_Label_TextByte3 : 32|8@1+ (1,0) [0|255] "ascii" Vector__XXX
+ SG_ TVMSRouge_Label_TextByte4 : 40|8@1+ (1,0) [0|255] "ascii" Vector__XXX
+ SG_ TVMSRouge_Label_TextByte5 : 48|8@1+ (1,0) [0|255] "ascii" Vector__XXX
+ SG_ TVMSRouge_Label_TextByte6 : 56|8@1+ (1,0) [0|255] "ascii" Vector__XXX
+CM_ BO_ 2549941296 "CONFIRMED_CORRECT_DO_NOT_EDIT: TVMS Rouge label/name page. Raw CAN ID 0x17FD0430, PGN 0x17FD04, SA 0x30. D1=item id, D2=string segment, D3-D8=ASCII text bytes; 0xFF pads unused text bytes.";
+CM_ SG_ 2549941296 TVMSRouge_Label_Item "CONFIRMED_CORRECT_DO_NOT_EDIT: Label item id. Config log confirms item 0x16 = InputVoltage and item 0x17 = InputCurrent.";
+CM_ SG_ 2549941296 TVMSRouge_Label_Segment "String segment index. Concatenate D3-D8 ASCII chunks ordered by D2 for the same item id.";
+VAL_ 2549941296 TVMSRouge_Label_Item 22 "InputVoltage" 23 "InputCurrent" ;
+BA_ "Decode_Status" BO_ 2549941296 "CONFIRMED_CORRECT_DO_NOT_EDIT";
+BA_ "Decode_Status" SG_ 2549941296 TVMSRouge_Label_Item "CONFIRMED_CORRECT_DO_NOT_EDIT";
+BA_ "Decode_Status" SG_ 2549941296 TVMSRouge_Label_Segment "CONFIRMED_CORRECT_DO_NOT_EDIT";
+BA_ "VFrameFormat" BO_ 2549941296 1;
+
+CM_ "v54 update: Added explicit TVMS Rouge label-page decode for raw CAN ID 0x17FD0430. Label item 0x17 is InputCurrent, supporting the 0x1BFD0230 D1=0x16 D3/10 A input-current candidate.";
+
 CM_ SG_ 2617049636 TVMS1280_Temp2_C "NOTE: TVMS1280 Voltage Input 1 candidate is currently decoded in ESPHome from 0x1BFD0224 page/mux 0x11 D2 / 10. It is expected to read near 0.0 V when the external voltage input is disconnected. This overlaps the temp/tank/status PGN and is kept as a diagnostic candidate until fully confirmed.";
 CM_ SG_ 2617049636 TVMS1280_Temp1_C "NOTE: TVMS1280 Voltage Input 2 candidate is currently decoded in ESPHome from 0x1BFD0224 page/mux 0x14 D2 / 10 and has appeared around 11.9-12.0 V in logs. This overlaps the temp/tank/status PGN and is kept as a diagnostic candidate until fully confirmed.";
 
