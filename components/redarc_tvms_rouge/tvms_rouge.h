@@ -95,7 +95,7 @@ class TVMSRougeComponent : public Component {
   sensor::Sensor *input_voltage_sensor_{nullptr};
   sensor::Sensor *input_current_sensor_{nullptr};
 
-  float true_off_threshold_percent_{1.0f};
+  float true_off_threshold_percent_{1.5f};
 };
 
 }  // namespace redarc_tvms_rouge
