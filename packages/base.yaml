@@ -12,6 +12,8 @@ logger:
   level: ${logger_level}
 
 api:
+  encryption:
+    key: !secret api_pass
 
 ota:
   - platform: esphome
