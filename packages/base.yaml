@@ -6,7 +6,7 @@ esphome:
 esp32:
   board: ${board}
   framework:
-    type: arduino
+    type: ${esp32_framework_type}
 
 logger:
   level: ${logger_level}
