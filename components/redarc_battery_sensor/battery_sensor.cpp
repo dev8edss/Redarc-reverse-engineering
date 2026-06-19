@@ -7,7 +7,7 @@ static const char *const TAG = "redarc_battery_sensor";
 
 void BatterySOCCalibrateButton::press_action() {
   if (this->parent_ == nullptr) return;
-  this->parent_->send_config_setting(0x15, 100);
+  this->parent_->send_soc_calibration_command(100);
 }
 
 void BatteryConfigNumber::control(float value) {
@@ -53,6 +53,18 @@ void BatterySensorComponent::send_config_setting(uint8_t command, uint16_t raw_v
       0x00, 0x00};
   bus->send_data(0x0F00FF20UL, true, data);
   ESP_LOGD(TAG, "Sent battery config command 0x%02X value %u", command, raw_value);
+}
+
+void BatterySensorComponent::send_soc_calibration_command(uint8_t target_percent) {
+  auto *bus = redarc_common::RedarcCanDispatcher::instance().canbus();
+  if (bus == nullptr) return;
+  const std::vector<uint8_t> data = {
+      0x15, 0x00, 0x03, 0x00,
+      target_percent, 0x00,
+      0x00, 0x00};
+  const uint32_t can_id = 0x0F0000FAUL | ((uint32_t) this->source_address_ << 8);
+  bus->send_data(can_id, true, data);
+  ESP_LOGD(TAG, "Sent SOC calibration command target %u%% to SA 0x%02X", target_percent, this->source_address_);
 }
 
 void BatterySensorComponent::handle_can_frame(uint32_t can_id, const std::vector<uint8_t> &data) {

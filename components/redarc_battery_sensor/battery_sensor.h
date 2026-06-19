@@ -71,6 +71,7 @@ class BatterySensorComponent : public Component {
   void dump_config() override;
   void handle_can_frame(uint32_t can_id, const std::vector<uint8_t> &data);
   void send_config_setting(uint8_t command, uint16_t raw_value);
+  void send_soc_calibration_command(uint8_t target_percent);
   float current_a() const { return this->current_a_; }
   bool has_current() const { return !std::isnan(this->current_a_); }
 
