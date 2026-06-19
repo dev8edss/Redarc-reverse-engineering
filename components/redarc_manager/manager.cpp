@@ -12,6 +12,7 @@ void Manager30Component::setup() {
 
 void Manager30Component::dump_config() {
   ESP_LOGCONFIG(TAG, "Manager30 SA 0x%02X", this->source_address_);
+  LOG_SENSOR("  ", "Vehicle Input Trigger", this->vehicle_input_trigger_sensor_);
 }
 
 void Manager30Component::handle_can_frame(uint32_t can_id, const std::vector<uint8_t> &data) {
@@ -19,6 +20,20 @@ void Manager30Component::handle_can_frame(uint32_t can_id, const std::vector<uin
   if (data.size() < 8) return;
 
   const uint32_t now = millis();
+
+  if (can_id == 0x0F0001FAUL && data[0] == 0x68 && data[2] == 0x03) {
+    if (this->vehicle_input_trigger_sensor_ != nullptr)
+      this->vehicle_input_trigger_sensor_->publish_state((float) redarc_common::u16_le(data, 4));
+    return;
+  }
+
+  if (redarc_common::rvc_matches(can_id, 0x1F206UL, this->source_address_)) {
+    if (now - this->last_charger_status_ms_ < this->filter_interval_ms_) return;
+    this->last_charger_status_ms_ = now;
+    if (this->vehicle_input_trigger_sensor_ != nullptr && data[7] != 0xFF)
+      this->vehicle_input_trigger_sensor_->publish_state((float) data[7]);
+    return;
+  }
 
   if (redarc_common::rvc_matches(can_id, 0x1F20AUL, this->source_address_)) {
     if (now - this->last_current_ms_ < this->filter_interval_ms_) return;

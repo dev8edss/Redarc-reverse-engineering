@@ -36,6 +36,12 @@ CONFIG_SCHEMA = cv.Schema({
     cv.GenerateID("voltage_id"): cv.declare_id(_SensorClass),
     cv.GenerateID("temperature_id"): cv.declare_id(_SensorClass),
     cv.GenerateID("soc_id"): cv.declare_id(_SensorClass),
+    cv.GenerateID("battery_type_id"): cv.declare_id(_SensorClass),
+    cv.GenerateID("configured_capacity_id"): cv.declare_id(_SensorClass),
+    cv.GenerateID("max_charge_current_id"): cv.declare_id(_SensorClass),
+    cv.GenerateID("low_soc_alarm_id"): cv.declare_id(_SensorClass),
+    cv.GenerateID("low_voltage_alarm_id"): cv.declare_id(_SensorClass),
+    cv.GenerateID("last_soc_calibration_target_id"): cv.declare_id(_SensorClass),
 }).extend(cv.COMPONENT_SCHEMA)
 
 
@@ -92,3 +98,37 @@ async def to_code(config):
                            unit="%", device_class="battery",
                            state_class=STATE_CLASS_MEASUREMENT, decimals=0)
     cg.add(var.set_soc_sensor(s))
+
+    s = await _make_sensor(config["battery_type_id"], f"{p} Battery Type",
+                           state_class=STATE_CLASS_MEASUREMENT, decimals=0,
+                           entity_category=ENTITY_CATEGORY_DIAGNOSTIC)
+    cg.add(var.set_battery_type_sensor(s))
+
+    s = await _make_sensor(config["configured_capacity_id"], f"{p} Configured Capacity",
+                           unit="Ah", state_class=STATE_CLASS_MEASUREMENT, decimals=0,
+                           entity_category=ENTITY_CATEGORY_DIAGNOSTIC)
+    cg.add(var.set_configured_capacity_sensor(s))
+
+    s = await _make_sensor(config["max_charge_current_id"], f"{p} Max Charge Current",
+                           unit="A", device_class="current",
+                           state_class=STATE_CLASS_MEASUREMENT, decimals=0,
+                           entity_category=ENTITY_CATEGORY_DIAGNOSTIC)
+    cg.add(var.set_max_charge_current_sensor(s))
+
+    s = await _make_sensor(config["low_soc_alarm_id"], f"{p} Low SOC Alarm",
+                           unit="%", device_class="battery",
+                           state_class=STATE_CLASS_MEASUREMENT, decimals=0,
+                           entity_category=ENTITY_CATEGORY_DIAGNOSTIC)
+    cg.add(var.set_low_soc_alarm_sensor(s))
+
+    s = await _make_sensor(config["low_voltage_alarm_id"], f"{p} Low Voltage Alarm",
+                           unit="V", device_class="voltage",
+                           state_class=STATE_CLASS_MEASUREMENT, decimals=1,
+                           entity_category=ENTITY_CATEGORY_DIAGNOSTIC)
+    cg.add(var.set_low_voltage_alarm_sensor(s))
+
+    s = await _make_sensor(config["last_soc_calibration_target_id"], f"{p} Last SOC Calibration Target",
+                           unit="%", device_class="battery",
+                           state_class=STATE_CLASS_MEASUREMENT, decimals=0,
+                           entity_category=ENTITY_CATEGORY_DIAGNOSTIC)
+    cg.add(var.set_last_soc_calibration_target_sensor(s))

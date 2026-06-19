@@ -2,7 +2,7 @@ VERSION ""
 
 NS_ :
 BS_:
-BU_: Manager30 Battery_Sensor Redvision_1 Redvision_2 TVMS_Rouge TVMS_1280
+BU_: Manager30 Battery_Sensor Redvision_1 Redvision_2 TVMS_Rouge TVMS_1280 Config_Tool
 
 CM_ "Current/SOC decode v27. Long-log cleanup: source Manager30 and Battery Sensor currents are 32-bit little-endian values centred at exactly 1,000,000. Formula is raw/1000 - 1000. Redvision display copies are 16-bit values centred at exactly 10,000. Formula is raw/10 - 1000.";
 
@@ -31,6 +31,47 @@ BO_ 2482045960 PGN_13F104_BatterySensor_SOC: 8 Battery_Sensor
 
 CM_ BO_ 2482045960 "Raw CAN ID 0x13F10408, PGN 0x13F104, SA 0x08 Battery_Sensor.";
 CM_ SG_ 2482045960 Battery_SOC_Percent "Battery state of charge. D1 raw percent. Confirmed 99to97.csv: 0x63 -> 99%, 0x62 -> 98%, 0x61 -> 97%.";
+
+BO_ 2482044936 PGN_13F100_BatterySensor_ConfigStatus: 8 Battery_Sensor
+ SG_ Battery_Type : 0|8@1+ (1,0) [0|4] "type" Vector__XXX
+ SG_ Battery_Configured_Capacity_Ah : 8|16@1+ (1,0) [0|1000] "Ah" Vector__XXX
+ SG_ BatterySensor_ConfigStatus_D4 : 24|8@1+ (1,0) [0|255] "raw" Vector__XXX
+ SG_ Battery_Max_Charge_Current_A : 32|8@1+ (1,0) [0|100] "A" Vector__XXX
+ SG_ BatterySensor_ConfigStatus_D6 : 40|8@1+ (1,0) [0|255] "raw" Vector__XXX
+ SG_ BatterySensor_ConfigStatus_D7 : 48|8@1+ (1,0) [0|255] "raw" Vector__XXX
+ SG_ BatterySensor_ConfigStatus_D8 : 56|8@1+ (1,0) [0|255] "raw" Vector__XXX
+
+CM_ BO_ 2482044936 "CONFIRMED_CORRECT_DO_NOT_EDIT: Battery Sensor config/status echo. Raw CAN ID 0x13F10008, private DGN 0x1F100, SA 0x08. D1 reports battery type, D2-D3 little-endian reports configured capacity Ah, D5 reports max charge current A.";
+CM_ SG_ 2482044936 Battery_Type "D1 battery type. Confirmed from battery type change 5 times.csv: 0=Gel, 1=AGM, 2=LeadAcid, 3=Calcium, 4=Lithium.";
+CM_ SG_ 2482044936 Battery_Configured_Capacity_Ah "D2-D3 little-endian unsigned Ah. Confirmed values: C2 01 = 450 Ah, 90 01 = 400 Ah, 5E 01 = 350 Ah.";
+CM_ SG_ 2482044936 Battery_Max_Charge_Current_A "D5 raw amps. Confirmed from max charge current 20a - 15 - 20 -30.csv after correction: values follow 20 A, 14 A, 10 A, 30 A.";
+
+BO_ 2399144186 BatterySensor_Config_Write_FromTool: 8 Config_Tool
+ SG_ BatteryConfigWrite_Command M : 0|8@1+ (1,0) [0|255] "raw" Vector__XXX
+ SG_ BatteryConfigWrite_D2 : 8|8@1+ (1,0) [0|255] "raw" Vector__XXX
+ SG_ BatteryConfigWrite_Item : 16|8@1+ (1,0) [0|255] "raw" Vector__XXX
+ SG_ BatteryConfigWrite_D4 : 24|8@1+ (1,0) [0|255] "raw" Vector__XXX
+ SG_ BatteryConfigWrite_BatteryType m17 : 32|16@1+ (1,0) [0|4] "type" Vector__XXX
+ SG_ BatteryConfigWrite_Capacity_Ah m18 : 32|16@1+ (1,0) [0|1000] "Ah" Vector__XXX
+ SG_ BatteryConfigWrite_MaxChargeCurrent_A m20 : 32|16@1+ (1,0) [0|100] "A" Vector__XXX
+ SG_ BatteryConfigWrite_SOCCalibrationTarget_Percent m21 : 32|16@1+ (1,0) [0|100] "%" Vector__XXX
+ SG_ BatteryConfigWrite_LowSOCAlarm_Percent m65 : 32|16@1+ (1,0) [0|100] "%" Vector__XXX
+ SG_ BatteryConfigWrite_LowVoltageAlarm_V m66 : 32|16@1+ (0.001,0) [0|60] "V" Vector__XXX
+ SG_ BatteryConfigWrite_D7 : 48|8@1+ (1,0) [0|255] "raw" Vector__XXX
+ SG_ BatteryConfigWrite_D8 : 56|8@1+ (1,0) [0|255] "raw" Vector__XXX
+
+CM_ BO_ 2399144186 "CONFIRMED_CORRECT_DO_NOT_EDIT: Battery config write from source 0xFA to Battery_Sensor destination 0x08. Raw CAN ID 0x0F0008FA. D1 is command/mux; D1=0x11 writes battery type, D1=0x12 writes configured capacity Ah, D1=0x14 writes max charge current A, D1=0x15 calibrates/sets SOC target %, D1=0x41 writes low SOC alarm %, D1=0x42 writes low voltage alarm V.";
+CM_ SG_ 2399144186 BatteryConfigWrite_Command "D1 command/mux. 0x11 = battery type, 0x12 = configured capacity, 0x14 = max charge current, 0x15 = SOC calibration target, 0x41 = low SOC alarm, 0x42 = low voltage alarm.";
+CM_ SG_ 2399144186 BatteryConfigWrite_Item "D3 observed 0x03 for these battery config writes.";
+CM_ SG_ 2399144186 BatteryConfigWrite_Capacity_Ah "D5-D6 little-endian unsigned Ah. Controlled sequence captured: 450 Ah, 400 Ah, 350 Ah, 400 Ah.";
+CM_ SG_ 2399144186 BatteryConfigWrite_BatteryType "D5-D6 little-endian battery type. Confirmed from battery type change 5 times.csv sequence: 0=Gel, 1=AGM, 2=LeadAcid, 3=Calcium, 4=Lithium.";
+CM_ SG_ 2399144186 BatteryConfigWrite_MaxChargeCurrent_A "D5-D6 little-endian unsigned A. Controlled sequence captured and corrected by user: 20 A, 14 A, 10 A, 30 A.";
+CM_ SG_ 2399144186 BatteryConfigWrite_SOCCalibrationTarget_Percent "D5-D6 little-endian unsigned percent. calibrate battery start of charge full 5 times.csv captured five repeats of D1=0x15, D5-D6=0x0064, calibrating/setting battery SOC to 100%.";
+CM_ SG_ 2399144186 BatteryConfigWrite_LowSOCAlarm_Percent "D5-D6 little-endian unsigned percent. Confirmed sequence from more battery config.csv: 10%, 15%, 20%, 30%.";
+CM_ SG_ 2399144186 BatteryConfigWrite_LowVoltageAlarm_V "D5-D6 little-endian millivolts, scale 0.001 V/count. Confirmed sequence from more battery config.csv: 10.0 V, 11.0 V, 11.5 V, 12.0 V.";
+VAL_ 2482044936 Battery_Type 0 "Gel" 1 "AGM" 2 "LeadAcid" 3 "Calcium" 4 "Lithium" ;
+VAL_ 2399144186 BatteryConfigWrite_Command 17 "BatteryType" 18 "ConfiguredCapacity" 20 "MaxChargeCurrent" 21 "SOCCalibrationTarget" 65 "LowSOCAlarm" 66 "LowVoltageAlarm" ;
+VAL_ 2399144186 BatteryConfigWrite_BatteryType 0 "Gel" 1 "AGM" 2 "LeadAcid" 3 "Calcium" 4 "Lithium" ;
 
 BO_ 2482143264 PGN_13F280_Redvision1_CurrentDisplay: 8 Redvision_1
  SG_ RV1_Battery_Current_Display_A : 0|16@1+ (0.1,-1000) [-300|100] "A" Vector__XXX
@@ -135,6 +176,27 @@ BA_ "Decode_Status" BO_ 2482045448 "CONFIRMED_CORRECT_DO_NOT_EDIT";
 BA_ "Decode_Status" SG_ 2482045448 Battery_Current_A "CONFIRMED_CORRECT_DO_NOT_EDIT";
 BA_ "Decode_Status" BO_ 2482045960 "CONFIRMED_CORRECT_DO_NOT_EDIT";
 BA_ "Decode_Status" SG_ 2482045960 Battery_SOC_Percent "CONFIRMED_CORRECT_DO_NOT_EDIT";
+BA_ "Decode_Status" BO_ 2482044936 "CONFIRMED_CORRECT_DO_NOT_EDIT";
+BA_ "Decode_Status" SG_ 2482044936 Battery_Type "CONFIRMED_CORRECT_DO_NOT_EDIT";
+BA_ "Decode_Status" SG_ 2482044936 Battery_Configured_Capacity_Ah "CONFIRMED_CORRECT_DO_NOT_EDIT";
+BA_ "Decode_Status" SG_ 2482044936 BatterySensor_ConfigStatus_D4 "UNCONFIRMED_PENDING_TEST";
+BA_ "Decode_Status" SG_ 2482044936 Battery_Max_Charge_Current_A "CONFIRMED_CORRECT_DO_NOT_EDIT";
+BA_ "Decode_Status" SG_ 2482044936 BatterySensor_ConfigStatus_D6 "UNCONFIRMED_PENDING_TEST";
+BA_ "Decode_Status" SG_ 2482044936 BatterySensor_ConfigStatus_D7 "UNCONFIRMED_PENDING_TEST";
+BA_ "Decode_Status" SG_ 2482044936 BatterySensor_ConfigStatus_D8 "UNCONFIRMED_PENDING_TEST";
+BA_ "Decode_Status" BO_ 2399144186 "CONFIRMED_CORRECT_DO_NOT_EDIT";
+BA_ "Decode_Status" SG_ 2399144186 BatteryConfigWrite_Command "CONFIRMED_CORRECT_DO_NOT_EDIT";
+BA_ "Decode_Status" SG_ 2399144186 BatteryConfigWrite_D2 "UNCONFIRMED_PENDING_TEST";
+BA_ "Decode_Status" SG_ 2399144186 BatteryConfigWrite_Item "CONFIRMED_CORRECT_DO_NOT_EDIT";
+BA_ "Decode_Status" SG_ 2399144186 BatteryConfigWrite_D4 "UNCONFIRMED_PENDING_TEST";
+BA_ "Decode_Status" SG_ 2399144186 BatteryConfigWrite_BatteryType "CONFIRMED_CORRECT_DO_NOT_EDIT";
+BA_ "Decode_Status" SG_ 2399144186 BatteryConfigWrite_Capacity_Ah "CONFIRMED_CORRECT_DO_NOT_EDIT";
+BA_ "Decode_Status" SG_ 2399144186 BatteryConfigWrite_MaxChargeCurrent_A "CONFIRMED_CORRECT_DO_NOT_EDIT";
+BA_ "Decode_Status" SG_ 2399144186 BatteryConfigWrite_SOCCalibrationTarget_Percent "CONFIRMED_CORRECT_DO_NOT_EDIT";
+BA_ "Decode_Status" SG_ 2399144186 BatteryConfigWrite_LowSOCAlarm_Percent "CONFIRMED_CORRECT_DO_NOT_EDIT";
+BA_ "Decode_Status" SG_ 2399144186 BatteryConfigWrite_LowVoltageAlarm_V "CONFIRMED_CORRECT_DO_NOT_EDIT";
+BA_ "Decode_Status" SG_ 2399144186 BatteryConfigWrite_D7 "UNCONFIRMED_PENDING_TEST";
+BA_ "Decode_Status" SG_ 2399144186 BatteryConfigWrite_D8 "UNCONFIRMED_PENDING_TEST";
 BA_ "Decode_Status" BO_ 2482143264 "CONFIRMED_CORRECT_DO_NOT_EDIT";
 BA_ "Decode_Status" SG_ 2482143264 RV1_Battery_Current_Display_A "CONFIRMED_CORRECT_DO_NOT_EDIT";
 BA_ "Decode_Status" SG_ 2482143264 RV1_Device_Current_Display_A "CONFIRMED_CORRECT_DO_NOT_EDIT";
@@ -493,16 +555,44 @@ BA_ "Decode_Status" SG_ 2399219744 Rouge_Output_10_TargetLevel "UNCONFIRMED_PEND
 BO_ 2213676545 Manager30_Charger_Current_Status: 8 Manager30
  SG_ Manager30_ChargerCurrent_Candidate_A : 0|16@1+ (0.01,0) [0|200] "A" Vector__XXX
  SG_ Manager30_ChargerTemp_Candidate_C : 16|8@1+ (1,-100) [-100|155] "degC" Vector__XXX
-CM_ BO_ 2213676545 "UNCONFIRMED_PENDING_TEST: imported from inputs_outputs DBC. Original note: Raw CAN ID 0x03F20601, PGN 0x03F206, source 0x01 Manager30. Candidate fields matched approx 30 A charger current and approx 17 degC.";
+ SG_ Manager30_VehicleInputTrigger : 56|8@1+ (1,0) [0|5] "trigger" Vector__XXX
+CM_ BO_ 2213676545 "PARTLY_CONFIRMED: Manager30 charger/status frame. Raw CAN ID 0x03F20601, private DGN 0x1F206, source 0x01 Manager30. D8 reports vehicle input trigger. Older charger current/temp candidates remain unconfirmed.";
 CM_ SG_ 2213676545 Manager30_ChargerCurrent_Candidate_A "UNCONFIRMED_PENDING_TEST: imported from inputs_outputs DBC. Signal was not present in v49 and requires validation.";
 CM_ SG_ 2213676545 Manager30_ChargerTemp_Candidate_C "UNCONFIRMED_PENDING_TEST: imported from inputs_outputs DBC. Signal was not present in v49 and requires validation.";
-BA_ "Decode_Status" BO_ 2213676545 "UNCONFIRMED_PENDING_TEST";
+CM_ SG_ 2213676545 Manager30_VehicleInputTrigger "CONFIRMED_CORRECT_DO_NOT_EDIT: D8 reports vehicle input trigger. charger input trigger.csv sequence: 0=Auto, 1=12V, 2=24V, 3=Ignition, 5=On.";
+VAL_ 2213676545 Manager30_VehicleInputTrigger 0 "Auto" 1 "12V" 2 "24V" 3 "Ignition" 5 "On" ;
+BA_ "Decode_Status" BO_ 2213676545 "PARTLY_CONFIRMED";
 BA_ "Decode_Status" SG_ 2213676545 Manager30_ChargerCurrent_Candidate_A "UNCONFIRMED_PENDING_TEST";
 BA_ "Decode_Status" SG_ 2213676545 Manager30_ChargerTemp_Candidate_C "UNCONFIRMED_PENDING_TEST";
+BA_ "Decode_Status" SG_ 2213676545 Manager30_VehicleInputTrigger "CONFIRMED_CORRECT_DO_NOT_EDIT";
+
+BO_ 2399142394 Manager30_VehicleInputTrigger_Write_FromTool: 8 Config_Tool
+ SG_ Manager30_VehicleInputTriggerWrite_Command : 0|8@1+ (1,0) [0|255] "raw" Vector__XXX
+ SG_ Manager30_VehicleInputTriggerWrite_D2 : 8|8@1+ (1,0) [0|255] "raw" Vector__XXX
+ SG_ Manager30_VehicleInputTriggerWrite_Item : 16|8@1+ (1,0) [0|255] "raw" Vector__XXX
+ SG_ Manager30_VehicleInputTriggerWrite_D4 : 24|8@1+ (1,0) [0|255] "raw" Vector__XXX
+ SG_ Manager30_VehicleInputTriggerWrite_Value : 32|16@1+ (1,0) [0|5] "trigger" Vector__XXX
+ SG_ Manager30_VehicleInputTriggerWrite_D7 : 48|8@1+ (1,0) [0|255] "raw" Vector__XXX
+ SG_ Manager30_VehicleInputTriggerWrite_D8 : 56|8@1+ (1,0) [0|255] "raw" Vector__XXX
+CM_ BO_ 2399142394 "CONFIRMED_CORRECT_DO_NOT_EDIT: Manager30 vehicle input trigger config write from source 0xFA to Manager30 destination 0x01. Raw CAN ID 0x0F0001FA. Payload pattern 68 00 03 00 <trigger little-endian> 00 00 00.";
+CM_ SG_ 2399142394 Manager30_VehicleInputTriggerWrite_Command "D1 observed 0x68 for vehicle input trigger write.";
+CM_ SG_ 2399142394 Manager30_VehicleInputTriggerWrite_Item "D3 observed 0x03 for this config write.";
+CM_ SG_ 2399142394 Manager30_VehicleInputTriggerWrite_Value "D5-D6 little-endian trigger value. Confirmed sequence: 0=Auto, 1=12V, 2=24V, 3=Ignition, 5=On.";
+VAL_ 2399142394 Manager30_VehicleInputTriggerWrite_Value 0 "Auto" 1 "12V" 2 "24V" 3 "Ignition" 5 "On" ;
+BA_ "Decode_Status" BO_ 2399142394 "CONFIRMED_CORRECT_DO_NOT_EDIT";
+BA_ "Decode_Status" SG_ 2399142394 Manager30_VehicleInputTriggerWrite_Command "CONFIRMED_CORRECT_DO_NOT_EDIT";
+BA_ "Decode_Status" SG_ 2399142394 Manager30_VehicleInputTriggerWrite_D2 "UNCONFIRMED_PENDING_TEST";
+BA_ "Decode_Status" SG_ 2399142394 Manager30_VehicleInputTriggerWrite_Item "CONFIRMED_CORRECT_DO_NOT_EDIT";
+BA_ "Decode_Status" SG_ 2399142394 Manager30_VehicleInputTriggerWrite_D4 "UNCONFIRMED_PENDING_TEST";
+BA_ "Decode_Status" SG_ 2399142394 Manager30_VehicleInputTriggerWrite_Value "CONFIRMED_CORRECT_DO_NOT_EDIT";
+BA_ "Decode_Status" SG_ 2399142394 Manager30_VehicleInputTriggerWrite_D7 "UNCONFIRMED_PENDING_TEST";
+BA_ "Decode_Status" SG_ 2399142394 Manager30_VehicleInputTriggerWrite_D8 "UNCONFIRMED_PENDING_TEST";
 
 BO_ 2482047496 BatterySensor_Load_Status: 8 Battery_Sensor
  SG_ BatterySensor_LoadCurrent_Candidate_A : 0|16@1+ (0.01,0) [0|200] "A" Vector__XXX
-CM_ BO_ 2482047496 "UNCONFIRMED_PENDING_TEST: imported from inputs_outputs DBC. Original note: Raw CAN ID 0x13F10A08, PGN 0x13F10A, source 0x08 Battery_Sensor. Candidate field matched approx 10 A load to devices.";
+ SG_ Battery_Low_SOC_Alarm_Report_Percent : 8|8@1+ (1,0) [0|100] "%" Vector__XXX
+ SG_ Battery_Low_Voltage_Alarm_Report_V : 16|16@1+ (0.001,0) [0|60] "V" Vector__XXX
+CM_ BO_ 2482047496 "PARTLY_CONFIRMED: Battery Sensor status/config report. Raw CAN ID 0x13F10A08, private DGN 0x1F10A, source 0x08 Battery_Sensor. D2 reports low SOC alarm percent. D3-D4 little-endian reports low voltage alarm in millivolts. Older load-current candidate remains unconfirmed.";
 
 BA_ "VFrameFormat" BO_ 2617049636 1;
 BA_ "VFrameFormat" BO_ 2617049124 1;
@@ -520,13 +610,20 @@ BA_ "VFrameFormat" BO_ 2213676545 1;
 BA_ "VFrameFormat" BO_ 2213677057 1;
 BA_ "VFrameFormat" BO_ 2213741569 1;
 BA_ "VFrameFormat" BO_ 2482045448 1;
+BA_ "VFrameFormat" BO_ 2482044936 1;
+BA_ "VFrameFormat" BO_ 2399144186 1;
+BA_ "VFrameFormat" BO_ 2399142394 1;
 BA_ "VFrameFormat" BO_ 2482047496 1;
 BA_ "VFrameFormat" BO_ 2482047012 1;
 BA_ "VFrameFormat" BO_ 2482047024 1;
 BA_ "VFrameFormat" BO_ 2399481888 1;
 CM_ SG_ 2482047496 BatterySensor_LoadCurrent_Candidate_A "UNCONFIRMED_PENDING_TEST: imported from inputs_outputs DBC. Signal was not present in v49 and requires validation.";
-BA_ "Decode_Status" BO_ 2482047496 "UNCONFIRMED_PENDING_TEST";
+CM_ SG_ 2482047496 Battery_Low_SOC_Alarm_Report_Percent "CONFIRMED_CORRECT_DO_NOT_EDIT: D2 raw percent. more battery config.csv reports 10, 15, 20, 30 after the matching config writes.";
+CM_ SG_ 2482047496 Battery_Low_Voltage_Alarm_Report_V "CONFIRMED_CORRECT_DO_NOT_EDIT: D3-D4 little-endian millivolts, scale 0.001 V/count. more battery config.csv reports 10.0, 11.0, 11.5, 12.0 V after the matching config writes.";
+BA_ "Decode_Status" BO_ 2482047496 "PARTLY_CONFIRMED";
 BA_ "Decode_Status" SG_ 2482047496 BatterySensor_LoadCurrent_Candidate_A "UNCONFIRMED_PENDING_TEST";
+BA_ "Decode_Status" SG_ 2482047496 Battery_Low_SOC_Alarm_Report_Percent "CONFIRMED_CORRECT_DO_NOT_EDIT";
+BA_ "Decode_Status" SG_ 2482047496 Battery_Low_Voltage_Alarm_Report_V "CONFIRMED_CORRECT_DO_NOT_EDIT";
 
 
 CM_ "v51 update: merged latest reverse-engineering results from ESPHome/log work: Manager30 solar Wh confirmed as 0x03FCD601 D1=0x00 D2-D5 uint32 Wh; Rouge 1BFD1230 level feedback corrected to base-channel grouped byte layout; Rouge 1BFD1430 identified as hardware button/dimming-active status; Rouge 1BFD0030 documented as coarse status; TVMS1280 1BFD0024 documented as output feedback; module input voltage frames 13F10830/13F10824 added.";
@@ -606,6 +703,13 @@ BA_ "Decode_Status" SG_ 2549941296 TVMSRouge_Label_Segment "CONFIRMED_CORRECT_DO
 BA_ "VFrameFormat" BO_ 2549941296 1;
 
 CM_ "v54 update: Added explicit TVMS Rouge label-page decode for raw CAN ID 0x17FD0430. Label item 0x17 is InputCurrent, supporting the 0x1BFD0230 D1=0x16 D3/10 A input-current candidate.";
+CM_ "v56 update: Added confirmed Battery Sensor configured-capacity decode. Config write raw CAN ID 0x0F0008FA uses D5-D6 little-endian Ah; status echo raw CAN ID 0x13F10008 uses D2-D3 little-endian Ah. Confirmed from battery 450ah - 350 - 400.csv sequence 450, 400, 350, 400 Ah.";
+CM_ "v57 update: Added confirmed Battery Sensor max charge current decode. Config write raw CAN ID 0x0F0008FA with D1=0x14 uses D5-D6 little-endian A; status echo raw CAN ID 0x13F10008 uses D5 raw A. Confirmed corrected sequence 20, 14, 10, 30 A.";
+CM_ "v58 update: Added confirmed Battery Sensor alarm config writes. Raw CAN ID 0x0F0008FA D1=0x41 uses D5-D6 little-endian percent for low SOC alarm; D1=0x42 uses D5-D6 little-endian millivolts for low voltage alarm. Confirmed sequences 10,15,20,30% and 10.0,11.0,11.5,12.0 V.";
+CM_ "v59 update: Added confirmed Battery Sensor alarm report fields on raw CAN ID 0x13F10A08. D2 reports low SOC alarm percent; D3-D4 little-endian millivolts report low voltage alarm. Confirmed around write transitions in more battery config.csv.";
+CM_ "v60 update: Added confirmed Battery Sensor SOC calibration target command. Raw CAN ID 0x0F0008FA D1=0x15 uses D5-D6 little-endian percent; calibrate battery start of charge full 5 times.csv captured five repeats of 100%.";
+CM_ "v61 update: Added confirmed Battery Sensor battery type decode. Config write raw CAN ID 0x0F0008FA D1=0x11 uses D5-D6 little-endian type; status raw CAN ID 0x13F10008 D1 reports type. Mapping: 0=Gel, 1=AGM, 2=LeadAcid, 3=Calcium, 4=Lithium.";
+CM_ "v62 update: Added confirmed Manager30 vehicle input trigger decode. Config write raw CAN ID 0x0F0001FA uses D1=0x68, D3=0x03, D5-D6 little-endian trigger; status raw CAN ID 0x03F20601 reports trigger in D8. Mapping: 0=Auto, 1=12V, 2=24V, 3=Ignition, 5=On.";
 
 CM_ SG_ 2617049636 TVMS1280_Temp2_C "NOTE: TVMS1280 Voltage Input 1 candidate is currently decoded in ESPHome from 0x1BFD0224 page/mux 0x11 D2 / 10. It is expected to read near 0.0 V when the external voltage input is disconnected. This overlaps the temp/tank/status PGN and is kept as a diagnostic candidate until fully confirmed.";
 CM_ SG_ 2617049636 TVMS1280_Temp1_C "NOTE: TVMS1280 Voltage Input 2 candidate is currently decoded in ESPHome from 0x1BFD0224 page/mux 0x14 D2 / 10 and has appeared around 11.9-12.0 V in logs. This overlaps the temp/tank/status PGN and is kept as a diagnostic candidate until fully confirmed.";

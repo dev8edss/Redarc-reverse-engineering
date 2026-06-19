@@ -45,6 +45,7 @@ CONFIG_SCHEMA = cv.Schema({
     cv.GenerateID("solar_power_id"): cv.declare_id(_SensorClass),
     cv.GenerateID("solar_energy_id"): cv.declare_id(_SensorClass),
     cv.GenerateID("ac_input_voltage_id"): cv.declare_id(_SensorClass),
+    cv.GenerateID("vehicle_input_trigger_id"): cv.declare_id(_SensorClass),
 }).extend(cv.COMPONENT_SCHEMA)
 
 
@@ -127,3 +128,8 @@ async def to_code(config):
                            unit="V", device_class="voltage",
                            state_class=STATE_CLASS_MEASUREMENT, decimals=0)
     cg.add(var.set_ac_input_voltage_sensor(s))
+
+    s = await _make_sensor(config["vehicle_input_trigger_id"], f"{p} Vehicle Input Trigger",
+                           state_class=STATE_CLASS_MEASUREMENT, decimals=0,
+                           entity_category=ENTITY_CATEGORY_DIAGNOSTIC)
+    cg.add(var.set_vehicle_input_trigger_sensor(s))
