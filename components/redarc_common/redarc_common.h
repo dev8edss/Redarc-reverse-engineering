@@ -27,6 +27,9 @@ class RedarcCanDispatcher {
       const uint32_t rvc_id = can_id & 0x1FFFFFFFUL;
       const uint32_t dgn = (rvc_id >> 8) & 0x1FFFFUL;
       const uint8_t sa = (uint8_t) (rvc_id & 0xFFU);
+      ESP_LOGD("redarc_common", "CAN_RX id=0x%08X dgn=0x%05X sa=0x%02X dlc=%u",
+               (unsigned) rvc_id, (unsigned) dgn, (unsigned) sa, (unsigned) data.size());
+#if ESPHOME_LOG_LEVEL >= ESPHOME_LOG_LEVEL_VERBOSE
       const uint8_t d1 = data.size() > 0 ? data[0] : 0xFF;
       const uint8_t d2 = data.size() > 1 ? data[1] : 0xFF;
       const uint8_t d3 = data.size() > 2 ? data[2] : 0xFF;
@@ -35,10 +38,11 @@ class RedarcCanDispatcher {
       const uint8_t d6 = data.size() > 5 ? data[5] : 0xFF;
       const uint8_t d7 = data.size() > 6 ? data[6] : 0xFF;
       const uint8_t d8 = data.size() > 7 ? data[7] : 0xFF;
-      ESP_LOGD("redarc_common", "CAN_RX id=0x%08X dgn=0x%05X sa=0x%02X dlc=%u data=%02X %02X %02X %02X %02X %02X %02X %02X",
+      ESP_LOGV("redarc_common", "CAN_RX_DATA id=0x%08X dgn=0x%05X sa=0x%02X dlc=%u data=%02X %02X %02X %02X %02X %02X %02X %02X",
                (unsigned) rvc_id, (unsigned) dgn, (unsigned) sa, (unsigned) data.size(),
                (unsigned) d1, (unsigned) d2, (unsigned) d3, (unsigned) d4,
                (unsigned) d5, (unsigned) d6, (unsigned) d7, (unsigned) d8);
+#endif
     }
 #endif
     for (auto &cb : this->listeners_) cb(can_id, data);

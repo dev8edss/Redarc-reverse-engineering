@@ -1,16 +1,16 @@
 import esphome.codegen as cg
 import esphome.config_validation as cv
-from esphome.components import sensor
+from esphome.components import button, number, select, sensor
 from esphome.const import (
     CONF_ACCURACY_DECIMALS, CONF_DEVICE_CLASS, CONF_DISABLED_BY_DEFAULT,
-    CONF_ENTITY_CATEGORY, CONF_FORCE_UPDATE, CONF_ICON, CONF_ID, CONF_NAME,
-    CONF_STATE_CLASS, CONF_UNIT_OF_MEASUREMENT,
+    CONF_ENTITY_CATEGORY, CONF_FORCE_UPDATE, CONF_ICON, CONF_ID, CONF_MODE,
+    CONF_NAME, CONF_STATE_CLASS, CONF_UNIT_OF_MEASUREMENT,
     ENTITY_CATEGORY_DIAGNOSTIC, ENTITY_CATEGORY_NONE,
     STATE_CLASS_MEASUREMENT,
 )
 
 CODEOWNERS = ["@dev8edss"]
-AUTO_LOAD = ["sensor", "redarc_common"]
+AUTO_LOAD = ["button", "number", "select", "sensor", "redarc_common"]
 MULTI_CONF = False
 
 CONF_SOURCE_ADDRESS = "source_address"
@@ -18,6 +18,9 @@ CONF_FILTER_INTERVAL = "filter_interval"
 
 battery_sensor_ns = cg.esphome_ns.namespace("redarc_battery_sensor")
 BatterySensorComponent = battery_sensor_ns.class_("BatterySensorComponent", cg.Component)
+BatterySOCCalibrateButton = battery_sensor_ns.class_("BatterySOCCalibrateButton", button.Button)
+BatteryConfigNumber = battery_sensor_ns.class_("BatteryConfigNumber", number.Number)
+BatteryTypeSelect = battery_sensor_ns.class_("BatteryTypeSelect", select.Select)
 
 _sensor_ns = cg.esphome_ns.namespace("sensor")
 _SensorClass = _sensor_ns.class_("Sensor")
@@ -42,6 +45,11 @@ CONFIG_SCHEMA = cv.Schema({
     cv.GenerateID("low_soc_alarm_id"): cv.declare_id(_SensorClass),
     cv.GenerateID("low_voltage_alarm_id"): cv.declare_id(_SensorClass),
     cv.GenerateID("last_soc_calibration_target_id"): cv.declare_id(_SensorClass),
+    cv.GenerateID("battery_type_select_id"): cv.declare_id(BatteryTypeSelect),
+    cv.GenerateID("configured_capacity_number_id"): cv.declare_id(BatteryConfigNumber),
+    cv.GenerateID("max_charge_current_number_id"): cv.declare_id(BatteryConfigNumber),
+    cv.GenerateID("low_soc_alarm_number_id"): cv.declare_id(BatteryConfigNumber),
+    cv.GenerateID("soc_calibration_button_id"): cv.declare_id(BatterySOCCalibrateButton),
 }).extend(cv.COMPONENT_SCHEMA)
 
 
@@ -64,6 +72,46 @@ async def _make_sensor(config_id, name, unit=None, device_class=None,
     if decimals is not None:
         cfg[CONF_ACCURACY_DECIMALS] = decimals
     return await sensor.new_sensor(cfg)
+
+
+async def _make_number(config_id, name, min_value, max_value, step,
+                       unit=None, device_class=None):
+    cfg = {
+        CONF_ID: config_id,
+        CONF_NAME: name,
+        CONF_DISABLED_BY_DEFAULT: False,
+        CONF_FORCE_UPDATE: False,
+        CONF_ICON: "",
+        CONF_ENTITY_CATEGORY: ENTITY_CATEGORY_NONE,
+        CONF_MODE: number.NUMBER_MODES["SLIDER"],
+    }
+    if unit is not None:
+        cfg[CONF_UNIT_OF_MEASUREMENT] = unit
+    if device_class is not None:
+        cfg[CONF_DEVICE_CLASS] = device_class
+    return await number.new_number(cfg, min_value=min_value, max_value=max_value, step=step)
+
+
+async def _make_select(config_id, name, options):
+    cfg = {
+        CONF_ID: config_id,
+        CONF_NAME: name,
+        CONF_DISABLED_BY_DEFAULT: False,
+        CONF_ICON: "",
+        CONF_ENTITY_CATEGORY: ENTITY_CATEGORY_NONE,
+    }
+    return await select.new_select(cfg, options=options)
+
+
+async def _make_button(config_id, name):
+    cfg = {
+        CONF_ID: config_id,
+        CONF_NAME: name,
+        CONF_DISABLED_BY_DEFAULT: False,
+        CONF_ICON: "mdi:battery-sync",
+        CONF_ENTITY_CATEGORY: ENTITY_CATEGORY_NONE,
+    }
+    return await button.new_button(cfg)
 
 
 async def to_code(config):
@@ -132,3 +180,30 @@ async def to_code(config):
                            state_class=STATE_CLASS_MEASUREMENT, decimals=0,
                            entity_category=ENTITY_CATEGORY_DIAGNOSTIC)
     cg.add(var.set_last_soc_calibration_target_sensor(s))
+
+    sel = await _make_select(config["battery_type_select_id"], f"{p} Battery Type",
+                             ["Gel", "AGM", "LeadAcid", "Calcium", "Lithium"])
+    cg.add(sel.set_parent(var))
+    cg.add(var.set_battery_type_select(sel))
+
+    n = await _make_number(config["configured_capacity_number_id"], f"{p} Configured Capacity",
+                           min_value=1, max_value=1000, step=1, unit="Ah")
+    cg.add(n.set_parent(var))
+    cg.add(n.set_command(0x12))
+    cg.add(var.set_configured_capacity_number(n))
+
+    n = await _make_number(config["max_charge_current_number_id"], f"{p} Max Charge Current",
+                           min_value=0, max_value=100, step=1, unit="A", device_class="current")
+    cg.add(n.set_parent(var))
+    cg.add(n.set_command(0x14))
+    cg.add(var.set_max_charge_current_number(n))
+
+    n = await _make_number(config["low_soc_alarm_number_id"], f"{p} Low SOC Alarm",
+                           min_value=0, max_value=100, step=1, unit="%", device_class="battery")
+    cg.add(n.set_parent(var))
+    cg.add(n.set_command(0x41))
+    cg.add(var.set_low_soc_alarm_number(n))
+
+    b = await _make_button(config["soc_calibration_button_id"], f"{p} Calibrate SOC Full")
+    cg.add(b.set_parent(var))
+    cg.add(var.set_soc_calibration_button(b))

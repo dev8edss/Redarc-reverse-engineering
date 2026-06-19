@@ -1,6 +1,9 @@
 #pragma once
 #include "esphome/core/component.h"
 #include "esphome/core/log.h"
+#include "esphome/components/button/button.h"
+#include "esphome/components/number/number.h"
+#include "esphome/components/select/select.h"
 #include "esphome/components/sensor/sensor.h"
 #include "esphome/components/redarc_common/redarc_common.h"
 #include <vector>
@@ -8,6 +11,37 @@
 
 namespace esphome {
 namespace redarc_battery_sensor {
+
+class BatterySensorComponent;
+
+class BatterySOCCalibrateButton : public button::Button {
+ public:
+  void set_parent(BatterySensorComponent *parent) { this->parent_ = parent; }
+
+ protected:
+  void press_action() override;
+  BatterySensorComponent *parent_{nullptr};
+};
+
+class BatteryConfigNumber : public number::Number {
+ public:
+  void set_parent(BatterySensorComponent *parent) { this->parent_ = parent; }
+  void set_command(uint8_t command) { this->command_ = command; }
+
+ protected:
+  void control(float value) override;
+  BatterySensorComponent *parent_{nullptr};
+  uint8_t command_{0};
+};
+
+class BatteryTypeSelect : public select::Select {
+ public:
+  void set_parent(BatterySensorComponent *parent) { this->parent_ = parent; }
+
+ protected:
+  void control(size_t index) override;
+  BatterySensorComponent *parent_{nullptr};
+};
 
 class BatterySensorComponent : public Component {
  public:
@@ -24,10 +58,16 @@ class BatterySensorComponent : public Component {
   void set_low_soc_alarm_sensor(sensor::Sensor *s) { this->low_soc_alarm_sensor_ = s; }
   void set_low_voltage_alarm_sensor(sensor::Sensor *s) { this->low_voltage_alarm_sensor_ = s; }
   void set_last_soc_calibration_target_sensor(sensor::Sensor *s) { this->last_soc_calibration_target_sensor_ = s; }
+  void set_battery_type_select(BatteryTypeSelect *s) { this->battery_type_select_ = s; }
+  void set_configured_capacity_number(number::Number *n) { this->configured_capacity_number_ = n; }
+  void set_max_charge_current_number(number::Number *n) { this->max_charge_current_number_ = n; }
+  void set_low_soc_alarm_number(number::Number *n) { this->low_soc_alarm_number_ = n; }
+  void set_soc_calibration_button(BatterySOCCalibrateButton *b) { this->soc_calibration_button_ = b; }
 
   void setup() override;
   void dump_config() override;
   void handle_can_frame(uint32_t can_id, const std::vector<uint8_t> &data);
+  void send_config_setting(uint8_t command, uint16_t raw_value);
   float current_a() const { return this->current_a_; }
   bool has_current() const { return !std::isnan(this->current_a_); }
 
@@ -50,6 +90,11 @@ class BatterySensorComponent : public Component {
   sensor::Sensor *low_soc_alarm_sensor_{nullptr};
   sensor::Sensor *low_voltage_alarm_sensor_{nullptr};
   sensor::Sensor *last_soc_calibration_target_sensor_{nullptr};
+  BatteryTypeSelect *battery_type_select_{nullptr};
+  number::Number *configured_capacity_number_{nullptr};
+  number::Number *max_charge_current_number_{nullptr};
+  number::Number *low_soc_alarm_number_{nullptr};
+  BatterySOCCalibrateButton *soc_calibration_button_{nullptr};
 };
 
 }  // namespace redarc_battery_sensor

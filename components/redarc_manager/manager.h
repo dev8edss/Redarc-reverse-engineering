@@ -1,6 +1,7 @@
 #pragma once
 #include "esphome/core/component.h"
 #include "esphome/core/log.h"
+#include "esphome/components/select/select.h"
 #include "esphome/components/sensor/sensor.h"
 #include "esphome/components/redarc_battery_sensor/battery_sensor.h"
 #include "esphome/components/redarc_common/redarc_common.h"
@@ -8,6 +9,17 @@
 
 namespace esphome {
 namespace redarc_manager {
+
+class Manager30Component;
+
+class VehicleInputTriggerSelect : public select::Select {
+ public:
+  void set_parent(Manager30Component *parent) { this->parent_ = parent; }
+
+ protected:
+  void control(size_t index) override;
+  Manager30Component *parent_{nullptr};
+};
 
 class Manager30Component : public Component {
  public:
@@ -24,10 +36,12 @@ class Manager30Component : public Component {
   void set_solar_energy_sensor(sensor::Sensor *s) { this->solar_energy_sensor_ = s; }
   void set_ac_input_voltage_sensor(sensor::Sensor *s) { this->ac_input_voltage_sensor_ = s; }
   void set_vehicle_input_trigger_sensor(sensor::Sensor *s) { this->vehicle_input_trigger_sensor_ = s; }
+  void set_vehicle_input_trigger_select(VehicleInputTriggerSelect *s) { this->vehicle_input_trigger_select_ = s; }
 
   void setup() override;
   void dump_config() override;
   void handle_can_frame(uint32_t can_id, const std::vector<uint8_t> &data);
+  void send_vehicle_input_trigger(uint16_t raw_value);
 
  protected:
   uint8_t source_address_{0x01};
@@ -48,6 +62,7 @@ class Manager30Component : public Component {
   sensor::Sensor *solar_energy_sensor_{nullptr};
   sensor::Sensor *ac_input_voltage_sensor_{nullptr};
   sensor::Sensor *vehicle_input_trigger_sensor_{nullptr};
+  VehicleInputTriggerSelect *vehicle_input_trigger_select_{nullptr};
 };
 
 }  // namespace redarc_manager

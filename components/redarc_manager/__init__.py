@@ -1,6 +1,6 @@
 import esphome.codegen as cg
 import esphome.config_validation as cv
-from esphome.components import sensor
+from esphome.components import select, sensor
 from esphome.const import (
     CONF_ACCURACY_DECIMALS, CONF_DEVICE_CLASS, CONF_DISABLED_BY_DEFAULT,
     CONF_ENTITY_CATEGORY, CONF_FORCE_UPDATE, CONF_ICON, CONF_ID, CONF_NAME,
@@ -10,7 +10,7 @@ from esphome.const import (
 )
 
 CODEOWNERS = ["@dev8edss"]
-AUTO_LOAD = ["sensor", "redarc_common"]
+AUTO_LOAD = ["select", "sensor", "redarc_common"]
 MULTI_CONF = False
 
 CONF_SOURCE_ADDRESS = "source_address"
@@ -19,6 +19,7 @@ CONF_BATTERY_SENSOR = "battery_sensor_id"
 
 manager30_ns = cg.esphome_ns.namespace("redarc_manager")
 Manager30Component = manager30_ns.class_("Manager30Component", cg.Component)
+VehicleInputTriggerSelect = manager30_ns.class_("VehicleInputTriggerSelect", select.Select)
 
 _battery_sensor_ns = cg.esphome_ns.namespace("redarc_battery_sensor")
 _BatterySensorComponent = _battery_sensor_ns.class_("BatterySensorComponent", cg.Component)
@@ -46,6 +47,7 @@ CONFIG_SCHEMA = cv.Schema({
     cv.GenerateID("solar_energy_id"): cv.declare_id(_SensorClass),
     cv.GenerateID("ac_input_voltage_id"): cv.declare_id(_SensorClass),
     cv.GenerateID("vehicle_input_trigger_id"): cv.declare_id(_SensorClass),
+    cv.GenerateID("vehicle_input_trigger_select_id"): cv.declare_id(VehicleInputTriggerSelect),
 }).extend(cv.COMPONENT_SCHEMA)
 
 
@@ -68,6 +70,17 @@ async def _make_sensor(config_id, name, unit=None, device_class=None,
     if decimals is not None:
         cfg[CONF_ACCURACY_DECIMALS] = decimals
     return await sensor.new_sensor(cfg)
+
+
+async def _make_select(config_id, name, options):
+    cfg = {
+        CONF_ID: config_id,
+        CONF_NAME: name,
+        CONF_DISABLED_BY_DEFAULT: False,
+        CONF_ICON: "",
+        CONF_ENTITY_CATEGORY: ENTITY_CATEGORY_NONE,
+    }
+    return await select.new_select(cfg, options=options)
 
 
 async def to_code(config):
@@ -133,3 +146,8 @@ async def to_code(config):
                            state_class=STATE_CLASS_MEASUREMENT, decimals=0,
                            entity_category=ENTITY_CATEGORY_DIAGNOSTIC)
     cg.add(var.set_vehicle_input_trigger_sensor(s))
+
+    sel = await _make_select(config["vehicle_input_trigger_select_id"], f"{p} Vehicle Input Trigger",
+                             ["Auto", "12V", "24V", "Ignition", "On"])
+    cg.add(sel.set_parent(var))
+    cg.add(var.set_vehicle_input_trigger_select(sel))

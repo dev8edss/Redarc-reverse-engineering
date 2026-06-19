@@ -5,6 +5,13 @@ namespace redarc_manager {
 
 static const char *const TAG = "redarc_manager";
 
+void VehicleInputTriggerSelect::control(size_t index) {
+  static const uint16_t VALUES[] = {0, 1, 2, 3, 5};
+  if (this->parent_ == nullptr || index >= 5) return;
+  this->parent_->send_vehicle_input_trigger(VALUES[index]);
+  this->publish_state(index);
+}
+
 void Manager30Component::setup() {
   redarc_common::RedarcCanDispatcher::instance().add_listener(
       [this](uint32_t id, const std::vector<uint8_t> &data) { this->handle_can_frame(id, data); });
@@ -13,6 +20,18 @@ void Manager30Component::setup() {
 void Manager30Component::dump_config() {
   ESP_LOGCONFIG(TAG, "Manager30 SA 0x%02X", this->source_address_);
   LOG_SENSOR("  ", "Vehicle Input Trigger", this->vehicle_input_trigger_sensor_);
+  LOG_SELECT("  ", "Vehicle Input Trigger", this->vehicle_input_trigger_select_);
+}
+
+void Manager30Component::send_vehicle_input_trigger(uint16_t raw_value) {
+  auto *bus = redarc_common::RedarcCanDispatcher::instance().canbus();
+  if (bus == nullptr) return;
+  const std::vector<uint8_t> data = {
+      0x68, 0x00, 0xFF, 0xFF,
+      (uint8_t) (raw_value & 0xFF), (uint8_t) (raw_value >> 8),
+      0x00, 0x00};
+  bus->send_data(0x0F00FF20UL, true, data);
+  ESP_LOGD(TAG, "Sent vehicle input trigger %u", raw_value);
 }
 
 void Manager30Component::handle_can_frame(uint32_t can_id, const std::vector<uint8_t> &data) {
@@ -22,14 +41,22 @@ void Manager30Component::handle_can_frame(uint32_t can_id, const std::vector<uin
   const uint32_t now = millis();
 
   if (can_id == 0x0F0001FAUL && data[0] == 0x68 && data[2] == 0x03) {
-    if (this->vehicle_input_trigger_sensor_ != nullptr)
-      this->vehicle_input_trigger_sensor_->publish_state((float) redarc_common::u16_le(data, 4));
+    const uint16_t raw = redarc_common::u16_le(data, 4);
+    if (this->vehicle_input_trigger_sensor_ != nullptr) this->vehicle_input_trigger_sensor_->publish_state((float) raw);
+    if (this->vehicle_input_trigger_select_ != nullptr) {
+      if (raw <= 3) this->vehicle_input_trigger_select_->publish_state((size_t) raw);
+      else if (raw == 5) this->vehicle_input_trigger_select_->publish_state((size_t) 4);
+    }
     return;
   }
 
   if (can_id == 0x0F00FF20UL && data[0] == 0x68 && data[2] == 0xFF && data[3] == 0xFF) {
-    if (this->vehicle_input_trigger_sensor_ != nullptr)
-      this->vehicle_input_trigger_sensor_->publish_state((float) redarc_common::u16_le(data, 4));
+    const uint16_t raw = redarc_common::u16_le(data, 4);
+    if (this->vehicle_input_trigger_sensor_ != nullptr) this->vehicle_input_trigger_sensor_->publish_state((float) raw);
+    if (this->vehicle_input_trigger_select_ != nullptr) {
+      if (raw <= 3) this->vehicle_input_trigger_select_->publish_state((size_t) raw);
+      else if (raw == 5) this->vehicle_input_trigger_select_->publish_state((size_t) 4);
+    }
     return;
   }
 
@@ -38,6 +65,10 @@ void Manager30Component::handle_can_frame(uint32_t can_id, const std::vector<uin
     this->last_charger_status_ms_ = now;
     if (this->vehicle_input_trigger_sensor_ != nullptr && data[7] != 0xFF)
       this->vehicle_input_trigger_sensor_->publish_state((float) data[7]);
+    if (this->vehicle_input_trigger_select_ != nullptr && data[7] != 0xFF) {
+      if (data[7] <= 3) this->vehicle_input_trigger_select_->publish_state((size_t) data[7]);
+      else if (data[7] == 5) this->vehicle_input_trigger_select_->publish_state((size_t) 4);
+    }
     return;
   }
 
