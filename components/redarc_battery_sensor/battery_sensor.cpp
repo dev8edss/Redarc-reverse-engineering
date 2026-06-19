@@ -24,7 +24,8 @@ void BatterySensorComponent::handle_can_frame(uint32_t can_id, const std::vector
   can_id = redarc_common::rvc_id(can_id);
   if (data.size() < 8) return;
 
-  if (can_id == 0x0F0008FAUL && data[2] == 0x03) {
+  if ((can_id == 0x0F0008FAUL && data[2] == 0x03) ||
+      (can_id == 0x0F00FF20UL && data[2] == 0xFF && data[3] == 0xFF)) {
     const uint16_t raw = redarc_common::u16_le(data, 4);
     switch (data[0]) {
       case 0x12:

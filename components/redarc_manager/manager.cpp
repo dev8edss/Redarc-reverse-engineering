@@ -27,6 +27,12 @@ void Manager30Component::handle_can_frame(uint32_t can_id, const std::vector<uin
     return;
   }
 
+  if (can_id == 0x0F00FF20UL && data[0] == 0x68 && data[2] == 0xFF && data[3] == 0xFF) {
+    if (this->vehicle_input_trigger_sensor_ != nullptr)
+      this->vehicle_input_trigger_sensor_->publish_state((float) redarc_common::u16_le(data, 4));
+    return;
+  }
+
   if (redarc_common::rvc_matches(can_id, 0x1F206UL, this->source_address_)) {
     if (now - this->last_charger_status_ms_ < this->filter_interval_ms_) return;
     this->last_charger_status_ms_ = now;
