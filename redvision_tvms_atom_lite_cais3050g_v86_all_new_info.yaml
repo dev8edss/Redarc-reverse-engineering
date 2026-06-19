@@ -18,6 +18,9 @@ substitutions:
   board: m5stack-atom
   esp32_framework_type: esp-idf
   logger_level: DEBUG
+  # Keep UART logging disabled when raw CAN debug is enabled. Use 115200 or 921600
+  # only for short serial captures, because the CAN firehose can overflow UART.
+  logger_baud_rate: "0"
 
   # ESP32 source address on the REDARC network (2 hex digits, no 0x prefix). Usually matches a redvision display address.
   host_address: "0x20"

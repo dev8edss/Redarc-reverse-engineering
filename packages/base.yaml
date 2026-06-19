@@ -10,6 +10,9 @@ esp32:
 
 logger:
   level: ${logger_level}
+  # Raw CAN debug logging can be very high volume; use API logging instead of
+  # UART so DEBUG boots do not overflow the ESP-IDF UART ringbuffer.
+  baud_rate: ${logger_baud_rate}
 
 api:
   encryption:
