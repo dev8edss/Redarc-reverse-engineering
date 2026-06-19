@@ -22,13 +22,17 @@ class RedarcCanDispatcher {
     this->listeners_.push_back(std::move(cb));
   }
   void dispatch(uint32_t can_id, const std::vector<uint8_t> &data) {
-#if ESPHOME_LOG_LEVEL >= ESPHOME_LOG_LEVEL_VERBOSE
+#if ESPHOME_LOG_LEVEL >= ESPHOME_LOG_LEVEL_DEBUG
     {
+      const uint32_t rvc_id = can_id & 0x1FFFFFFFUL;
+      const uint32_t dgn = (rvc_id >> 8) & 0x1FFFFUL;
+      const uint8_t sa = (uint8_t) (rvc_id & 0xFFU);
       char hex[25] = {};
       size_t n = data.size() < 8 ? data.size() : 8;
       for (size_t i = 0; i < n; i++) snprintf(hex + i * 3, 4, "%02X ", data[i]);
       if (n > 0) hex[n * 3 - 1] = '\0';
-      ESP_LOGV("redarc_common", "RX 0x%08X [%s]", (unsigned) can_id, hex);
+      ESP_LOGD("redarc_common", "RX id=0x%08X dgn=0x%05X sa=0x%02X len=%u data=[%s]",
+               (unsigned) rvc_id, (unsigned) dgn, sa, (unsigned) data.size(), hex);
     }
 #endif
     for (auto &cb : this->listeners_) cb(can_id, data);

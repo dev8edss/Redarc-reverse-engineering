@@ -16,7 +16,7 @@ substitutions:
   sensor_average_interval: 5s
   rouge_transition_length: 750ms
   board: m5stack-atom
-  logger_level: INFO
+  logger_level: DEBUG
 
   # ESP32 source address on the REDARC network (2 hex digits, no 0x prefix). Usually matches a redvision display address.
   host_address: "0x20"
