@@ -49,6 +49,7 @@ CONFIG_SCHEMA = cv.Schema({
     cv.GenerateID("configured_capacity_number_id"): cv.declare_id(BatteryConfigNumber),
     cv.GenerateID("max_charge_current_number_id"): cv.declare_id(BatteryConfigNumber),
     cv.GenerateID("low_soc_alarm_number_id"): cv.declare_id(BatteryConfigNumber),
+    cv.GenerateID("low_voltage_alarm_number_id"): cv.declare_id(BatteryConfigNumber),
     cv.GenerateID("soc_calibration_button_id"): cv.declare_id(BatterySOCCalibrateButton),
 }).extend(cv.COMPONENT_SCHEMA)
 
@@ -203,6 +204,13 @@ async def to_code(config):
     cg.add(n.set_parent(var))
     cg.add(n.set_command(0x41))
     cg.add(var.set_low_soc_alarm_number(n))
+
+    n = await _make_number(config["low_voltage_alarm_number_id"], f"{p} Low Voltage Alarm",
+                           min_value=0, max_value=16, step=0.1, unit="V", device_class="voltage")
+    cg.add(n.set_parent(var))
+    cg.add(n.set_command(0x42))
+    cg.add(n.set_raw_multiplier(1000.0))
+    cg.add(var.set_low_voltage_alarm_number(n))
 
     b = await _make_button(config["soc_calibration_button_id"], f"{p} Calibrate SOC Full")
     cg.add(b.set_parent(var))

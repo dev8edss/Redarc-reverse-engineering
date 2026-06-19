@@ -12,9 +12,9 @@ void BatterySOCCalibrateButton::press_action() {
 
 void BatteryConfigNumber::control(float value) {
   if (this->parent_ == nullptr) return;
-  const uint16_t raw = (uint16_t) std::lround(value);
+  const uint16_t raw = (uint16_t) std::lround(value * this->raw_multiplier_);
   this->parent_->send_config_setting(this->command_, raw);
-  this->publish_state((float) raw);
+  this->publish_state(value);
 }
 
 void BatteryTypeSelect::control(size_t index) {
@@ -40,6 +40,7 @@ void BatterySensorComponent::dump_config() {
   LOG_NUMBER("  ", "Configured Capacity", this->configured_capacity_number_);
   LOG_NUMBER("  ", "Max Charge Current", this->max_charge_current_number_);
   LOG_NUMBER("  ", "Low SOC Alarm", this->low_soc_alarm_number_);
+  LOG_NUMBER("  ", "Low Voltage Alarm", this->low_voltage_alarm_number_);
   LOG_BUTTON("  ", "SOC Calibration", this->soc_calibration_button_);
 }
 
@@ -84,6 +85,7 @@ void BatterySensorComponent::handle_can_frame(uint32_t can_id, const std::vector
         break;
       case 0x42:
         if (this->low_voltage_alarm_sensor_ != nullptr) this->low_voltage_alarm_sensor_->publish_state((float) raw * 0.001f);
+        if (this->low_voltage_alarm_number_ != nullptr) this->low_voltage_alarm_number_->publish_state((float) raw * 0.001f);
         break;
       default:
         break;
@@ -130,6 +132,9 @@ void BatterySensorComponent::handle_can_frame(uint32_t can_id, const std::vector
       const uint16_t raw_low_voltage = redarc_common::u16_le(data, 2);
       if (this->low_voltage_alarm_sensor_ != nullptr && raw_low_voltage != 0xFFFF) {
         this->low_voltage_alarm_sensor_->publish_state((float) raw_low_voltage * 0.001f);
+      }
+      if (this->low_voltage_alarm_number_ != nullptr && raw_low_voltage != 0xFFFF) {
+        this->low_voltage_alarm_number_->publish_state((float) raw_low_voltage * 0.001f);
       }
     }
     return;

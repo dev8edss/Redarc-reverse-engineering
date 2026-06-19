@@ -27,11 +27,13 @@ class BatteryConfigNumber : public number::Number {
  public:
   void set_parent(BatterySensorComponent *parent) { this->parent_ = parent; }
   void set_command(uint8_t command) { this->command_ = command; }
+  void set_raw_multiplier(float multiplier) { this->raw_multiplier_ = multiplier; }
 
  protected:
   void control(float value) override;
   BatterySensorComponent *parent_{nullptr};
   uint8_t command_{0};
+  float raw_multiplier_{1.0f};
 };
 
 class BatteryTypeSelect : public select::Select {
@@ -62,6 +64,7 @@ class BatterySensorComponent : public Component {
   void set_configured_capacity_number(number::Number *n) { this->configured_capacity_number_ = n; }
   void set_max_charge_current_number(number::Number *n) { this->max_charge_current_number_ = n; }
   void set_low_soc_alarm_number(number::Number *n) { this->low_soc_alarm_number_ = n; }
+  void set_low_voltage_alarm_number(number::Number *n) { this->low_voltage_alarm_number_ = n; }
   void set_soc_calibration_button(BatterySOCCalibrateButton *b) { this->soc_calibration_button_ = b; }
 
   void setup() override;
@@ -94,6 +97,7 @@ class BatterySensorComponent : public Component {
   number::Number *configured_capacity_number_{nullptr};
   number::Number *max_charge_current_number_{nullptr};
   number::Number *low_soc_alarm_number_{nullptr};
+  number::Number *low_voltage_alarm_number_{nullptr};
   BatterySOCCalibrateButton *soc_calibration_button_{nullptr};
 };
 
