@@ -7,7 +7,7 @@ This package splits the RedVision / TVMS CAN bridge into ESPHome external compon
 | Component | Purpose |
 |---|---|
 | `redarc_common` | Shared CAN byte helpers, source-address helpers, and current/voltage decoding helpers. |
-| `tvms_rouge` | TVMS Rouge dimmable output lights, ON/OFF commands, dim hold/ramp protocol, output level feedback, hardware-button/dimming-active binary sensors, input voltage, candidate input current, and tank sensors. |
+| `tvms_rouge` | TVMS Rouge dimmable output lights, direct set-level and OFF commands, output level feedback, hardware-button/dimming-active binary sensors, input voltage, candidate input current, and tank sensors. |
 | `tvms_1280` | TVMS1280 relay output switches, inverter switch, output feedback from RedVision/display changes, tank sensors, temperature sensors, supply voltage, voltage-input diagnostic candidates, and notes for the 3 unused digital inputs. |
 | `manager30` | Manager30 output current, battery voltage, source-derived device current, solar current/voltage/power, solar Wh/yield, and AC input voltage. |
 | `battery_sensor` | Battery shunt current, voltage, SOC, and temperature. |
@@ -130,26 +130,25 @@ Use `LISTENONLY` only for passive monitoring YAMLs where nothing is transmitted.
 
 | Purpose | CAN ID | Decode/use |
 |---|---:|---|
-| ON/OFF command | `0x0F003020` | `CB 00 FF <channel> <00 off / 01 on> 00 00 00` |
-| Dim hold command | `0x0F053020` | `<channel> 01 <01 down / 64 up> 05 00 FF FF FF` |
-| Dim release | `0x0F053020` | `<channel> 01 FF 00 00 FF FF FF` |
-| Keepalive during dim hold | `0x0FE6FF20` | `FF FF FF FF FF FF FF FF` |
+| Set output level | `0x0F003020` | `5A 01 FF <channel> <percent 00-64> 00 00 00`; example output 4 at 65% is `5A 01 FF 0F 41 00 00 00` |
+| ON command | `0x0F003020` | `CB 00 FF <channel> 01 00 00 00` |
+| OFF command | `0x0F003020` | `CB 00 FF <channel> 00 00 00 00` |
 | Actual output level | `0x1BFD1230` | `D1=base channel`, `D2-D8=0-100% levels for base+0..base+6` |
 | Hardware button / dim-active | `0x1BFD1430` | `D1=base channel`, `D2-D8`; `0x02=active`, `0x00=inactive`, ignore other values |
 | Coarse output status | `0x1BFD0030` | `D1=base channel`, `D2-D8`; `0x00=off`, `0x01=on`, `0xF8/0xFF/special values=ignore/unknown` |
 | Tank feedback | `0x1BFD0230` | Tank 1 and Tank 2 percentage feedback |
 | Input/status voltage | `0x13F10830` | `D1-D2` little-endian, scale `0.01 V/count`; examples `F0 04 = 12.64 V`, `EC 04 = 12.60 V` |
 
-### Current dimming behaviour
+### Current dimming behavior
 
-Rouge dimming is working as a timed hold/ramp protocol, not as an absolute brightness command. Home Assistant sends a target brightness, the component estimates the required hold time, sends dim-up or dim-down holds, then releases.
+Rouge dimming now uses the absolute set-level command observed from the RedVision display. Home Assistant sends a target brightness and the component sends one direct `0x0F003020` frame with the requested percent; full-on requests use the basic ON command.
 
 Current UX behaviour:
 
 - `1BFD1230` remains the source of truth for real hardware brightness.
-- The HA light entity keeps the requested target while an HA-driven dim operation is active, so it no longer jumps back to the old feedback value mid-ramp.
-- The diagnostic `Output X Level` sensor still tracks the actual hardware level live while the output ramps.
-- Physical Rouge hardware buttons can turn an output on at its remembered dim level, for example `0% -> 85%` or `0% -> 70%`, but the known CAN ON command still turns outputs on at `100%` before dimming down.
+- The HA light entity publishes the requested target immediately, then reconciles from hardware feedback.
+- The diagnostic `Output X Level` sensor tracks the actual hardware level from `1BFD1230`.
+- The old timed dim-hold/ramp protocol is no longer used by this component.
 
 Recommended Rouge YAML options:
 
@@ -158,23 +157,12 @@ tvms_rouge:
   id: tvms_rouge_hub
   canbus_id: rv_can
   output_command_id: 0x0F003020
-  dim_command_id: 0x0F053020
-  keepalive_id: 0x0FE6FF20
   level_feedback_id: 0x1BFD1230
   tank_feedback_id: 0x1BFD0230
   button_status_id: 0x1BFD1430
   input_status_id: 0x13F10830
 
   true_off_threshold: 1.0
-  target_debounce: 600ms
-  start_deadline: 2500ms
-  default_deadband: 3.0
-  initial_rate_ms_per_percent: 50.0
-  learning_gain: 0.25
-  approach: 0.80
-  max_pulse: 1200ms
-  settle_time: 700ms
-  max_iterations: 12
 
   input_voltage:
     name: "TVMS Rouge Input Voltage"
@@ -366,6 +354,6 @@ After applying component patches to the GitHub repo:
 
 ## Known limitations / next targets
 
-- The known CAN ON command for TVMS Rouge turns an output on at `100%`; hardware Rouge buttons can recall a saved dim level, but the external CAN command for “turn on at remembered brightness” has not been identified.
+- TVMS Rouge brightness uses the direct set-level command `5A 01 FF <channel> <percent> 00 00 00`; the older timed dim-hold/ramp command path is no longer used.
 - TVMS1280 voltage input 1/2 candidates are diagnostic until confirmed against the RedVision UI or direct wiring tests.
 - Some status/config PGNs remain observed-only and should not be used for HA entities until tested.
