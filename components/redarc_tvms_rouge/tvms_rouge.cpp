@@ -226,7 +226,7 @@ void TVMSRougeComponent::handle_can_frame(uint32_t can_id, const std::vector<uin
   }
 
   if (redarc_common::rvc_matches(can_id, 0x1FD00UL, this->source_address_)) {
-    this->handle_button_status_frame_(data);
+    this->handle_channel_status_frame_(data);
     return;
   }
 
@@ -259,18 +259,26 @@ void TVMSRougeComponent::publish_channel_(uint8_t channel, bool state) {
   this->set_feedback_level_(output_number, current);
 }
 
-void TVMSRougeComponent::handle_button_status_frame_(const std::vector<uint8_t> &data) {
+void TVMSRougeComponent::handle_channel_status_frame_(const std::vector<uint8_t> &data) {
   if (data.size() < 8) return;
 
-  const uint8_t base_input = data[0];
+  // DGN 0x1FD00 is a paginated channel-state array (same layout the TVMS1280 uses):
+  // data[0] is the base channel number and data[1..7] are the states for
+  // base..base+6. Only 0x00/0x01 are valid on/off states; 0xF8/0xFF (no data) and
+  // dimming-level bytes are ignored. Channel map: 0x01-0x08 = input buttons,
+  // 0x0B = master, 0x0C-0x15 = outputs. Output brightness is reported separately
+  // via 0x1FD12, so outputs are not decoded here.
+  const uint8_t base_channel = data[0];
   for (uint8_t i = 1; i <= 7; i++) {
-    const uint8_t input_number = base_input + i - 1;
-    if (input_number < 1 || input_number > 8) continue;
-
     const uint8_t value = data[i];
     if (value != 0x00 && value != 0x01) continue;
 
-    this->set_button_state_(input_number, value == 0x01);
+    const uint8_t channel = base_channel + i - 1;
+    if (channel >= 0x01 && channel <= 0x08) {
+      this->set_button_state_(channel, value == 0x01);
+    } else if (channel == 0x0B && this->master_switch_ != nullptr) {
+      this->master_switch_->publish_state(value == 0x01);
+    }
   }
 }
 

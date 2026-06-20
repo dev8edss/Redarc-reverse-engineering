@@ -86,7 +86,7 @@ class TVMSRougeComponent : public Component {
   void set_feedback_level_(uint8_t output_number, float level);
   void publish_actual_light_level_(uint8_t output_number);
   void set_button_state_(uint8_t output_number, bool active);
-  void handle_button_status_frame_(const std::vector<uint8_t> &data);
+  void handle_channel_status_frame_(const std::vector<uint8_t> &data);
 
   uint8_t source_address_{0x30};
   uint8_t host_address_{0x20};
