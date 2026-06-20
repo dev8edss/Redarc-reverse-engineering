@@ -10,6 +10,7 @@
 #include "esphome/components/redarc_common/redarc_common.h"
 #include <array>
 #include <cmath>
+#include <cstdint>
 #include <vector>
 
 namespace esphome {
@@ -36,7 +37,6 @@ class TVMSRougeLight : public light::LightOutput {
   void setup_state(light::LightState *state) override;
   void write_state(light::LightState *state) override;
   void publish_feedback_level(float level_percent);
-  void publish_target_level(float level_percent);
 
   uint8_t output_number() const { return this->output_number_; }
   uint8_t channel() const { return this->channel_; }
@@ -96,6 +96,7 @@ class TVMSRougeComponent : public Component {
   uint32_t output_command_id_{0};
 
   std::array<float, 11> levels_{};
+  std::array<int16_t, 11> last_commanded_percent_{};
   std::array<TVMSRougeLight *, 11> lights_{};
   TVMSRougeSwitch *master_switch_{nullptr};
   std::array<sensor::Sensor *, 11> level_sensors_{};
