@@ -3,6 +3,7 @@
 #include "esphome/core/log.h"
 #include "esphome/components/select/select.h"
 #include "esphome/components/sensor/sensor.h"
+#include "esphome/components/text_sensor/text_sensor.h"
 #include "esphome/components/redarc_battery_sensor/battery_sensor.h"
 #include "esphome/components/redarc_common/redarc_common.h"
 #include <vector>
@@ -36,6 +37,10 @@ class Manager30Component : public Component {
   void set_solar_energy_sensor(sensor::Sensor *s) { this->solar_energy_sensor_ = s; }
   void set_ac_input_voltage_sensor(sensor::Sensor *s) { this->ac_input_voltage_sensor_ = s; }
   void set_vehicle_input_trigger_sensor(sensor::Sensor *s) { this->vehicle_input_trigger_sensor_ = s; }
+  void set_clock_flags_sensor(sensor::Sensor *s) { this->clock_flags_sensor_ = s; }
+  void set_clock_date_text_sensor(text_sensor::TextSensor *s) { this->clock_date_text_sensor_ = s; }
+  void set_clock_time_text_sensor(text_sensor::TextSensor *s) { this->clock_time_text_sensor_ = s; }
+  void set_clock_datetime_text_sensor(text_sensor::TextSensor *s) { this->clock_datetime_text_sensor_ = s; }
   void set_vehicle_input_trigger_select(VehicleInputTriggerSelect *s) { this->vehicle_input_trigger_select_ = s; }
 
   void setup() override;
@@ -51,6 +56,7 @@ class Manager30Component : public Component {
   uint32_t last_solar_energy_ms_{0};
   uint32_t last_ac_ms_{0};
   uint32_t last_charger_status_ms_{0};
+  uint32_t last_clock_ms_{0};
   redarc_battery_sensor::BatterySensorComponent *battery_sensor_{nullptr};
   sensor::Sensor *output_current_sensor_{nullptr};
   sensor::Sensor *output_current_raw_sensor_{nullptr};
@@ -62,6 +68,10 @@ class Manager30Component : public Component {
   sensor::Sensor *solar_energy_sensor_{nullptr};
   sensor::Sensor *ac_input_voltage_sensor_{nullptr};
   sensor::Sensor *vehicle_input_trigger_sensor_{nullptr};
+  sensor::Sensor *clock_flags_sensor_{nullptr};
+  text_sensor::TextSensor *clock_date_text_sensor_{nullptr};
+  text_sensor::TextSensor *clock_time_text_sensor_{nullptr};
+  text_sensor::TextSensor *clock_datetime_text_sensor_{nullptr};
   VehicleInputTriggerSelect *vehicle_input_trigger_select_{nullptr};
 };
 

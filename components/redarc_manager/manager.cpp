@@ -1,4 +1,5 @@
 #include "manager.h"
+#include <cstdio>
 
 namespace esphome {
 namespace redarc_manager {
@@ -20,6 +21,10 @@ void Manager30Component::setup() {
 void Manager30Component::dump_config() {
   ESP_LOGCONFIG(TAG, "Manager30 SA 0x%02X", this->source_address_);
   LOG_SENSOR("  ", "Vehicle Input Trigger", this->vehicle_input_trigger_sensor_);
+  LOG_SENSOR("  ", "Clock Flags Raw", this->clock_flags_sensor_);
+  LOG_TEXT_SENSOR("  ", "CAN Date", this->clock_date_text_sensor_);
+  LOG_TEXT_SENSOR("  ", "CAN Time", this->clock_time_text_sensor_);
+  LOG_TEXT_SENSOR("  ", "CAN Date Time", this->clock_datetime_text_sensor_);
   LOG_SELECT("  ", "Vehicle Input Trigger", this->vehicle_input_trigger_select_);
 }
 
@@ -68,6 +73,38 @@ void Manager30Component::handle_can_frame(uint32_t can_id, const std::vector<uin
     if (this->vehicle_input_trigger_select_ != nullptr && data[7] != 0xFF) {
       if (data[7] <= 3) this->vehicle_input_trigger_select_->publish_state((size_t) data[7]);
       else if (data[7] == 5) this->vehicle_input_trigger_select_->publish_state((size_t) 4);
+    }
+    return;
+  }
+
+  if (redarc_common::rvc_matches(can_id, 0x1F304UL, this->source_address_)) {
+    if (now - this->last_clock_ms_ < this->filter_interval_ms_) return;
+    this->last_clock_ms_ = now;
+    const uint8_t raw_day_flags = data[0];
+    const uint8_t day = raw_day_flags & 0x1FU;
+    const uint8_t flags = raw_day_flags & 0xE0U;
+    const uint8_t month = data[1];
+    const uint16_t year = redarc_common::u16_le(data, 2);
+    const uint8_t hour = data[4];
+    const uint8_t minute = data[5];
+    const uint8_t second = data[6];
+    if (this->clock_flags_sensor_ != nullptr) this->clock_flags_sensor_->publish_state((float) flags);
+    if (year >= 2000 && year <= 2100 && month >= 1 && month <= 12 && day >= 1 && day <= 31 &&
+        hour <= 23 && minute <= 59 && second <= 59) {
+      char date[11];
+      char time[9];
+      char datetime[20];
+      std::snprintf(date, sizeof(date), "%04u-%02u-%02u", (unsigned) year, (unsigned) month, (unsigned) day);
+      std::snprintf(time, sizeof(time), "%02u:%02u:%02u", (unsigned) hour, (unsigned) minute, (unsigned) second);
+      std::snprintf(datetime, sizeof(datetime), "%04u-%02u-%02u %02u:%02u:%02u",
+                    (unsigned) year, (unsigned) month, (unsigned) day,
+                    (unsigned) hour, (unsigned) minute, (unsigned) second);
+      if (this->clock_date_text_sensor_ != nullptr) this->clock_date_text_sensor_->publish_state(date);
+      if (this->clock_time_text_sensor_ != nullptr) this->clock_time_text_sensor_->publish_state(time);
+      if (this->clock_datetime_text_sensor_ != nullptr) this->clock_datetime_text_sensor_->publish_state(datetime);
+    } else {
+      ESP_LOGD(TAG, "Ignored invalid CAN clock payload: %02X %02X %02X %02X %02X %02X %02X %02X",
+               data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7]);
     }
     return;
   }

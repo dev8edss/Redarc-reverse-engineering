@@ -1,6 +1,6 @@
 import esphome.codegen as cg
 import esphome.config_validation as cv
-from esphome.components import select, sensor
+from esphome.components import select, sensor, text_sensor
 from esphome.const import (
     CONF_ACCURACY_DECIMALS, CONF_DEVICE_CLASS, CONF_DISABLED_BY_DEFAULT,
     CONF_ENTITY_CATEGORY, CONF_FORCE_UPDATE, CONF_ICON, CONF_ID, CONF_NAME,
@@ -10,7 +10,7 @@ from esphome.const import (
 )
 
 CODEOWNERS = ["@dev8edss"]
-AUTO_LOAD = ["select", "sensor", "redarc_common"]
+AUTO_LOAD = ["select", "sensor", "text_sensor", "redarc_common"]
 MULTI_CONF = False
 
 CONF_SOURCE_ADDRESS = "source_address"
@@ -32,6 +32,9 @@ _SC_MAP = {
     "total_increasing": _StateClass.STATE_CLASS_TOTAL_INCREASING,
 }
 
+_text_sensor_ns = cg.esphome_ns.namespace("text_sensor")
+_TextSensorClass = _text_sensor_ns.class_("TextSensor")
+
 CONFIG_SCHEMA = cv.Schema({
     cv.GenerateID(): cv.declare_id(Manager30Component),
     cv.Optional(CONF_SOURCE_ADDRESS, default=0x01): cv.hex_uint8_t,
@@ -47,6 +50,10 @@ CONFIG_SCHEMA = cv.Schema({
     cv.GenerateID("solar_energy_id"): cv.declare_id(_SensorClass),
     cv.GenerateID("ac_input_voltage_id"): cv.declare_id(_SensorClass),
     cv.GenerateID("vehicle_input_trigger_id"): cv.declare_id(_SensorClass),
+    cv.GenerateID("clock_flags_id"): cv.declare_id(_SensorClass),
+    cv.GenerateID("clock_date_id"): cv.declare_id(_TextSensorClass),
+    cv.GenerateID("clock_time_id"): cv.declare_id(_TextSensorClass),
+    cv.GenerateID("clock_datetime_id"): cv.declare_id(_TextSensorClass),
     cv.GenerateID("vehicle_input_trigger_select_id"): cv.declare_id(VehicleInputTriggerSelect),
 }).extend(cv.COMPONENT_SCHEMA)
 
@@ -81,6 +88,17 @@ async def _make_select(config_id, name, options):
         CONF_ENTITY_CATEGORY: ENTITY_CATEGORY_NONE,
     }
     return await select.new_select(cfg, options=options)
+
+
+async def _make_text_sensor(config_id, name, entity_category=None):
+    cfg = {
+        CONF_ID: config_id,
+        CONF_NAME: name,
+        CONF_DISABLED_BY_DEFAULT: False,
+        CONF_ICON: "",
+        CONF_ENTITY_CATEGORY: entity_category if entity_category is not None else ENTITY_CATEGORY_NONE,
+    }
+    return await text_sensor.new_text_sensor(cfg)
 
 
 async def to_code(config):
@@ -146,6 +164,20 @@ async def to_code(config):
                            state_class=STATE_CLASS_MEASUREMENT, decimals=0,
                            entity_category=ENTITY_CATEGORY_DIAGNOSTIC)
     cg.add(var.set_vehicle_input_trigger_sensor(s))
+
+    s = await _make_sensor(config["clock_flags_id"], f"{p} Clock Flags Raw",
+                           state_class=STATE_CLASS_MEASUREMENT, decimals=0,
+                           entity_category=ENTITY_CATEGORY_DIAGNOSTIC)
+    cg.add(var.set_clock_flags_sensor(s))
+
+    ts = await _make_text_sensor(config["clock_date_id"], f"{p} CAN Date")
+    cg.add(var.set_clock_date_text_sensor(ts))
+
+    ts = await _make_text_sensor(config["clock_time_id"], f"{p} CAN Time")
+    cg.add(var.set_clock_time_text_sensor(ts))
+
+    ts = await _make_text_sensor(config["clock_datetime_id"], f"{p} CAN Date Time")
+    cg.add(var.set_clock_datetime_text_sensor(ts))
 
     sel = await _make_select(config["vehicle_input_trigger_select_id"], f"{p} Vehicle Input Trigger",
                              ["Auto", "12V", "24V", "Ignition", "On"])
