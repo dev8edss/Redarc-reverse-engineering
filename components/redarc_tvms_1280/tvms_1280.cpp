@@ -20,6 +20,9 @@ void TVMS1280Component::setup() {
 
 void TVMS1280Component::dump_config() {
   ESP_LOGCONFIG(TAG, "TVMS1280 SA 0x%02X", this->source_address_);
+  LOG_BINARY_SENSOR("  ", "Digital Input 1", this->digital_input_sensors_[1]);
+  LOG_BINARY_SENSOR("  ", "Digital Input 2", this->digital_input_sensors_[2]);
+  LOG_BINARY_SENSOR("  ", "Digital Input 3", this->digital_input_sensors_[3]);
 }
 
 void TVMS1280Component::register_output_switch(TVMS1280Switch *sw) {
@@ -42,7 +45,9 @@ void TVMS1280Component::publish_output_(uint8_t output_number, bool state) {
 }
 
 void TVMS1280Component::publish_channel_(uint8_t channel, bool state) {
-  if (channel >= 0x04 && channel <= 0x0D) {
+  if (channel >= 0x01 && channel <= 0x03) {
+    if (this->digital_input_sensors_[channel] != nullptr) this->digital_input_sensors_[channel]->publish_state(state);
+  } else if (channel >= 0x04 && channel <= 0x0D) {
     this->publish_output_(channel - 0x04, state);
   } else if (channel == 0x0E && this->inverter_switch_ != nullptr) {
     this->inverter_switch_->publish_state(state);
@@ -75,20 +80,23 @@ void TVMS1280Component::handle_can_frame(uint32_t can_id, const std::vector<uint
   }
 
   if (redarc_common::rvc_matches(can_id, 0x1FD02UL, this->source_address_)) {
-    if (data[0] == 0x14) {
-      if (now - this->last_mux_0x14_ms_ < this->filter_interval_ms_) return;
-      this->last_mux_0x14_ms_ = now;
-      if (this->temp1_sensor_ != nullptr) this->temp1_sensor_->publish_state((float) data[1] - 100.0f);
-      if (this->voltage_input2_sensor_ != nullptr && tvms1280_valid_byte_voltage_(data[1]))
-        this->voltage_input2_sensor_->publish_state((float) data[1] / 10.0f);
-      if (this->tank_sensors_[1] != nullptr) this->tank_sensors_[1]->publish_state((float) data[3]);
-      if (this->tank_sensors_[2] != nullptr) this->tank_sensors_[2]->publish_state((float) data[5]);
-    } else if (data[0] == 0x11) {
+    if (data[0] == 0x11) {
       if (now - this->last_mux_0x11_ms_ < this->filter_interval_ms_) return;
       this->last_mux_0x11_ms_ = now;
       if (this->voltage_input1_sensor_ != nullptr && tvms1280_valid_byte_voltage_(data[1]))
         this->voltage_input1_sensor_->publish_state((float) data[1] / 10.0f);
       if (this->temp2_sensor_ != nullptr) this->temp2_sensor_->publish_state((float) data[5] - 100.0f);
+    } else if (data[0] == 0x12) {
+      if (now - this->last_mux_0x12_ms_ < this->filter_interval_ms_) return;
+      this->last_mux_0x12_ms_ = now;
+      if (this->voltage_input2_sensor_ != nullptr && tvms1280_valid_byte_voltage_(data[1]))
+        this->voltage_input2_sensor_->publish_state((float) data[1] / 10.0f);
+    } else if (data[0] == 0x14) {
+      if (now - this->last_mux_0x14_ms_ < this->filter_interval_ms_) return;
+      this->last_mux_0x14_ms_ = now;
+      if (this->temp1_sensor_ != nullptr) this->temp1_sensor_->publish_state((float) data[1] - 100.0f);
+      if (this->tank_sensors_[1] != nullptr) this->tank_sensors_[1]->publish_state((float) data[3]);
+      if (this->tank_sensors_[2] != nullptr) this->tank_sensors_[2]->publish_state((float) data[5]);
     } else if (data[0] == 0x17) {
       if (now - this->last_mux_0x17_ms_ < this->filter_interval_ms_) return;
       this->last_mux_0x17_ms_ = now;
