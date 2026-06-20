@@ -46,6 +46,8 @@ void TVMS1280Component::publish_channel_(uint8_t channel, bool state) {
     this->publish_output_(channel - 0x04, state);
   } else if (channel == 0x0E && this->inverter_switch_ != nullptr) {
     this->inverter_switch_->publish_state(state);
+  } else if (channel == 0x0F && this->master_switch_ != nullptr) {
+    this->master_switch_->publish_state(state);
   }
 }
 

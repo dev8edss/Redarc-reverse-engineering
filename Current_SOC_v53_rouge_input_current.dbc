@@ -397,10 +397,13 @@ BO_ 2399151136 TVMS1280_Command_From_Redvision1: 8 Redvision_1
  SG_ TVMS1280_Command_D2_Raw : 8|8@1+ (1,0) [0|255] "raw" Vector__XXX
  SG_ TVMS1280_Command_Channel M : 16|8@1+ (1,0) [0|255] "channel" Vector__XXX
  SG_ TVMS1280_Inverter_Command m14 : 24|1@1+ (1,0) [0|1] "bool" Vector__XXX
+ SG_ TVMS1280_Master_Command m15 : 24|1@1+ (1,0) [0|1] "bool" Vector__XXX
  SG_ TVMS1280_Command_State_Raw : 24|8@1+ (1,0) [0|255] "raw" Vector__XXX
 CM_ BO_ 2399151136 "UNCONFIRMED_PENDING_TEST: imported from inputs_outputs DBC. Original note: Raw CAN ID 0x0F002420, PGN 0x0F0024, source 0x20 Redvision_1. Logical commands from Redvision to TVMS_1280.";
 CM_ SG_ 2399151136 TVMS1280_Inverter_Command "UNCONFIRMED_PENDING_TEST: imported from inputs_outputs DBC. Original note: Confirmed inverter enable command. Frame pattern D3=0x0E, D4=0x01 ON, D4=0x00 OFF.";
+CM_ SG_ 2399151136 TVMS1280_Master_Command "UNCONFIRMED_PENDING_TEST: TVMS1280 config/label page identifies item/channel 0x0F as Master switch. ESPHome maps the master switch to the same on/off command shape as other TVMS1280 logical channels.";
 VAL_ 2399151136 TVMS1280_Inverter_Command 0 "Off" 1 "On" ;
+VAL_ 2399151136 TVMS1280_Master_Command 0 "Off" 1 "On" ;
 CM_ SG_ 2399151136 TVMS1280_Command_D1_Raw "UNCONFIRMED_PENDING_TEST: imported from inputs_outputs DBC. Signal was not present in v49 and requires validation.";
 CM_ SG_ 2399151136 TVMS1280_Command_D2_Raw "UNCONFIRMED_PENDING_TEST: imported from inputs_outputs DBC. Signal was not present in v49 and requires validation.";
 CM_ SG_ 2399151136 TVMS1280_Command_Channel "UNCONFIRMED_PENDING_TEST: imported from inputs_outputs DBC. Signal was not present in v49 and requires validation.";
@@ -410,6 +413,7 @@ BA_ "Decode_Status" SG_ 2399151136 TVMS1280_Command_D1_Raw "UNCONFIRMED_PENDING_
 BA_ "Decode_Status" SG_ 2399151136 TVMS1280_Command_D2_Raw "UNCONFIRMED_PENDING_TEST";
 BA_ "Decode_Status" SG_ 2399151136 TVMS1280_Command_Channel "UNCONFIRMED_PENDING_TEST";
 BA_ "Decode_Status" SG_ 2399151136 TVMS1280_Inverter_Command "UNCONFIRMED_PENDING_TEST";
+BA_ "Decode_Status" SG_ 2399151136 TVMS1280_Master_Command "UNCONFIRMED_PENDING_TEST";
 BA_ "Decode_Status" SG_ 2399151136 TVMS1280_Command_State_Raw "UNCONFIRMED_PENDING_TEST";
 
 BO_ 2617049136 TVMSRouge_Output_Coarse_Status: 8 TVMS_Rouge
@@ -515,6 +519,7 @@ BO_ 2399154208 TVMSRouge_Command_From_Redvision1: 8 Redvision_1
  SG_ TVMSRouge_Command_D2_Raw : 8|8@1+ (1,0) [0|255] "raw" Vector__XXX
  SG_ TVMSRouge_Command_Channel M : 24|8@1+ (1,0) [0|255] "channel" Vector__XXX
  SG_ TVMSRouge_Command_State : 32|8@1+ (1,0) [0|255] "state" Vector__XXX
+ SG_ TVMSRouge_Master_OnOffCmd m11 : 32|1@1+ (1,0) [0|1] "bool" Vector__XXX
  SG_ Rouge_Output_01_OnOffCmd m12 : 32|1@1+ (1,0) [0|1] "bool" Vector__XXX
  SG_ Rouge_Output_02_OnOffCmd m13 : 32|1@1+ (1,0) [0|1] "bool" Vector__XXX
  SG_ Rouge_Output_03_OnOffCmd m14 : 32|1@1+ (1,0) [0|1] "bool" Vector__XXX
@@ -526,11 +531,12 @@ BO_ 2399154208 TVMSRouge_Command_From_Redvision1: 8 Redvision_1
  SG_ Rouge_Output_09_OnOffCmd m20 : 32|1@1+ (1,0) [0|1] "bool" Vector__XXX
  SG_ Rouge_Output_10_OnOffCmd m21 : 32|1@1+ (1,0) [0|1] "bool" Vector__XXX
 CM_ BO_ 2399154208 "UNCONFIRMED_PENDING_TEST: imported from inputs_outputs DBC. Original note: Raw CAN ID 0x0F003020, PGN 0x0F0030, source 0x20 Redvision_1. Logical Redvision commands to Rouge outputs; not physical button mapping.";
-VAL_ 2399154208 TVMSRouge_Command_Channel 12 "Output_1" 13 "Output_2" 14 "Output_3" 15 "Output_4" 16 "Output_5" 17 "Output_6" 18 "Output_7" 19 "Output_8" 20 "Output_9" 21 "Output_10" ;
+VAL_ 2399154208 TVMSRouge_Command_Channel 11 "Master" 12 "Output_1" 13 "Output_2" 14 "Output_3" 15 "Output_4" 16 "Output_5" 17 "Output_6" 18 "Output_7" 19 "Output_8" 20 "Output_9" 21 "Output_10" ;
 CM_ SG_ 2399154208 TVMSRouge_Command_D1_Raw "UNCONFIRMED_PENDING_TEST: imported from inputs_outputs DBC. Signal was not present in v49 and requires validation.";
 CM_ SG_ 2399154208 TVMSRouge_Command_D2_Raw "UNCONFIRMED_PENDING_TEST: imported from inputs_outputs DBC. Signal was not present in v49 and requires validation.";
 CM_ SG_ 2399154208 TVMSRouge_Command_Channel "UNCONFIRMED_PENDING_TEST: imported from inputs_outputs DBC. Signal was not present in v49 and requires validation.";
 CM_ SG_ 2399154208 TVMSRouge_Command_State "UNCONFIRMED_PENDING_TEST: imported from inputs_outputs DBC. Signal was not present in v49 and requires validation.";
+CM_ SG_ 2399154208 TVMSRouge_Master_OnOffCmd "UNCONFIRMED_PENDING_TEST: TVMS Rouge config/label page identifies item/channel 0x0B as Master. ESPHome maps the master switch to the same on/off command shape as other Rouge logical channels.";
 CM_ SG_ 2399154208 Rouge_Output_01_OnOffCmd "UNCONFIRMED_PENDING_TEST: imported from inputs_outputs DBC. Signal was not present in v49 and requires validation.";
 CM_ SG_ 2399154208 Rouge_Output_02_OnOffCmd "UNCONFIRMED_PENDING_TEST: imported from inputs_outputs DBC. Signal was not present in v49 and requires validation.";
 CM_ SG_ 2399154208 Rouge_Output_03_OnOffCmd "UNCONFIRMED_PENDING_TEST: imported from inputs_outputs DBC. Signal was not present in v49 and requires validation.";
@@ -546,6 +552,7 @@ BA_ "Decode_Status" SG_ 2399154208 TVMSRouge_Command_D1_Raw "UNCONFIRMED_PENDING
 BA_ "Decode_Status" SG_ 2399154208 TVMSRouge_Command_D2_Raw "UNCONFIRMED_PENDING_TEST";
 BA_ "Decode_Status" SG_ 2399154208 TVMSRouge_Command_Channel "UNCONFIRMED_PENDING_TEST";
 BA_ "Decode_Status" SG_ 2399154208 TVMSRouge_Command_State "UNCONFIRMED_PENDING_TEST";
+BA_ "Decode_Status" SG_ 2399154208 TVMSRouge_Master_OnOffCmd "UNCONFIRMED_PENDING_TEST";
 BA_ "Decode_Status" SG_ 2399154208 Rouge_Output_01_OnOffCmd "UNCONFIRMED_PENDING_TEST";
 BA_ "Decode_Status" SG_ 2399154208 Rouge_Output_02_OnOffCmd "UNCONFIRMED_PENDING_TEST";
 BA_ "Decode_Status" SG_ 2399154208 Rouge_Output_03_OnOffCmd "UNCONFIRMED_PENDING_TEST";
@@ -758,6 +765,7 @@ CM_ "v60 update: Added confirmed Battery Sensor SOC calibration target command. 
 CM_ "v61 update: Added confirmed Battery Sensor battery type decode. Config write raw CAN ID 0x0F0008FA D1=0x11 uses D5-D6 little-endian type; status raw CAN ID 0x13F10008 D1 reports type. Mapping: 0=Gel, 1=AGM, 2=LeadAcid, 3=Calcium, 4=Lithium.";
 CM_ "v62 update: Added confirmed Manager30 vehicle input trigger decode. Config write raw CAN ID 0x0F0001FA uses D1=0x68, D3=0x03, D5-D6 little-endian trigger; status raw CAN ID 0x03F20601 reports trigger in D8. Mapping: 0=Auto, 1=12V, 2=24V, 3=Ignition, 5=On.";
 CM_ "v63 update: Added confirmed Redvision Display setting-change broadcast decode. Raw CAN ID 0x0F00FF20 from source 0x20 uses D1 as setting ID and D5-D6 little-endian value for battery type, capacity, max charge current, low SOC alarm, low voltage alarm, and vehicle input trigger.";
+CM_ "v64 update: Added unconfirmed TVMS master command entries based on config/label pages: TVMS1280 item/channel 0x0F is Master switch, TVMS Rouge item/channel 0x0B is Master. ESPHome exposes them as HA switches using the existing TVMS on/off command shape.";
 
 CM_ SG_ 2617049636 TVMS1280_Temp2_C "NOTE: TVMS1280 Voltage Input 1 candidate is currently decoded in ESPHome from 0x1BFD0224 page/mux 0x11 D2 / 10. It is expected to read near 0.0 V when the external voltage input is disconnected. This overlaps the temp/tank/status PGN and is kept as a diagnostic candidate until fully confirmed.";
 CM_ SG_ 2617049636 TVMS1280_Temp1_C "NOTE: TVMS1280 Voltage Input 2 candidate is currently decoded in ESPHome from 0x1BFD0224 page/mux 0x14 D2 / 10 and has appeared around 11.9-12.0 V in logs. This overlaps the temp/tank/status PGN and is kept as a diagnostic candidate until fully confirmed.";

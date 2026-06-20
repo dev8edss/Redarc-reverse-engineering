@@ -46,6 +46,7 @@ class TVMS1280Component : public Component {
   void setup() override;
   void register_output_switch(TVMS1280Switch *sw);
   void register_inverter_switch(TVMS1280Switch *sw) { this->inverter_switch_ = sw; }
+  void register_master_switch(TVMS1280Switch *sw) { this->master_switch_ = sw; }
   void send_channel(uint8_t channel, bool state);
   void handle_can_frame(uint32_t can_id, const std::vector<uint8_t> &data);
   void dump_config() override;
@@ -65,6 +66,7 @@ class TVMS1280Component : public Component {
   uint32_t command_id_{0};
   std::array<TVMS1280Switch *, 10> output_switches_{};
   TVMS1280Switch *inverter_switch_{nullptr};
+  TVMS1280Switch *master_switch_{nullptr};
   sensor::Sensor *temp1_sensor_{nullptr};
   sensor::Sensor *temp2_sensor_{nullptr};
   sensor::Sensor *supply_voltage_sensor_{nullptr};

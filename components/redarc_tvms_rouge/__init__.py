@@ -1,6 +1,6 @@
 import esphome.codegen as cg
 import esphome.config_validation as cv
-from esphome.components import binary_sensor, light, sensor
+from esphome.components import binary_sensor, light, sensor, switch
 from esphome.const import (
     CONF_ACCURACY_DECIMALS, CONF_DEFAULT_TRANSITION_LENGTH, CONF_DEVICE_CLASS,
     CONF_DISABLED_BY_DEFAULT, CONF_EFFECTS, CONF_ENTITY_CATEGORY,
@@ -23,8 +23,19 @@ except AttributeError:
     _light_ns = cg.esphome_ns.namespace("light")
     _RESTORE_MODE_OFF = _light_ns.enum("LightRestoreMode", is_class=True).RESTORE_AND_OFF
 
+try:
+    _SWITCH_RESTORE_MODE_OFF = (
+        switch.RESTORE_MODES.get("RESTORE_DEFAULT_OFF")
+        or switch.RESTORE_MODES.get("RESTORE_AND_OFF")
+        or switch.RESTORE_MODES.get("ALWAYS_OFF")
+        or next(iter(switch.RESTORE_MODES.values()))
+    )
+except AttributeError:
+    _switch_ns = cg.esphome_ns.namespace("switch_")
+    _SWITCH_RESTORE_MODE_OFF = _switch_ns.enum("SwitchRestoreMode", is_class=True).SWITCH_RESTORE_DEFAULT_OFF
+
 CODEOWNERS = ["@dev8edss"]
-AUTO_LOAD = ["binary_sensor", "light", "sensor", "redarc_common"]
+AUTO_LOAD = ["binary_sensor", "light", "sensor", "switch", "redarc_common"]
 MULTI_CONF = False
 
 CONF_SOURCE_ADDRESS = "source_address"
@@ -35,6 +46,7 @@ CONF_TRUE_OFF_THRESHOLD = "true_off_threshold"
 tvms_rouge_ns = cg.esphome_ns.namespace("redarc_tvms_rouge")
 TVMSRougeComponent = tvms_rouge_ns.class_("TVMSRougeComponent", cg.Component)
 TVMSRougeLight = tvms_rouge_ns.class_("TVMSRougeLight", light.LightOutput)
+TVMSRougeSwitch = tvms_rouge_ns.class_("TVMSRougeSwitch", switch.Switch)
 
 _sensor_ns = cg.esphome_ns.namespace("sensor")
 _SensorClass = _sensor_ns.class_("Sensor")
@@ -57,6 +69,7 @@ _AUTO_IDS[cv.GenerateID("tank1_id")] = cv.declare_id(_SensorClass)
 _AUTO_IDS[cv.GenerateID("tank2_id")] = cv.declare_id(_SensorClass)
 _AUTO_IDS[cv.GenerateID("input_voltage_id")] = cv.declare_id(_SensorClass)
 _AUTO_IDS[cv.GenerateID("input_current_id")] = cv.declare_id(_SensorClass)
+_AUTO_IDS[cv.GenerateID("master_id")] = cv.declare_id(TVMSRougeSwitch)
 
 CONFIG_SCHEMA = cv.Schema(
     {
@@ -140,6 +153,20 @@ async def to_code(config):
         }
         await binary_sensor.register_binary_sensor(bs, bs_cfg)
         cg.add(var.set_button_sensor(i, bs))
+
+    # Master switch (channel 0x0B)
+    master = cg.new_Pvariable(config["master_id"])
+    cg.add(master.set_parent(var))
+    master_cfg = {
+        CONF_ID: config["master_id"],
+        CONF_NAME: f"{p} Master",
+        CONF_DISABLED_BY_DEFAULT: False,
+        CONF_ICON: "",
+        CONF_ENTITY_CATEGORY: ENTITY_CATEGORY_NONE,
+        CONF_RESTORE_MODE: _SWITCH_RESTORE_MODE_OFF,
+    }
+    await switch.register_switch(master, master_cfg)
+    cg.add(var.register_master_switch(master))
 
     # Lights
     for i in range(1, 11):

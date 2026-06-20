@@ -54,6 +54,7 @@ _AUTO_IDS[cv.GenerateID("voltage_input2_id")] = cv.declare_id(_SensorClass)
 _AUTO_IDS[cv.GenerateID("last_cmd_channel_id")] = cv.declare_id(_SensorClass)
 _AUTO_IDS[cv.GenerateID("last_cmd_state_id")] = cv.declare_id(_SensorClass)
 _AUTO_IDS[cv.GenerateID("inverter_id")] = cv.declare_id(TVMS1280Switch)
+_AUTO_IDS[cv.GenerateID("master_id")] = cv.declare_id(TVMS1280Switch)
 
 CONFIG_SCHEMA = cv.Schema({
     cv.GenerateID(): cv.declare_id(TVMS1280Component),
@@ -171,3 +172,20 @@ async def to_code(config):
     }
     await switch.register_switch(inv, inv_cfg)
     cg.add(var.register_inverter_switch(inv))
+
+    # Master switch (channel 0x0F)
+    master = cg.new_Pvariable(config["master_id"])
+    cg.add(master.set_parent(var))
+    cg.add(master.set_output_number(0))
+    cg.add(master.set_channel(0x0F))
+    cg.add(master.set_is_inverter(False))
+    master_cfg = {
+        CONF_ID: config["master_id"],
+        CONF_NAME: f"{p} Master",
+        CONF_DISABLED_BY_DEFAULT: False,
+        CONF_ICON: "",
+        CONF_ENTITY_CATEGORY: ENTITY_CATEGORY_NONE,
+        CONF_RESTORE_MODE: _SWITCH_RESTORE_MODE_OFF,
+    }
+    await switch.register_switch(master, master_cfg)
+    cg.add(var.register_master_switch(master))

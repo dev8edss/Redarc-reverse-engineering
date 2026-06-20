@@ -5,6 +5,11 @@ namespace redarc_tvms_rouge {
 
 static const char *const TAG = "redarc_tvms_rouge";
 
+void TVMSRougeSwitch::write_state(bool state) {
+  if (this->parent_ != nullptr) this->parent_->send_master(state);
+  this->publish_state(state);
+}
+
 light::LightTraits TVMSRougeLight::get_traits() {
   auto traits = light::LightTraits();
   traits.set_supported_color_modes({light::ColorMode::BRIGHTNESS});
@@ -101,6 +106,7 @@ void TVMSRougeComponent::dump_config() {
   ESP_LOGCONFIG(TAG, "  Output cmd: 0x%08X  DGN: 0x1F108, 0x1FD02, 0x1FD12, 0x1FD14", this->output_command_id_);
   LOG_SENSOR("  ", "Input Voltage", this->input_voltage_sensor_);
   LOG_SENSOR("  ", "Input Current", this->input_current_sensor_);
+  LOG_SWITCH("  ", "Master", this->master_switch_);
   ESP_LOGCONFIG(TAG, "  True-off threshold: %.1f%%", this->true_off_threshold_percent_);
 }
 
@@ -133,6 +139,15 @@ void TVMSRougeComponent::send_off_(uint8_t channel) {
 void TVMSRougeComponent::send_level_(uint8_t channel, uint8_t percent) {
   if (percent > 100) percent = 100;
   this->send_frame_(this->output_command_id_, {0x5A, 0x01, 0xFF, channel, percent, 0x00, 0x00, 0x00});
+}
+
+void TVMSRougeComponent::send_master(bool state) {
+  if (state) {
+    this->send_on_(0x0B);
+  } else {
+    this->send_off_(0x0B);
+  }
+  ESP_LOGI(TAG, "Master channel 0x0B %s", state ? "ON" : "OFF");
 }
 
 void TVMSRougeComponent::turn_off(uint8_t output_number, uint8_t channel) {
@@ -207,23 +222,24 @@ void TVMSRougeComponent::handle_can_frame(uint32_t can_id, const std::vector<uin
     // Output command events are not throttled; they reflect requested state changes.
     if (data[0] == 0xCB && data[2] == 0xFF) {
       const uint8_t channel = data[3];
-      if (channel >= 0x0C && channel <= 0x15) {
-        const uint8_t output_number = channel - 0x0B;
-        const bool on = data[4] != 0;
-        if (!on) {
-          this->set_feedback_level_(output_number, 0.0f);
-        } else {
-          float current = this->level(output_number);
-          if (std::isnan(current) || current <= this->true_off_threshold_percent_) current = 100.0f;
-          this->set_feedback_level_(output_number, current);
-        }
-      }
+      this->publish_channel_(channel, data[4] != 0);
     } else if (data[0] == 0x5A && data[1] == 0x01 && data[2] == 0xFF) {
       const uint8_t channel = data[3];
       if (channel >= 0x0C && channel <= 0x15 && data[4] <= 100) {
         const uint8_t output_number = channel - 0x0B;
         this->set_feedback_level_(output_number, (float) data[4]);
       }
+    }
+    return;
+  }
+
+  if (redarc_common::rvc_matches(can_id, 0x1FD00UL, this->source_address_)) {
+    const uint8_t base_channel = data[0];
+    for (uint8_t i = 1; i < 8; i++) {
+      const uint8_t value = data[i];
+      if (value != 0x00 && value != 0x01) continue;
+      const uint8_t channel = base_channel + i - 1;
+      if (channel == 0x0B) this->publish_channel_(channel, value == 0x01);
     }
     return;
   }
@@ -237,6 +253,24 @@ void TVMSRougeComponent::handle_can_frame(uint32_t can_id, const std::vector<uin
     this->set_feedback_level_(9, (float) data[2]);
     this->set_feedback_level_(10, (float) data[3]);
   }
+}
+
+void TVMSRougeComponent::publish_channel_(uint8_t channel, bool state) {
+  if (channel == 0x0B) {
+    if (this->master_switch_ != nullptr) this->master_switch_->publish_state(state);
+    return;
+  }
+  if (channel < 0x0C || channel > 0x15) return;
+
+  const uint8_t output_number = channel - 0x0B;
+  if (!state) {
+    this->set_feedback_level_(output_number, 0.0f);
+    return;
+  }
+
+  float current = this->level(output_number);
+  if (std::isnan(current) || current <= this->true_off_threshold_percent_) current = 100.0f;
+  this->set_feedback_level_(output_number, current);
 }
 
 void TVMSRougeComponent::handle_button_status_frame_(const std::vector<uint8_t> &data) {

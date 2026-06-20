@@ -6,6 +6,7 @@
 #include "esphome/components/light/light_output.h"
 #include "esphome/components/light/light_state.h"
 #include "esphome/components/sensor/sensor.h"
+#include "esphome/components/switch/switch.h"
 #include "esphome/components/redarc_common/redarc_common.h"
 #include <array>
 #include <cmath>
@@ -15,6 +16,15 @@ namespace esphome {
 namespace redarc_tvms_rouge {
 
 class TVMSRougeComponent;
+
+class TVMSRougeSwitch : public switch_::Switch {
+ public:
+  void set_parent(TVMSRougeComponent *parent) { this->parent_ = parent; }
+  void write_state(bool state) override;
+
+ protected:
+  TVMSRougeComponent *parent_{nullptr};
+};
 
 class TVMSRougeLight : public light::LightOutput {
  public:
@@ -56,10 +66,12 @@ class TVMSRougeComponent : public Component {
   void set_true_off_threshold(float v) { this->true_off_threshold_percent_ = v; }
 
   void register_light(TVMSRougeLight *light);
+  void register_master_switch(TVMSRougeSwitch *sw) { this->master_switch_ = sw; }
 
   void handle_can_frame(uint32_t can_id, const std::vector<uint8_t> &data);
   void set_target(uint8_t output_number, uint8_t channel, float target_percent);
   void turn_off(uint8_t output_number, uint8_t channel);
+  void send_master(bool state);
 
   float level(uint8_t output_number) const;
   float true_off_threshold() const { return this->true_off_threshold_percent_; }
@@ -70,6 +82,7 @@ class TVMSRougeComponent : public Component {
   void send_off_(uint8_t channel);
   void send_level_(uint8_t channel, uint8_t percent);
 
+  void publish_channel_(uint8_t channel, bool state);
   void set_feedback_level_(uint8_t output_number, float level);
   void publish_actual_light_level_(uint8_t output_number);
   void set_button_state_(uint8_t output_number, bool active);
@@ -86,6 +99,7 @@ class TVMSRougeComponent : public Component {
 
   std::array<float, 11> levels_{};
   std::array<TVMSRougeLight *, 11> lights_{};
+  TVMSRougeSwitch *master_switch_{nullptr};
   std::array<sensor::Sensor *, 11> level_sensors_{};
   std::array<binary_sensor::BinarySensor *, 11> button_sensors_{};
   std::array<bool, 11> button_states_{};
