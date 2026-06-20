@@ -96,6 +96,15 @@ cards:
       - entity: sensor.redvision_can_bridge_manager30_ac_input_voltage
         name: AC Input Voltage
         icon: mdi:power-plug
+      - entity: sensor.redvision_can_bridge_manager30_charging_stage
+        name: Charging Stage
+        icon: mdi:battery-clock
+      - entity: select.redvision_can_bridge_manager30_charging_mode
+        name: Charging Mode
+        icon: mdi:battery-sync
+      - entity: select.redvision_can_bridge_manager30_vehicle_input_trigger
+        name: Vehicle Input Trigger
+        icon: mdi:car-electric
       - entity: sensor.redvision_can_bridge_battery_current
         name: Battery Current
         icon: mdi:current-dc
@@ -116,6 +125,29 @@ cards:
         icon: mdi:thermometer
 
   - type: entities
+    title: Battery Settings
+    show_header_toggle: false
+    entities:
+      - entity: select.redvision_can_bridge_battery_battery_type
+        name: Battery Type
+        icon: mdi:format-list-bulleted-type
+      - entity: number.redvision_can_bridge_battery_configured_capacity
+        name: Configured Capacity
+        icon: mdi:battery-plus
+      - entity: number.redvision_can_bridge_battery_max_charge_current
+        name: Max Charge Current
+        icon: mdi:current-dc
+      - entity: number.redvision_can_bridge_battery_low_soc_alarm
+        name: Low SOC Alarm
+        icon: mdi:battery-alert
+      - entity: number.redvision_can_bridge_battery_low_voltage_alarm
+        name: Low Voltage Alarm
+        icon: mdi:sine-wave
+      - entity: button.redvision_can_bridge_battery_calibrate_soc_full
+        name: Calibrate SOC Full
+        icon: mdi:battery-sync
+
+  - type: entities
     title: TVMS Voltage and Current Inputs
     show_header_toggle: false
     entities:
@@ -125,14 +157,11 @@ cards:
       - entity: sensor.redvision_can_bridge_tvms_rouge_input_current
         name: TVMS Rouge Input Current
         icon: mdi:current-dc
-      - entity: sensor.redvision_can_bridge_tvms1280_supply_voltage
-        name: TVMS1280 Supply Voltage
-        icon: mdi:sine-wave
-      - entity: sensor.redvision_can_bridge_tvms1280_voltage_input_1_candidate
-        name: TVMS1280 Voltage Input 1 Candidate
+      - entity: sensor.redvision_can_bridge_tvms1280_voltage_input_1
+        name: TVMS1280 Voltage Input 1
         icon: mdi:meter-electric-outline
-      - entity: sensor.redvision_can_bridge_tvms1280_voltage_input_2_candidate
-        name: TVMS1280 Voltage Input 2 Candidate
+      - entity: sensor.redvision_can_bridge_tvms1280_voltage_input_2
+        name: TVMS1280 Voltage Input 2
         icon: mdi:meter-electric-outline
 
   - type: history-graph
@@ -158,8 +187,10 @@ cards:
         name: Manager30 Battery
       - entity: sensor.redvision_can_bridge_tvms_rouge_input_voltage
         name: Rouge Input
-      - entity: sensor.redvision_can_bridge_tvms1280_supply_voltage
-        name: TVMS1280 Supply
+      - entity: sensor.redvision_can_bridge_tvms1280_voltage_input_1
+        name: TVMS1280 V In 1
+      - entity: sensor.redvision_can_bridge_tvms1280_voltage_input_2
+        name: TVMS1280 V In 2
       - entity: sensor.redvision_can_bridge_manager30_ac_input_voltage
         name: AC Input
 
@@ -209,6 +240,10 @@ cards:
     columns: 2
     square: false
     cards:
+      - type: entity
+        entity: switch.redvision_can_bridge_tvms_rouge_master
+        name: Rouge Master
+        icon: mdi:power
       - type: custom:mushroom-light-card
         entity: light.redvision_can_bridge_tvms_rouge_output_1
         name: Rouge Output 1
@@ -296,36 +331,34 @@ cards:
         name: Output 10 Level
 
   - type: entities
-    title: TVMS Rouge Hardware Button Activity
+    title: TVMS Rouge Input Buttons
     show_header_toggle: false
     state_color: true
     entities:
-      - entity: binary_sensor.redvision_can_bridge_tvms_rouge_output_1_button_active
-        name: Output 1 Button Active
-      - entity: binary_sensor.redvision_can_bridge_tvms_rouge_output_2_button_active
-        name: Output 2 Button Active
-      - entity: binary_sensor.redvision_can_bridge_tvms_rouge_output_3_button_active
-        name: Output 3 Button Active
-      - entity: binary_sensor.redvision_can_bridge_tvms_rouge_output_4_button_active
-        name: Output 4 Button Active
-      - entity: binary_sensor.redvision_can_bridge_tvms_rouge_output_5_button_active
-        name: Output 5 Button Active
-      - entity: binary_sensor.redvision_can_bridge_tvms_rouge_output_6_button_active
-        name: Output 6 Button Active
-      - entity: binary_sensor.redvision_can_bridge_tvms_rouge_output_7_button_active
-        name: Output 7 Button Active
-      - entity: binary_sensor.redvision_can_bridge_tvms_rouge_output_8_button_active
-        name: Output 8 Button Active
-      - entity: binary_sensor.redvision_can_bridge_tvms_rouge_output_9_button_active
-        name: Output 9 Button Active
-      - entity: binary_sensor.redvision_can_bridge_tvms_rouge_output_10_button_active
-        name: Output 10 Button Active
+      - entity: binary_sensor.redvision_can_bridge_tvms_rouge_input_button_1
+        name: Input Button 1
+      - entity: binary_sensor.redvision_can_bridge_tvms_rouge_input_button_2
+        name: Input Button 2
+      - entity: binary_sensor.redvision_can_bridge_tvms_rouge_input_button_3
+        name: Input Button 3
+      - entity: binary_sensor.redvision_can_bridge_tvms_rouge_input_button_4
+        name: Input Button 4
+      - entity: binary_sensor.redvision_can_bridge_tvms_rouge_input_button_5
+        name: Input Button 5
+      - entity: binary_sensor.redvision_can_bridge_tvms_rouge_input_button_6
+        name: Input Button 6
+      - entity: binary_sensor.redvision_can_bridge_tvms_rouge_input_button_7
+        name: Input Button 7
+      - entity: binary_sensor.redvision_can_bridge_tvms_rouge_input_button_8
+        name: Input Button 8
 
   - type: entities
     title: TVMS1280 Outputs
     show_header_toggle: false
     state_color: true
     entities:
+      - entity: switch.redvision_can_bridge_tvms1280_master
+        name: Master
       - entity: switch.redvision_can_bridge_tvms1280_output_0
         name: Output 0
       - entity: switch.redvision_can_bridge_tvms1280_output_1
@@ -348,6 +381,18 @@ cards:
         name: Output 9
       - entity: switch.redvision_can_bridge_tvms1280_inverter
         name: Inverter
+
+  - type: entities
+    title: TVMS1280 Digital Inputs
+    show_header_toggle: false
+    state_color: true
+    entities:
+      - entity: binary_sensor.redvision_can_bridge_tvms1280_digital_input_1
+        name: Digital Input 1
+      - entity: binary_sensor.redvision_can_bridge_tvms1280_digital_input_2
+        name: Digital Input 2
+      - entity: binary_sensor.redvision_can_bridge_tvms1280_digital_input_3
+        name: Digital Input 3
 
   - type: grid
     title: Water Tanks
