@@ -149,7 +149,7 @@ void TVMSRougeComponent::turn_off(uint8_t output_number, uint8_t channel) {
   if (this->last_commanded_percent_[output_number] == 0) return;
 
   this->send_off_(channel);
-  this->mark_output_commanded_(output_number, 0);
+  this->last_commanded_percent_[output_number] = 0;
   ESP_LOGI(TAG, "Output %u channel 0x%02X OFF", output_number, channel);
 }
 
@@ -163,7 +163,7 @@ void TVMSRougeComponent::set_target(uint8_t output_number, uint8_t channel, floa
 
   const uint8_t percent = (uint8_t) std::round(target_percent);
   if (this->last_commanded_percent_[output_number] == percent) return;
-  this->mark_output_commanded_(output_number, percent);
+  this->last_commanded_percent_[output_number] = percent;
 
   if (percent >= 100) {
     this->send_on_(channel);
@@ -273,17 +273,6 @@ void TVMSRougeComponent::handle_button_status_frame_(const std::vector<uint8_t> 
   }
 }
 
-void TVMSRougeComponent::mark_output_commanded_(uint8_t output_number, int16_t percent) {
-  if (output_number < 1 || output_number > 10) return;
-  this->last_commanded_percent_[output_number] = percent;
-
-  // RedVision/TVMS feedback echoes can arrive while ESPHome is still applying
-  // its transition. If accepted immediately they reset current_values and make
-  // the visible fade complete faster than the configured transition length.
-  const uint32_t ignore_ms = this->default_transition_length_ms_ > 0 ? this->default_transition_length_ms_ + 150U : 0U;
-  this->ignore_feedback_until_ms_[output_number] = millis() + ignore_ms;
-}
-
 void TVMSRougeComponent::set_button_state_(uint8_t output_number, bool active) {
   if (output_number < 1 || output_number > 8) return;
   if (this->button_state_known_[output_number] && this->button_states_[output_number] == active) return;
@@ -297,13 +286,8 @@ void TVMSRougeComponent::set_button_state_(uint8_t output_number, bool active) {
 
 void TVMSRougeComponent::set_feedback_level_(uint8_t output_number, float level) {
   if (output_number < 1 || output_number > 10) return;
-  if (this->ignore_feedback_until_ms_[output_number] != 0 &&
-      (int32_t) (millis() - this->ignore_feedback_until_ms_[output_number]) < 0) {
-    return;
-  }
   if (level < 0.0f) level = 0.0f;
   if (level > 100.0f) level = 100.0f;
-  this->last_commanded_percent_[output_number] = (int16_t) std::round(level);
   const bool changed = this->levels_[output_number] != level;
   this->levels_[output_number] = level;
   if (changed && this->level_sensors_[output_number] != nullptr)
