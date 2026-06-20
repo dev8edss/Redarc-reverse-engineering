@@ -51,6 +51,7 @@ class TVMSRougeLight : public light::LightOutput {
 class TVMSRougeComponent : public Component {
  public:
   void setup() override;
+  void loop() override;
   void dump_config() override;
 
   void set_source_address(uint8_t sa) { this->source_address_ = sa; }
@@ -70,6 +71,7 @@ class TVMSRougeComponent : public Component {
   void register_master_switch(TVMSRougeSwitch *sw) { this->master_switch_ = sw; }
 
   void handle_can_frame(uint32_t can_id, const std::vector<uint8_t> &data);
+  void start_transition(uint8_t output_number, uint8_t channel, float target_percent);
   void set_target(uint8_t output_number, uint8_t channel, float target_percent);
   void turn_off(uint8_t output_number, uint8_t channel);
   void send_master(bool state);
@@ -99,6 +101,12 @@ class TVMSRougeComponent : public Component {
   uint32_t default_transition_length_ms_{0};
 
   std::array<float, 11> levels_{};
+  std::array<bool, 11> transition_active_{};
+  std::array<uint8_t, 11> transition_channel_{};
+  std::array<float, 11> transition_start_percent_{};
+  std::array<float, 11> transition_target_percent_{};
+  std::array<uint32_t, 11> transition_start_ms_{};
+  std::array<uint32_t, 11> transition_duration_ms_{};
   std::array<int16_t, 11> last_commanded_percent_{};
   std::array<uint32_t, 11> ignore_feedback_until_ms_{};
   std::array<TVMSRougeLight *, 11> lights_{};

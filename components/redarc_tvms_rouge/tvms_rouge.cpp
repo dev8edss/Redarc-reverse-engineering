@@ -41,30 +41,14 @@ void TVMSRougeLight::publish_feedback_level(float level_percent) {
 void TVMSRougeLight::write_state(light::LightState *state) {
   if (this->parent_ == nullptr) return;
 
-  // ESPHome applies transitions by moving current_values toward remote_values and
-  // calling write_state() for each intermediate step. Use current_values here so
-  // the Rouge sees the ramp instead of jumping straight to the final target.
   const bool target_on = state->remote_values.is_on();
-  const bool binary = state->current_values.is_on();
-  const float brightness = state->current_values.get_brightness();
 
   if (!target_on) {
-    if (!binary || brightness <= 0.0f) {
-      this->parent_->turn_off(this->output_number_, this->channel_);
-      return;
-    }
-
-    float target_percent = brightness * 100.0f;
-    if (target_percent > 100.0f) target_percent = 100.0f;
-    this->parent_->set_target(this->output_number_, this->channel_, target_percent);
+    this->parent_->start_transition(this->output_number_, this->channel_, 0.0f);
     return;
   }
 
-  float target_percent = brightness * 100.0f;
-
-  // During a fade-up from OFF, ESPHome can call write_state() once at 0% before
-  // the first real ramp step. Ignore that tick so we do not send an OFF command.
-  if (target_percent <= 0.0f && state->remote_values.get_brightness() > 0.0f) return;
+  float target_percent = state->remote_values.get_brightness() * 100.0f;
 
   // A plain HA turn_on can arrive as ON with brightness still at 0 because our
   // feedback publisher correctly reported the real Rouge output as OFF/0%. Do
@@ -82,17 +66,42 @@ void TVMSRougeLight::write_state(light::LightState *state) {
   if (target_percent > 100.0f) target_percent = 100.0f;
   if (target_percent < this->parent_->true_off_threshold()) target_percent = this->parent_->true_off_threshold();
 
-  this->parent_->set_target(this->output_number_, this->channel_, target_percent);
+  this->parent_->start_transition(this->output_number_, this->channel_, target_percent);
 }
 
 void TVMSRougeComponent::setup() {
   for (auto &level : this->levels_) level = NAN;
+  for (auto &target : this->transition_target_percent_) target = NAN;
   for (auto &percent : this->last_commanded_percent_) percent = -1;
   const uint8_t sa = this->source_address_;
   const uint8_t ha = this->host_address_;
   this->output_command_id_ = 0x0F000000UL | ((uint32_t) sa << 8) | ha;
   redarc_common::RedarcCanDispatcher::instance().add_listener(
       [this](uint32_t id, const std::vector<uint8_t> &data) { this->handle_can_frame(id, data); });
+}
+
+void TVMSRougeComponent::loop() {
+  const uint32_t now = millis();
+
+  for (uint8_t output = 1; output <= 10; output++) {
+    if (!this->transition_active_[output]) continue;
+
+    const uint32_t elapsed = now - this->transition_start_ms_[output];
+    const uint32_t duration = this->transition_duration_ms_[output];
+    const bool finished = duration == 0 || elapsed >= duration;
+    const float progress = finished ? 1.0f : (float) elapsed / (float) duration;
+    const float level = this->transition_start_percent_[output] +
+                        (this->transition_target_percent_[output] - this->transition_start_percent_[output]) * progress;
+
+    this->set_target(output, this->transition_channel_[output], level);
+
+    if (finished) {
+      this->transition_active_[output] = false;
+      if (this->transition_target_percent_[output] <= this->true_off_threshold_percent_) {
+        this->turn_off(output, this->transition_channel_[output]);
+      }
+    }
+  }
 }
 
 void TVMSRougeComponent::dump_config() {
@@ -172,6 +181,53 @@ void TVMSRougeComponent::set_target(uint8_t output_number, uint8_t channel, floa
     this->send_level_(channel, percent);
     ESP_LOGI(TAG, "Output %u channel 0x%02X level %u%%", output_number, channel, percent);
   }
+}
+
+void TVMSRougeComponent::start_transition(uint8_t output_number, uint8_t channel, float target_percent) {
+  if (output_number < 1 || output_number > 10) return;
+  if (target_percent > 100.0f) target_percent = 100.0f;
+  if (target_percent < 0.0f) target_percent = 0.0f;
+
+  if (this->transition_active_[output_number] &&
+      this->transition_channel_[output_number] == channel &&
+      this->transition_target_percent_[output_number] == target_percent) {
+    return;
+  }
+
+  const int16_t rounded_target = (int16_t) std::round(target_percent);
+  if (!this->transition_active_[output_number] && this->last_commanded_percent_[output_number] == rounded_target) return;
+
+  if (this->default_transition_length_ms_ == 0) {
+    if (target_percent <= this->true_off_threshold_percent_) {
+      this->turn_off(output_number, channel);
+    } else {
+      this->set_target(output_number, channel, target_percent);
+    }
+    return;
+  }
+
+  float start_percent = NAN;
+  if (this->transition_active_[output_number] && this->last_commanded_percent_[output_number] >= 0) {
+    start_percent = (float) this->last_commanded_percent_[output_number];
+  } else {
+    start_percent = this->levels_[output_number];
+  }
+  if (std::isnan(start_percent)) {
+    start_percent = this->last_commanded_percent_[output_number] >= 0 ? (float) this->last_commanded_percent_[output_number] : 0.0f;
+  }
+  if (start_percent < 0.0f) start_percent = 0.0f;
+  if (start_percent > 100.0f) start_percent = 100.0f;
+
+  this->transition_active_[output_number] = true;
+  this->transition_channel_[output_number] = channel;
+  this->transition_start_percent_[output_number] = start_percent;
+  this->transition_target_percent_[output_number] = target_percent;
+  this->transition_start_ms_[output_number] = millis();
+  this->transition_duration_ms_[output_number] = this->default_transition_length_ms_;
+  this->mark_output_commanded_(output_number, this->last_commanded_percent_[output_number]);
+
+  ESP_LOGD(TAG, "Output %u channel 0x%02X transition %.0f%% -> %.0f%% over %ums",
+           output_number, channel, start_percent, target_percent, this->default_transition_length_ms_);
 }
 
 void TVMSRougeComponent::handle_can_frame(uint32_t can_id, const std::vector<uint8_t> &data) {
