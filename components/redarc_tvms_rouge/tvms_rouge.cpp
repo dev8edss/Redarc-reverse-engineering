@@ -38,33 +38,39 @@ void TVMSRougeLight::publish_feedback_level(float level_percent) {
   this->state_->publish_state();
 }
 
+void TVMSRougeLight::publish_target_level(float level_percent) {
+  if (this->state_ == nullptr) return;
+
+  if (level_percent < 0.0f) level_percent = 0.0f;
+  if (level_percent > 100.0f) level_percent = 100.0f;
+
+  const bool on = level_percent > 0.5f;
+  const float brightness = on ? level_percent / 100.0f : 0.0f;
+
+  // This is the HA-requested target. The Rouge now supports an absolute level
+  // command, so feedback should reconcile quickly after the CAN frame is sent.
+  this->state_->current_values.set_state(on);
+  this->state_->current_values.set_brightness(brightness);
+  this->state_->remote_values.set_state(on);
+  this->state_->remote_values.set_brightness(brightness);
+  this->state_->publish_state();
+}
+
 void TVMSRougeLight::write_state(light::LightState *state) {
   if (this->parent_ == nullptr) return;
 
-  // ESPHome applies transitions by moving current_values toward remote_values and
-  // calling write_state() for each intermediate step. Use current_values here so
-  // the Rouge sees the ramp instead of jumping straight to the final target.
-  const bool target_on = state->remote_values.is_on();
-  const bool binary = state->current_values.is_on();
-  const float brightness = state->current_values.get_brightness();
+  // Use the requested frontend target, not current_values. current_values may still
+  // contain the previous OFF feedback when HA sends a plain turn_on command.
+  bool binary = state->remote_values.is_on();
+  float brightness = state->remote_values.get_brightness();
 
-  if (!target_on) {
-    if (!binary || brightness <= 0.0f) {
-      this->parent_->turn_off(this->output_number_, this->channel_);
-      return;
-    }
-
-    float target_percent = brightness * 100.0f;
-    if (target_percent > 100.0f) target_percent = 100.0f;
-    this->parent_->set_target(this->output_number_, this->channel_, target_percent);
+  if (!binary) {
+    this->publish_target_level(0.0f);
+    this->parent_->turn_off(this->output_number_, this->channel_);
     return;
   }
 
   float target_percent = brightness * 100.0f;
-
-  // During a fade-up from OFF, ESPHome can call write_state() once at 0% before
-  // the first real ramp step. Ignore that tick so we do not send an OFF command.
-  if (target_percent <= 0.0f && state->remote_values.get_brightness() > 0.0f) return;
 
   // A plain HA turn_on can arrive as ON with brightness still at 0 because our
   // feedback publisher correctly reported the real Rouge output as OFF/0%. Do
@@ -82,12 +88,12 @@ void TVMSRougeLight::write_state(light::LightState *state) {
   if (target_percent > 100.0f) target_percent = 100.0f;
   if (target_percent < this->parent_->true_off_threshold()) target_percent = this->parent_->true_off_threshold();
 
+  this->publish_target_level(target_percent);
   this->parent_->set_target(this->output_number_, this->channel_, target_percent);
 }
 
 void TVMSRougeComponent::setup() {
   for (auto &level : this->levels_) level = NAN;
-  for (auto &percent : this->last_commanded_percent_) percent = -1;
   const uint8_t sa = this->source_address_;
   const uint8_t ha = this->host_address_;
   this->output_command_id_ = 0x0F000000UL | ((uint32_t) sa << 8) | ha;
@@ -146,10 +152,8 @@ void TVMSRougeComponent::send_master(bool state) {
 
 void TVMSRougeComponent::turn_off(uint8_t output_number, uint8_t channel) {
   if (output_number < 1 || output_number > 10) return;
-  if (this->last_commanded_percent_[output_number] == 0) return;
 
   this->send_off_(channel);
-  this->last_commanded_percent_[output_number] = 0;
   ESP_LOGI(TAG, "Output %u channel 0x%02X OFF", output_number, channel);
 }
 
@@ -162,9 +166,6 @@ void TVMSRougeComponent::set_target(uint8_t output_number, uint8_t channel, floa
   if (target_percent > 100.0f) target_percent = 100.0f;
 
   const uint8_t percent = (uint8_t) std::round(target_percent);
-  if (this->last_commanded_percent_[output_number] == percent) return;
-  this->last_commanded_percent_[output_number] = percent;
-
   if (percent >= 100) {
     this->send_on_(channel);
     ESP_LOGI(TAG, "Output %u channel 0x%02X ON", output_number, channel);
