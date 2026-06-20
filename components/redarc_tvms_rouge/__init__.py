@@ -114,6 +114,7 @@ async def to_code(config):
     cg.add(var.set_host_address(config[CONF_HOST_ADDRESS]))
     cg.add(var.set_filter_interval_ms(config[CONF_FILTER_INTERVAL]))
     cg.add(var.set_true_off_threshold(config[CONF_TRUE_OFF_THRESHOLD]))
+    cg.add(var.set_default_transition_length_ms(config[CONF_DEFAULT_TRANSITION_LENGTH]))
 
     p = config[CONF_ID].id.replace("_", " ")
 

@@ -56,6 +56,7 @@ class TVMSRougeComponent : public Component {
   void set_source_address(uint8_t sa) { this->source_address_ = sa; }
   void set_host_address(uint8_t ha) { this->host_address_ = ha; }
   void set_filter_interval_ms(uint32_t ms) { this->filter_interval_ms_ = ms; }
+  void set_default_transition_length_ms(uint32_t ms) { this->default_transition_length_ms_ = ms; }
   void set_tank1_sensor(sensor::Sensor *s) { this->tank1_sensor_ = s; }
   void set_tank2_sensor(sensor::Sensor *s) { this->tank2_sensor_ = s; }
   void set_input_voltage_sensor(sensor::Sensor *s) { this->input_voltage_sensor_ = s; }
@@ -81,6 +82,7 @@ class TVMSRougeComponent : public Component {
   void send_on_(uint8_t channel);
   void send_off_(uint8_t channel);
   void send_level_(uint8_t channel, uint8_t percent);
+  void mark_output_commanded_(uint8_t output_number, int16_t percent);
 
   void publish_channel_(uint8_t channel, bool state);
   void set_feedback_level_(uint8_t output_number, float level);
@@ -94,9 +96,11 @@ class TVMSRougeComponent : public Component {
   uint32_t last_tank_ms_{0};
   uint32_t last_input_current_ms_{0};
   uint32_t output_command_id_{0};
+  uint32_t default_transition_length_ms_{0};
 
   std::array<float, 11> levels_{};
   std::array<int16_t, 11> last_commanded_percent_{};
+  std::array<uint32_t, 11> ignore_feedback_until_ms_{};
   std::array<TVMSRougeLight *, 11> lights_{};
   TVMSRougeSwitch *master_switch_{nullptr};
   std::array<sensor::Sensor *, 11> level_sensors_{};
