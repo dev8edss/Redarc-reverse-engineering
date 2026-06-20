@@ -127,12 +127,14 @@ BO_ 2617049648 PGN_1BFD02_TVMSRouge_WaterTankLevels: 8 TVMS_Rouge
  SG_ WaterTank_MUX M : 0|8@1+ (1,0) [0|255] "" Vector__XXX
  SG_ WaterTank1_Percent m9 : 8|8@1+ (1,0) [0|100] "%" Vector__XXX
  SG_ WaterTank2_Percent m9 : 16|8@1+ (1,0) [0|100] "%" Vector__XXX
+ SG_ TVMSRouge_Input_Voltage m22 : 8|16@1+ (0.001,0) [0|65.535] "V" Vector__XXX
  SG_ TVMSRouge_Input_Current_A_Candidate m22 : 16|8@1+ (0.1,0) [0|25.5] "A" Vector__XXX
 
 CM_ BO_ 2617049648 "Confirmed TVMS_Rouge water tank levels. Raw CAN ID 0x1BFD0230, PGN 0xFD02, source address 0x30.";
-CM_ SG_ 2617049648 WaterTank_MUX "D1 message type/mux. 0x09 = water tank levels.";
+CM_ SG_ 2617049648 WaterTank_MUX "D1 message type/mux. 0x09 = water tank levels. 0x16 = live input voltage and current.";
 CM_ SG_ 2617049648 WaterTank1_Percent "D2 = Tank 1 level percent. 0x00 = 0%, 0x64 = 100%. Scale: raw percent.";
 CM_ SG_ 2617049648 WaterTank2_Percent "D3 = Tank 2 level percent. 0x00 = 0%, 0x64 = 100%. Scale: raw percent.";
+CM_ SG_ 2617049648 TVMSRouge_Input_Voltage "CONFIRMED_CORRECT_DO_NOT_EDIT: MUX 0x16, D2-D3 little-endian uint16 millivolts. Live input voltage. ESPHome: data[1]|(data[2]<<8) / 1000.0.";
 CM_ SG_ 2617049648 TVMSRouge_Input_Current_A_Candidate "CANDIDATE: Label pages identify item 0x17 as Input Current. In 0x1BFD0230 with D1/base=0x16, D3 maps to item 0x17. Observed payloads include 16 C2 2F FF FF FF FF FF, 16 C1 2F FF FF FF FF FF, 16 BC 2F FF FF FF FF FF, so D3=0x2F likely means 4.7 A using /10 A. Needs controlled current-change confirmation before marking confirmed.";
 VAL_ 2617049648 WaterTank_MUX 9 "WaterTankLevels" 22 "InputVoltageCurrentCandidates";
 
@@ -253,6 +255,7 @@ BA_ "Decode_Status" BO_ 2617049648 "CONFIRMED_CORRECT_DO_NOT_EDIT";
 BA_ "Decode_Status" SG_ 2617049648 WaterTank_MUX "CONFIRMED_CORRECT_DO_NOT_EDIT";
 BA_ "Decode_Status" SG_ 2617049648 WaterTank1_Percent "CONFIRMED_CORRECT_DO_NOT_EDIT";
 BA_ "Decode_Status" SG_ 2617049648 WaterTank2_Percent "CONFIRMED_CORRECT_DO_NOT_EDIT";
+BA_ "Decode_Status" SG_ 2617049648 TVMSRouge_Input_Voltage "CONFIRMED_CORRECT_DO_NOT_EDIT";
 BA_ "Decode_Status" SG_ 2617049648 TVMSRouge_Input_Current_A_Candidate "UNCONFIRMED_PENDING_TEST";
 BA_ "Decode_Status" BO_ 2617049636 "CONFIRMED_CORRECT_DO_NOT_EDIT";
 BA_ "Decode_Status" SG_ 2617049636 TVMS1280_Status_MUX "CONFIRMED_CORRECT_DO_NOT_EDIT";
@@ -698,9 +701,9 @@ BO_ 2482047024 PGN_13F108_TVMSRouge_InputStatus: 8 TVMS_Rouge
  SG_ TVMSRouge_Input_Status_D7 : 48|8@1+ (1,0) [0|255] "raw" Vector__XXX
  SG_ TVMSRouge_Input_Status_D8 : 56|8@1+ (1,0) [0|255] "raw" Vector__XXX
 CM_ BO_ 2482047024 "CONFIRMED_CORRECT_DO_NOT_EDIT: TVMS Rouge input/status frame. Raw CAN ID 0x13F10830, PGN 0x13F108, SA 0x30.";
-CM_ SG_ 2482047024 TVMSRouge_Input_Voltage "CONFIRMED_CORRECT_DO_NOT_EDIT: D1-D2 little-endian, scale 0.01 V/count. Example F0 04 = 12.64 V; EC 04 = 12.60 V.";
+CM_ SG_ 2482047024 TVMSRouge_Input_Voltage "SUPERSEDED: Static frame — payload is fixed and does not track live voltage. Live voltage is in 0x1BFD0230 MUX 0x16 D2-D3 LE uint16 millivolts. D1-D2 little-endian, scale 0.01 V/count. Example F0 04 = 12.64 V; EC 04 = 12.60 V.";
 BA_ "Decode_Status" BO_ 2482047024 "CONFIRMED_CORRECT_DO_NOT_EDIT";
-BA_ "Decode_Status" SG_ 2482047024 TVMSRouge_Input_Voltage "CONFIRMED_CORRECT_DO_NOT_EDIT";
+BA_ "Decode_Status" SG_ 2482047024 TVMSRouge_Input_Voltage "SUPERSEDED";
 BA_ "Decode_Status" SG_ 2482047024 TVMSRouge_Input_Status_D3 "UNCONFIRMED_PENDING_TEST";
 BA_ "Decode_Status" SG_ 2482047024 TVMSRouge_Input_Status_D4 "UNCONFIRMED_PENDING_TEST";
 BA_ "Decode_Status" SG_ 2482047024 TVMSRouge_Input_Status_D5 "UNCONFIRMED_PENDING_TEST";

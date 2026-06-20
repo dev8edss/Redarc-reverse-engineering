@@ -189,11 +189,12 @@ void TVMSRougeComponent::handle_can_frame(uint32_t can_id, const std::vector<uin
         if (this->tank2_sensor_ != nullptr) this->tank2_sensor_->publish_state((float) data[2]);
       }
     } else if (data[0] == 0x16) {
-      // Label pages identify item 0x16 as Input Voltage and item 0x17 as
-      // Input Current. In the grouped 0x1BFD0230 status frame, D1 is the base
-      // item, so D3 carries item 0x17. Observed D3=0x2F => 4.7 A.
       if (now - this->last_input_current_ms_ >= this->filter_interval_ms_) {
         this->last_input_current_ms_ = now;
+        if (this->input_voltage_sensor_ != nullptr) {
+          const uint16_t raw_mv = (uint16_t) data[1] | ((uint16_t) data[2] << 8);
+          this->input_voltage_sensor_->publish_state((float) raw_mv / 1000.0f);
+        }
         if (this->input_current_sensor_ != nullptr && data[2] != 0xFF) {
           const float current = data[2] / 10.0f;
           if (current >= 0.0f && current <= 25.5f)
@@ -210,13 +211,6 @@ void TVMSRougeComponent::handle_can_frame(uint32_t can_id, const std::vector<uin
     return;
   }
 
-  if (redarc_common::rvc_matches(can_id, 0x1F108UL, this->source_address_)) {
-    if (now - this->last_input_status_ms_ >= this->filter_interval_ms_) {
-      this->last_input_status_ms_ = now;
-      this->handle_input_status_frame_(data);
-    }
-    return;
-  }
 
   if (can_id == this->output_command_id_) {
     // Output command events are not throttled; they reflect requested state changes.
@@ -289,18 +283,6 @@ void TVMSRougeComponent::handle_button_status_frame_(const std::vector<uint8_t> 
   }
 }
 
-void TVMSRougeComponent::handle_input_status_frame_(const std::vector<uint8_t> &data) {
-  if (data.size() < 2) return;
-  if (this->input_voltage_sensor_ == nullptr) return;
-
-  const uint16_t raw = (uint16_t) data[0] | ((uint16_t) data[1] << 8);
-  if (raw == 0x0000 || raw == 0xFFFF) return;
-
-  const float voltage = raw / 100.0f;
-  if (voltage < 0.0f || voltage > 60.0f) return;
-
-  this->input_voltage_sensor_->publish_state(voltage);
-}
 
 void TVMSRougeComponent::set_button_state_(uint8_t output_number, bool active) {
   if (output_number < 1 || output_number > 10) return;
