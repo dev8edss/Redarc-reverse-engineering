@@ -26,6 +26,7 @@ _SC_MAP = {
     "measurement": _StateClass.STATE_CLASS_MEASUREMENT,
     "total_increasing": _StateClass.STATE_CLASS_TOTAL_INCREASING,
 }
+_shared_current_sensors = {}
 
 CONFIG_SCHEMA = cv.Schema({
     cv.GenerateID(): cv.declare_id(RedvisionDisplayComponent),
@@ -67,34 +68,40 @@ async def to_code(config):
     cg.add(var.set_source_address(config[CONF_SOURCE_ADDRESS]))
     cg.add(var.set_filter_interval_ms(config[CONF_FILTER_INTERVAL]))
 
-    p = config[CONF_ID].id.replace("_", " ")
+    if not _shared_current_sensors:
+        s = await _make_sensor(config["batt_current_id"], "Redvision Battery Current Display",
+                               unit="A", device_class="current",
+                               state_class=STATE_CLASS_MEASUREMENT, decimals=1)
+        _shared_current_sensors["batt_current"] = s
 
-    s = await _make_sensor(config["batt_current_id"], f"{p} Battery Current Display",
-                           unit="A", device_class="current",
-                           state_class=STATE_CLASS_MEASUREMENT, decimals=1)
-    cg.add(var.set_battery_current_display_sensor(s))
+        s = await _make_sensor(config["device_current_id"], "Redvision Device Current Display",
+                               unit="A", device_class="current",
+                               state_class=STATE_CLASS_MEASUREMENT, decimals=1)
+        _shared_current_sensors["device_current"] = s
 
-    s = await _make_sensor(config["device_current_id"], f"{p} Device Current Display",
-                           unit="A", device_class="current",
-                           state_class=STATE_CLASS_MEASUREMENT, decimals=1)
-    cg.add(var.set_device_current_display_sensor(s))
+        s = await _make_sensor(config["batt_current_raw_id"], "Redvision Battery Current Display Raw",
+                               state_class=STATE_CLASS_MEASUREMENT, decimals=0,
+                               entity_category=ENTITY_CATEGORY_DIAGNOSTIC)
+        _shared_current_sensors["batt_current_raw"] = s
 
-    s = await _make_sensor(config["batt_current_raw_id"], f"{p} Battery Current Display Raw",
-                           state_class=STATE_CLASS_MEASUREMENT, decimals=0,
-                           entity_category=ENTITY_CATEGORY_DIAGNOSTIC)
-    cg.add(var.set_battery_current_display_raw_sensor(s))
+        s = await _make_sensor(config["device_current_raw_id"], "Redvision Device Current Display Raw",
+                               state_class=STATE_CLASS_MEASUREMENT, decimals=0,
+                               entity_category=ENTITY_CATEGORY_DIAGNOSTIC)
+        _shared_current_sensors["device_current_raw"] = s
 
-    s = await _make_sensor(config["device_current_raw_id"], f"{p} Device Current Display Raw",
-                           state_class=STATE_CLASS_MEASUREMENT, decimals=0,
-                           entity_category=ENTITY_CATEGORY_DIAGNOSTIC)
-    cg.add(var.set_device_current_display_raw_sensor(s))
+        s = await _make_sensor(config["mgr_output_current_id"], "Redvision Manager Output Current Display",
+                               unit="A", device_class="current",
+                               state_class=STATE_CLASS_MEASUREMENT, decimals=1)
+        _shared_current_sensors["mgr_output_current"] = s
 
-    s = await _make_sensor(config["mgr_output_current_id"], f"{p} Manager Output Current Display",
-                           unit="A", device_class="current",
-                           state_class=STATE_CLASS_MEASUREMENT, decimals=1)
-    cg.add(var.set_manager_output_current_display_sensor(s))
+        s = await _make_sensor(config["mgr_output_current_raw_id"], "Redvision Manager Output Current Display Raw",
+                               state_class=STATE_CLASS_MEASUREMENT, decimals=0,
+                               entity_category=ENTITY_CATEGORY_DIAGNOSTIC)
+        _shared_current_sensors["mgr_output_current_raw"] = s
 
-    s = await _make_sensor(config["mgr_output_current_raw_id"], f"{p} Manager Output Current Display Raw",
-                           state_class=STATE_CLASS_MEASUREMENT, decimals=0,
-                           entity_category=ENTITY_CATEGORY_DIAGNOSTIC)
-    cg.add(var.set_manager_output_current_display_raw_sensor(s))
+    cg.add(var.set_battery_current_display_sensor(_shared_current_sensors["batt_current"]))
+    cg.add(var.set_device_current_display_sensor(_shared_current_sensors["device_current"]))
+    cg.add(var.set_battery_current_display_raw_sensor(_shared_current_sensors["batt_current_raw"]))
+    cg.add(var.set_device_current_display_raw_sensor(_shared_current_sensors["device_current_raw"]))
+    cg.add(var.set_manager_output_current_display_sensor(_shared_current_sensors["mgr_output_current"]))
+    cg.add(var.set_manager_output_current_display_raw_sensor(_shared_current_sensors["mgr_output_current_raw"]))
