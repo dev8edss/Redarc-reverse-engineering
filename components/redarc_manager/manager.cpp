@@ -13,6 +13,12 @@ void VehicleInputTriggerSelect::control(size_t index) {
   this->publish_state(index);
 }
 
+void ChargingModeSelect::control(size_t index) {
+  if (this->parent_ == nullptr || index >= 2) return;
+  this->parent_->send_charging_mode((uint8_t) index);
+  this->publish_state(index);
+}
+
 void Manager30Component::setup() {
   redarc_common::RedarcCanDispatcher::instance().add_listener(
       [this](uint32_t id, const std::vector<uint8_t> &data) { this->handle_can_frame(id, data); });
@@ -25,7 +31,9 @@ void Manager30Component::dump_config() {
   LOG_TEXT_SENSOR("  ", "CAN Date", this->clock_date_text_sensor_);
   LOG_TEXT_SENSOR("  ", "CAN Time", this->clock_time_text_sensor_);
   LOG_TEXT_SENSOR("  ", "CAN Date Time", this->clock_datetime_text_sensor_);
+  LOG_TEXT_SENSOR("  ", "Charging Stage", this->charging_stage_text_sensor_);
   LOG_SELECT("  ", "Vehicle Input Trigger", this->vehicle_input_trigger_select_);
+  LOG_SELECT("  ", "Charging Mode", this->charging_mode_select_);
 }
 
 void Manager30Component::send_vehicle_input_trigger(uint16_t raw_value) {
@@ -37,6 +45,15 @@ void Manager30Component::send_vehicle_input_trigger(uint16_t raw_value) {
       0x00, 0x00};
   bus->send_data(0x0F00FF20UL, true, data);
   ESP_LOGD(TAG, "Sent vehicle input trigger %u", raw_value);
+}
+
+void Manager30Component::send_charging_mode(uint8_t mode) {
+  if (mode > 1) return;
+  auto *bus = redarc_common::RedarcCanDispatcher::instance().canbus();
+  if (bus == nullptr) return;
+  const std::vector<uint8_t> data = {0x43, 0x00, 0xFF, 0xFF, mode, 0x00, 0x00, 0x00};
+  bus->send_data(0x0F00FF20UL, true, data);
+  ESP_LOGD(TAG, "Sent charging mode %s", mode == 0 ? "Touring" : "Storage");
 }
 
 void Manager30Component::handle_can_frame(uint32_t can_id, const std::vector<uint8_t> &data) {
@@ -62,6 +79,27 @@ void Manager30Component::handle_can_frame(uint32_t can_id, const std::vector<uin
       if (raw <= 3) this->vehicle_input_trigger_select_->publish_state((size_t) raw);
       else if (raw == 5) this->vehicle_input_trigger_select_->publish_state((size_t) 4);
     }
+    return;
+  }
+
+  if (can_id == 0x0F00FF20UL && data[0] == 0x43 && data[1] == 0x00 && data[2] == 0xFF && data[3] == 0xFF) {
+    this->publish_charging_mode_(data[4] & 0x01U);
+    return;
+  }
+
+  if (redarc_common::rvc_matches(can_id, 0x1F108UL, this->source_address_)) {
+    if (now - this->last_manager_status_ms_ < this->filter_interval_ms_) return;
+    this->last_manager_status_ms_ = now;
+    this->charging_mode_status_seen_ = true;
+    this->publish_charging_mode_(data[0] & 0x01U);
+    return;
+  }
+
+  if (redarc_common::rvc_matches(can_id, 0x1F200UL, this->source_address_)) {
+    if (now - this->last_charging_stage_ms_ < this->filter_interval_ms_) return;
+    this->last_charging_stage_ms_ = now;
+    this->publish_charging_stage_(data[0]);
+    if (!this->charging_mode_status_seen_) this->publish_charging_mode_(data[0] & 0x01U);
     return;
   }
 
@@ -159,6 +197,41 @@ void Manager30Component::handle_can_frame(uint32_t can_id, const std::vector<uin
       this->ac_input_voltage_sensor_->publish_state((float) redarc_common::u16_le(data, 4));
     }
     return;
+  }
+}
+
+void Manager30Component::publish_charging_mode_(uint8_t mode) {
+  if (mode > 1) return;
+  if (this->charging_mode_select_ != nullptr) this->charging_mode_select_->publish_state((size_t) mode);
+}
+
+void Manager30Component::publish_charging_stage_(uint8_t stage) {
+  if (this->charging_stage_text_sensor_ == nullptr) return;
+
+  const char *name = nullptr;
+  switch (stage) {
+    case 0x21:
+      name = "Soft-start";
+      break;
+    case 0x30:
+      name = "Boost";
+      break;
+    case 0x40:
+      name = "Absorption";
+      break;
+    case 0x70:
+      name = "Float";
+      break;
+    default:
+      break;
+  }
+
+  if (name != nullptr) {
+    this->charging_stage_text_sensor_->publish_state(name);
+  } else {
+    char unknown[13];
+    std::snprintf(unknown, sizeof(unknown), "Unknown 0x%02X", stage);
+    this->charging_stage_text_sensor_->publish_state(unknown);
   }
 }
 

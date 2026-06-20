@@ -197,6 +197,10 @@ Component behaviour:
 | Manager30 `0x01` | `0x03F20801` | `0x03F208` | — | `Solar_Input_Voltage` | D5-D6 | raw × 0.001 V | WORKING IN ESPHOME |
 | Manager30 `0x01` | `0x03F20801` | `0x03F208` | — | `Solar_Input_Power_W` | derived | current × voltage | DERIVED IN ESPHOME/HA |
 | Manager30 `0x01` | `0x03FCD601` | `0x03FCD6` | D1=`0x00` | `Solar_Energy_Wh` | D2-D5 | uint32 little-endian Wh | CONFIRMED FROM 14→19 Wh CAPTURE |
+| Manager30 `0x01` | `0x03F10801` | `0x03F108` | — | `Charging_Mode_Status` | D1 bit0 | `0=Touring`, `1=Storage` | CONFIRMED CORRECT DO NOT EDIT |
+| Manager30 `0x01` | `0x03F20001` | `0x03F200` | — | `Charging_Stage` | D1 | `0x21=Soft-start`, `0x30=Boost`, `0x40=Absorption`, `0x70=Float` | CONFIRMED CORRECT DO NOT EDIT |
+| RedVision 1 `0x20` | `0x0F00FF20` | `0x0F00FF` | D1=`0x43` | `Manager30_Charging_Mode_Command` | D5 | `0x00=Touring`, `0x01=Storage` | CONFIRMED COMMAND PATTERN |
+| RedVision 1 `0x20` | `0x0F00FF20` | `0x0F00FF` | D1=`0x4D` | `Manager30_Charge_Cycle_Request_Candidate` | D5 | `0x01` likely request boost / restart charge cycle | PARTLY CONFIRMED |
 | Battery Sensor `0x08` | `0x13F10208` | `0x13F102` | — | `Battery_Current_A` | D1-D4 | raw / 1000 - 1000 | CONFIRMED CORRECT DO NOT EDIT |
 | Battery Sensor `0x08` | `0x13F10208` | `0x13F102` | — | `Battery_Voltage` | D5-D6 | raw × 0.001 V | CONFIRMED CORRECT DO NOT EDIT |
 | Battery Sensor `0x08` | `0x13F10208` | `0x13F102` | — | `Battery_Temperature` | D7 | raw - 60 | CONFIRMED CORRECT DO NOT EDIT |
@@ -207,8 +211,8 @@ Component behaviour:
 | TVMS Rouge `0x30` | `0x1BFD0230` | `0x1BFD02` | D1=`0x09` | `WaterTank1_Percent` | D2 | raw % | CONFIRMED CORRECT DO NOT EDIT |
 | TVMS Rouge `0x30` | `0x1BFD0230` | `0x1BFD02` | D1=`0x09` | `WaterTank2_Percent` | D3 | raw % | CONFIRMED CORRECT DO NOT EDIT |
 | TVMS Rouge `0x30` | `0x1BFD1230` | `0x1BFD12` | D1 base | `Output_Level_BasePlus0..6` | D2-D8 | raw % | CONFIRMED CORRECT DO NOT EDIT |
-| TVMS Rouge `0x30` | `0x1BFD1430` | `0x1BFD14` | D1 base | `ButtonActivity_BasePlus0..6` | D2-D8 | `0x02=active`, `0x00=inactive`, ignore others | CONFIRMED CORRECT DO NOT EDIT |
-| TVMS Rouge `0x30` | `0x1BFD0030` | `0x1BFD00` | D1 base | `CoarseStatus_BasePlus0..6` | D2-D8 | `0x00=off`, `0x01=on`, `0xF8/0xFF/special=ignore` | PARTLY CONFIRMED |
+| TVMS Rouge `0x30` | `0x1BFD0030` | `0x1BFD00` | D1 base | `Input_Button_1_to_8` | D2-D8 | `0x00=inactive`, `0x01=active`; D1=`0x01` covers 1-7, D1=`0x08` D2 covers 8 | CONFIRMED CORRECT DO NOT EDIT |
+| TVMS Rouge `0x30` | `0x1BFD1430` | `0x1BFD14` | D1 base | `Output_Dim_Activity_BasePlus0..6` | D2-D8 | output/dimming activity only; not real physical input state | CONFIRMED CORRECT DO NOT EDIT |
 | TVMS Rouge `0x30` | `0x13F10830` | `0x13F108` | — | `TVMSRouge_Input_Voltage` | D1-D2 | uint16 little-endian × 0.01 V | CONFIRMED CORRECT DO NOT EDIT |
 | TVMS Rouge `0x30` | `0x1BFD0230` | `0x1BFD02` | D1=`0x16` | `TVMSRouge_Input_Current_A_Candidate` | D3 | raw / 10 A | DIAGNOSTIC CANDIDATE; label pages identify item 0x17 as Input Current; needs controlled current-change test |
 | RedVision 1 `0x20` | `0x0F003020` | `0x0F0030` | — | `TVMSRouge_Output_Command` | D4/D5 | D4 channel, D5 `0x00/0x01` | CONFIRMED COMMAND PATTERN |
@@ -222,9 +226,9 @@ Component behaviour:
 | TVMS1280 `0x24` | `0x1BFD0224` | `0x1BFD02` | D1=`0x17` | `TVMS1280_Tank4_Percent` | D4 | raw % | CONFIRMED CORRECT DO NOT EDIT |
 | TVMS1280 `0x24` | `0x1BFD0224` | `0x1BFD02` | D1=`0x17` | `TVMS1280_Tank5_Percent` | D6 | raw % | CONFIRMED CORRECT DO NOT EDIT |
 | TVMS1280 `0x24` | `0x1BFD0224` | `0x1BFD02` | D1=`0x1A` | `TVMS1280_Tank6_Percent` | D2 | raw % | CONFIRMED CORRECT DO NOT EDIT |
-| TVMS1280 `0x24` | `0x13F10824` | `0x13F108` | — | `TVMS1280_Supply_Voltage` | D1-D2 | uint16 little-endian × 0.01 V | CONFIRMED / interpreted as supply voltage |
-| TVMS1280 `0x24` | `0x1BFD0224` | `0x1BFD02` | D1=`0x11` | `TVMS1280_Voltage_Input_1_Candidate` | D2 | raw / 10 V | DIAGNOSTIC CANDIDATE; expected near 0 V when disconnected |
-| TVMS1280 `0x24` | `0x1BFD0224` | `0x1BFD02` | D1=`0x14` | `TVMS1280_Voltage_Input_2_Candidate` | D2 | raw / 10 V | DIAGNOSTIC CANDIDATE; observed around 11.9–12.0 V |
+| TVMS1280 `0x24` | `0x13F10824` | `0x13F108` | — | `TVMS1280_Static_Input_Status_Candidate` | D1-D2 | static/status candidate | NOT LIVE VOLTAGE SOURCE |
+| TVMS1280 `0x24` | `0x1BFD0224` | `0x1BFD02` | D1=`0x11` | `TVMS1280_Voltage_Input_1` | D2-D3 | uint16 little-endian millivolts / 1000 | CONFIRMED CORRECT DO NOT EDIT; item/channel `0x11` |
+| TVMS1280 `0x24` | `0x1BFD0224` | `0x1BFD02` | D1=`0x11` | `TVMS1280_Voltage_Input_2` | D4-D5 | uint16 little-endian millivolts / 1000 | CONFIRMED CORRECT DO NOT EDIT; item/channel `0x12` |
 | RedVision 1 `0x20` | `0x0F002420` | `0x0F0024` | — | `TVMS1280_Output_Command` | D4/D5 | D4 channel, D5 `0x00/0x01` | CONFIRMED COMMAND PATTERN |
 | TVMS1280 `0x24` | `0x1BFD0024` candidate | `0x1BFD00` | D1 base | `TVMS1280_Digital_Inputs_1_to_3` | channels `0x01`-`0x03` | `0x00=off`, `0x01=on`, `0xF8/0xFF=ignore` | TEST CANDIDATE |
 
@@ -360,6 +364,8 @@ Current full component/YAML set can publish:
 - Manager30 solar input voltage
 - Manager30 derived solar power
 - Manager30 solar energy/yield Wh
+- Manager30 charging mode select, Touring/Storage
+- Manager30 charging stage text, Soft-start/Boost/Absorption/Float
 - Battery Sensor current
 - source-derived device current
 - Battery SOC
@@ -370,7 +376,7 @@ Current full component/YAML set can publish:
 - TVMS Rouge Tank 1 and Tank 2
 - TVMS Rouge Outputs 1-10 as dimmable lights
 - TVMS Rouge Output 1-10 actual level sensors
-- TVMS Rouge Output 1-10 button/dimming-active binary sensors
+- TVMS Rouge Input Button 1-8 binary sensors from `0x1BFD0030`
 - TVMS Rouge input voltage
 - TVMS Rouge input current candidate
 - TVMS1280 Outputs 0-9 as switches
@@ -379,7 +385,7 @@ Current full component/YAML set can publish:
 - TVMS1280 Tank 1 through Tank 6
 - TVMS1280 Temperature 1 and Temperature 2
 - TVMS1280 supply voltage
-- TVMS1280 Voltage Input 1/2 diagnostic candidates
+- TVMS1280 Voltage Input 1/2 sensors from items/channels `0x11` and `0x12`
 
 ## ESPHome and Home Assistant notes
 

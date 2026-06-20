@@ -83,12 +83,14 @@ BO_ 2399207200 Redvision1_Config_Setting_Broadcast: 8 Redvision_1
  SG_ RedvisionConfigBroadcast_MaxChargeCurrent_A m20 : 32|16@1+ (1,0) [0|100] "A" Vector__XXX
  SG_ RedvisionConfigBroadcast_LowSOCAlarm_Percent m65 : 32|16@1+ (1,0) [0|100] "%" Vector__XXX
  SG_ RedvisionConfigBroadcast_LowVoltageAlarm_V m66 : 32|16@1+ (0.001,0) [0|60] "V" Vector__XXX
+ SG_ RedvisionConfigBroadcast_ChargingMode m67 : 32|8@1+ (1,0) [0|1] "mode" Vector__XXX
+ SG_ RedvisionConfigBroadcast_ChargeCycleRequest_Candidate m77 : 32|8@1+ (1,0) [0|1] "request" Vector__XXX
  SG_ RedvisionConfigBroadcast_VehicleInputTrigger m104 : 32|16@1+ (1,0) [0|5] "trigger" Vector__XXX
  SG_ RedvisionConfigBroadcast_D7 : 48|8@1+ (1,0) [0|255] "raw" Vector__XXX
  SG_ RedvisionConfigBroadcast_D8 : 56|8@1+ (1,0) [0|255] "raw" Vector__XXX
 
 CM_ BO_ 2399207200 "CONFIRMED_CORRECT_DO_NOT_EDIT: Redvision Display 1 local setting-change broadcast. Raw CAN ID 0x0F00FF20, source 0x20. Payload pattern <setting> 00 FF FF <value little-endian> 00 00. battery changes from redvision.csv shows the same setting IDs and value encoding as Bluetooth/config-tool changes.";
-CM_ SG_ 2399207200 RedvisionConfigBroadcast_Command "D1 setting/mux. 0x11 = battery type, 0x12 = configured capacity, 0x14 = max charge current, 0x41 = low SOC alarm, 0x42 = low voltage alarm, 0x68 = vehicle input trigger. 0x4D observed but not decoded.";
+CM_ SG_ 2399207200 RedvisionConfigBroadcast_Command "D1 setting/mux. 0x11 = battery type, 0x12 = configured capacity, 0x14 = max charge current, 0x41 = low SOC alarm, 0x42 = low voltage alarm, 0x43 = Manager30 charging mode, 0x4D = charge-cycle/stage request candidate, 0x68 = vehicle input trigger.";
 CM_ SG_ 2399207200 RedvisionConfigBroadcast_D3 "D3 observed 0xFF for these Redvision setting broadcasts.";
 CM_ SG_ 2399207200 RedvisionConfigBroadcast_D4 "D4 observed 0xFF for these Redvision setting broadcasts.";
 CM_ SG_ 2399207200 RedvisionConfigBroadcast_BatteryType "D5-D6 little-endian battery type. Confirmed examples: 2=LeadAcid, 0=Gel, 4=Lithium.";
@@ -96,11 +98,15 @@ CM_ SG_ 2399207200 RedvisionConfigBroadcast_Capacity_Ah "D5-D6 little-endian uns
 CM_ SG_ 2399207200 RedvisionConfigBroadcast_MaxChargeCurrent_A "D5-D6 little-endian unsigned A. Confirmed example: 0x001E=30 A.";
 CM_ SG_ 2399207200 RedvisionConfigBroadcast_LowSOCAlarm_Percent "D5-D6 little-endian unsigned percent. Confirmed example: 0x001E=30%.";
 CM_ SG_ 2399207200 RedvisionConfigBroadcast_LowVoltageAlarm_V "D5-D6 little-endian millivolts, scale 0.001 V/count. Confirmed example: 0x2EE0=12.0 V.";
+CM_ SG_ 2399207200 RedvisionConfigBroadcast_ChargingMode "CONFIRMED_CORRECT_DO_NOT_EDIT: D1=0x43 Manager30 charging mode command. D5=0x00 Touring, D5=0x01 Storage. Observed RedVision source 0x20 sends 43 00 FF FF <mode> 00 00 00.";
+CM_ SG_ 2399207200 RedvisionConfigBroadcast_ChargeCycleRequest_Candidate "PARTLY_CONFIRMED: D1=0x4D charge-cycle/stage request candidate. Observed 4D 00 FF FF 01 00 00 00 before later Float->Boost transition, but it did not immediately change live stage status.";
 CM_ SG_ 2399207200 RedvisionConfigBroadcast_VehicleInputTrigger "D5-D6 little-endian trigger value. Confirmed examples: 0=Auto, 1=12V, 3=Ignition.";
 CM_ SG_ 2399207200 RedvisionConfigBroadcast_D7 "D7 observed 0x00 for these Redvision setting broadcasts.";
 CM_ SG_ 2399207200 RedvisionConfigBroadcast_D8 "D8 observed 0x00 for these Redvision setting broadcasts.";
-VAL_ 2399207200 RedvisionConfigBroadcast_Command 17 "BatteryType" 18 "ConfiguredCapacity" 20 "MaxChargeCurrent" 65 "LowSOCAlarm" 66 "LowVoltageAlarm" 104 "VehicleInputTrigger" ;
+VAL_ 2399207200 RedvisionConfigBroadcast_Command 17 "BatteryType" 18 "ConfiguredCapacity" 20 "MaxChargeCurrent" 65 "LowSOCAlarm" 66 "LowVoltageAlarm" 67 "ChargingMode" 77 "ChargeCycleRequest_Candidate" 104 "VehicleInputTrigger" ;
 VAL_ 2399207200 RedvisionConfigBroadcast_BatteryType 0 "Gel" 1 "AGM" 2 "LeadAcid" 3 "Calcium" 4 "Lithium" ;
+VAL_ 2399207200 RedvisionConfigBroadcast_ChargingMode 0 "Touring" 1 "Storage" ;
+VAL_ 2399207200 RedvisionConfigBroadcast_ChargeCycleRequest_Candidate 1 "RequestBoostOrRestartCycle" ;
 VAL_ 2399207200 RedvisionConfigBroadcast_VehicleInputTrigger 0 "Auto" 1 "12V" 2 "24V" 3 "Ignition" 5 "On" ;
 
 BO_ 2482143264 PGN_13F280_Redvision1_CurrentDisplay: 8 Redvision_1
@@ -243,6 +249,8 @@ BA_ "Decode_Status" SG_ 2399207200 RedvisionConfigBroadcast_Capacity_Ah "CONFIRM
 BA_ "Decode_Status" SG_ 2399207200 RedvisionConfigBroadcast_MaxChargeCurrent_A "CONFIRMED_CORRECT_DO_NOT_EDIT";
 BA_ "Decode_Status" SG_ 2399207200 RedvisionConfigBroadcast_LowSOCAlarm_Percent "CONFIRMED_CORRECT_DO_NOT_EDIT";
 BA_ "Decode_Status" SG_ 2399207200 RedvisionConfigBroadcast_LowVoltageAlarm_V "CONFIRMED_CORRECT_DO_NOT_EDIT";
+BA_ "Decode_Status" SG_ 2399207200 RedvisionConfigBroadcast_ChargingMode "CONFIRMED_CORRECT_DO_NOT_EDIT";
+BA_ "Decode_Status" SG_ 2399207200 RedvisionConfigBroadcast_ChargeCycleRequest_Candidate "PARTLY_CONFIRMED";
 BA_ "Decode_Status" SG_ 2399207200 RedvisionConfigBroadcast_VehicleInputTrigger "CONFIRMED_CORRECT_DO_NOT_EDIT";
 BA_ "Decode_Status" SG_ 2399207200 RedvisionConfigBroadcast_D7 "CONFIRMED_CORRECT_DO_NOT_EDIT";
 BA_ "Decode_Status" SG_ 2399207200 RedvisionConfigBroadcast_D8 "CONFIRMED_CORRECT_DO_NOT_EDIT";
@@ -369,6 +377,22 @@ BA_ "Decode_Status" SG_ 2213741569 Manager30_Clock_Second "PARTLY_CONFIRMED";
 
 CM_ "v55 update: Added Manager30 clock candidate on raw CAN ID 0x03F30401. Month/year/hour/minute/second are partly confirmed from find unknown.csv; D1 high 5 bits plus 1 gives day-of-month, low 3 bits remain unknown flags.";
 
+BO_ 66127873 PGN_03F108_Manager30_Status: 8 Manager30
+ SG_ Manager30_ChargingMode_Status : 0|1@1+ (1,0) [0|1] "mode" Vector__XXX
+CM_ BO_ 66127873 "CONFIRMED_CORRECT_DO_NOT_EDIT: Manager30 status frame. Raw CAN ID 0x03F10801, PGN 0x03F108, SA 0x01. D1 bit0 reports charging mode.";
+CM_ SG_ 66127873 Manager30_ChargingMode_Status "CONFIRMED_CORRECT_DO_NOT_EDIT: D1 bit0 charging mode. 0=Touring, 1=Storage. Observed E4 during Touring and E5 during Storage after RedVision 0x43 command.";
+VAL_ 66127873 Manager30_ChargingMode_Status 0 "Touring" 1 "Storage" ;
+BA_ "Decode_Status" BO_ 66127873 "CONFIRMED_CORRECT_DO_NOT_EDIT";
+BA_ "Decode_Status" SG_ 66127873 Manager30_ChargingMode_Status "CONFIRMED_CORRECT_DO_NOT_EDIT";
+
+BO_ 66191361 PGN_03F200_Manager30_ChargingStage: 8 Manager30
+ SG_ Manager30_ChargingStage : 0|8@1+ (1,0) [0|255] "stage" Vector__XXX
+CM_ BO_ 66191361 "CONFIRMED_CORRECT_DO_NOT_EDIT: Manager30 fast charging stage/status frame. Raw CAN ID 0x03F20001, PGN 0x03F200, SA 0x01. D1 reports charging stage/state. D1 bit0 also mirrors Touring/Storage before cleaner 0x03F10801 status is seen.";
+CM_ SG_ 66191361 Manager30_ChargingStage "CONFIRMED_CORRECT_DO_NOT_EDIT: D1 charging stage/status. Observed 0x21=Soft-start, 0x30=Boost, 0x40=Absorption, 0x70=Float.";
+VAL_ 66191361 Manager30_ChargingStage 33 "SoftStart" 48 "Boost" 64 "Absorption" 112 "Float" ;
+BA_ "Decode_Status" BO_ 66191361 "CONFIRMED_CORRECT_DO_NOT_EDIT";
+BA_ "Decode_Status" SG_ 66191361 Manager30_ChargingStage "CONFIRMED_CORRECT_DO_NOT_EDIT";
+
 CM_ "v49 update: TVMS1280_Tank5_Percent corrected to raw percent scaling (1,0). Previous raw x 1.25 scaling removed.";
 
 CM_ "v50 update: merged missing messages/signals from TVMS_Redvision_clean_separated_inputs_outputs(2).dbc into Current_SOC_v49_TVMS1280_Tank5_raw_percent(1).dbc. Existing v49 confirmed messages/signals were left unchanged. Every added message and signal from the inputs_outputs DBC is marked UNCONFIRMED_PENDING_TEST.";
@@ -434,24 +458,24 @@ BO_ 2617049136 TVMSRouge_Output_Coarse_Status: 8 TVMS_Rouge
  SG_ TVMSRouge_Coarse_BasePlus4 : 40|8@1+ (1,0) [0|255] "state" Vector__XXX
  SG_ TVMSRouge_Coarse_BasePlus5 : 48|8@1+ (1,0) [0|255] "state" Vector__XXX
  SG_ TVMSRouge_Coarse_BasePlus6 : 56|8@1+ (1,0) [0|255] "state" Vector__XXX
-CM_ BO_ 2617049136 "PARTLY_CONFIRMED: TVMS Rouge coarse output/channel status. Raw CAN ID 0x1BFD0030, PGN 0x1BFD00, SA 0x30. D1 is base channel; D2-D8 are states for base+0..base+6.";
-CM_ SG_ 2617049136 TVMSRouge_Coarse_BaseChannel "D1 base channel. Examples: base 0x08 covers channels 0x08-0x0E; base 0x0F covers channels 0x0F-0x15.";
-CM_ SG_ 2617049136 TVMSRouge_Coarse_BasePlus0 "Coarse state for channel base+0. 0x00=OFF/inactive, 0x01=ON/active, 0xF8/0xFF=unavailable/ignore; 0x14/0x15 seen as special/unknown.";
-CM_ SG_ 2617049136 TVMSRouge_Coarse_BasePlus1 "Coarse state for channel base+1. 0x00=OFF/inactive, 0x01=ON/active, 0xF8/0xFF=unavailable/ignore.";
-CM_ SG_ 2617049136 TVMSRouge_Coarse_BasePlus2 "Coarse state for channel base+2. 0x00=OFF/inactive, 0x01=ON/active, 0xF8/0xFF=unavailable/ignore.";
-CM_ SG_ 2617049136 TVMSRouge_Coarse_BasePlus3 "Coarse state for channel base+3. 0x00=OFF/inactive, 0x01=ON/active, 0xF8/0xFF=unavailable/ignore.";
-CM_ SG_ 2617049136 TVMSRouge_Coarse_BasePlus4 "Coarse state for channel base+4. 0x00=OFF/inactive, 0x01=ON/active, 0xF8/0xFF=unavailable/ignore; special values have been observed.";
-CM_ SG_ 2617049136 TVMSRouge_Coarse_BasePlus5 "Coarse state for channel base+5. 0x00=OFF/inactive, 0x01=ON/active, 0xF8/0xFF=unavailable/ignore.";
-CM_ SG_ 2617049136 TVMSRouge_Coarse_BasePlus6 "Coarse state for channel base+6. 0x00=OFF/inactive, 0x01=ON/active, 0xF8/0xFF=unavailable/ignore.";
-BA_ "Decode_Status" BO_ 2617049136 "PARTLY_CONFIRMED";
-BA_ "Decode_Status" SG_ 2617049136 TVMSRouge_Coarse_BaseChannel "PARTLY_CONFIRMED";
-BA_ "Decode_Status" SG_ 2617049136 TVMSRouge_Coarse_BasePlus0 "PARTLY_CONFIRMED";
-BA_ "Decode_Status" SG_ 2617049136 TVMSRouge_Coarse_BasePlus1 "PARTLY_CONFIRMED";
-BA_ "Decode_Status" SG_ 2617049136 TVMSRouge_Coarse_BasePlus2 "PARTLY_CONFIRMED";
-BA_ "Decode_Status" SG_ 2617049136 TVMSRouge_Coarse_BasePlus3 "PARTLY_CONFIRMED";
-BA_ "Decode_Status" SG_ 2617049136 TVMSRouge_Coarse_BasePlus4 "PARTLY_CONFIRMED";
-BA_ "Decode_Status" SG_ 2617049136 TVMSRouge_Coarse_BasePlus5 "PARTLY_CONFIRMED";
-BA_ "Decode_Status" SG_ 2617049136 TVMSRouge_Coarse_BasePlus6 "PARTLY_CONFIRMED";
+CM_ BO_ 2617049136 "CONFIRMED_CORRECT_DO_NOT_EDIT: TVMS Rouge physical input/button state. Raw CAN ID 0x1BFD0030, PGN 0x1FD00, SA 0x30. D1 is base input; D2-D8 are states for base+0..base+6. D1=0x01 covers inputs 1-7; D1=0x08 D2 covers input 8. 0x00=inactive, 0x01=active.";
+CM_ SG_ 2617049136 TVMSRouge_Coarse_BaseChannel "D1 base input/channel. D1=0x01 maps D2-D8 to Rouge inputs/buttons 1-7. D1=0x08 maps D2 to Rouge input/button 8; later bytes in that frame are not physical button states.";
+CM_ SG_ 2617049136 TVMSRouge_Coarse_BasePlus0 "Input/button state for base+0. 0x00=inactive, 0x01=active.";
+CM_ SG_ 2617049136 TVMSRouge_Coarse_BasePlus1 "Input/button state for base+1. 0x00=inactive, 0x01=active.";
+CM_ SG_ 2617049136 TVMSRouge_Coarse_BasePlus2 "Input/button state for base+2. 0x00=inactive, 0x01=active.";
+CM_ SG_ 2617049136 TVMSRouge_Coarse_BasePlus3 "Input/button state for base+3. 0x00=inactive, 0x01=active.";
+CM_ SG_ 2617049136 TVMSRouge_Coarse_BasePlus4 "Input/button state for base+4. 0x00=inactive, 0x01=active.";
+CM_ SG_ 2617049136 TVMSRouge_Coarse_BasePlus5 "Input/button state for base+5. 0x00=inactive, 0x01=active.";
+CM_ SG_ 2617049136 TVMSRouge_Coarse_BasePlus6 "Input/button state for base+6. 0x00=inactive, 0x01=active.";
+BA_ "Decode_Status" BO_ 2617049136 "CONFIRMED_CORRECT_DO_NOT_EDIT";
+BA_ "Decode_Status" SG_ 2617049136 TVMSRouge_Coarse_BaseChannel "CONFIRMED_CORRECT_DO_NOT_EDIT";
+BA_ "Decode_Status" SG_ 2617049136 TVMSRouge_Coarse_BasePlus0 "CONFIRMED_CORRECT_DO_NOT_EDIT";
+BA_ "Decode_Status" SG_ 2617049136 TVMSRouge_Coarse_BasePlus1 "CONFIRMED_CORRECT_DO_NOT_EDIT";
+BA_ "Decode_Status" SG_ 2617049136 TVMSRouge_Coarse_BasePlus2 "CONFIRMED_CORRECT_DO_NOT_EDIT";
+BA_ "Decode_Status" SG_ 2617049136 TVMSRouge_Coarse_BasePlus3 "CONFIRMED_CORRECT_DO_NOT_EDIT";
+BA_ "Decode_Status" SG_ 2617049136 TVMSRouge_Coarse_BasePlus4 "CONFIRMED_CORRECT_DO_NOT_EDIT";
+BA_ "Decode_Status" SG_ 2617049136 TVMSRouge_Coarse_BasePlus5 "CONFIRMED_CORRECT_DO_NOT_EDIT";
+BA_ "Decode_Status" SG_ 2617049136 TVMSRouge_Coarse_BasePlus6 "CONFIRMED_CORRECT_DO_NOT_EDIT";
 
 BO_ 2617246256 TVMSRouge_WaterLevelStatus: 8 TVMS_Rouge
  SG_ WaterLevel_MUX M : 0|8@1+ (1,0) [0|255] "" Vector__XXX
@@ -504,8 +528,8 @@ BO_ 2617054256 TVMSRouge_Button_Activity_Status: 8 TVMS_Rouge
  SG_ TVMSRouge_ButtonActivity_BasePlus4 : 40|8@1+ (1,0) [0|255] "state" Vector__XXX
  SG_ TVMSRouge_ButtonActivity_BasePlus5 : 48|8@1+ (1,0) [0|255] "state" Vector__XXX
  SG_ TVMSRouge_ButtonActivity_BasePlus6 : 56|8@1+ (1,0) [0|255] "state" Vector__XXX
-CM_ BO_ 2617054256 "CONFIRMED_CORRECT_DO_NOT_EDIT: TVMS Rouge hardware button/dimming-active status. Raw CAN ID 0x1BFD1430, PGN 0x1BFD14, SA 0x30. D1 is base channel; D2-D8 are activity states for base+0..base+6.";
-CM_ SG_ 2617054256 TVMSRouge_ButtonActivity_BaseChannel "D1 base channel. Example 0x0C with D2=0x02 means Rouge Output 1 button/dim active; D7=0x02 means Output 6 active; D8=0x02 means Output 7 active.";
+CM_ BO_ 2617054256 "CONFIRMED_CORRECT_DO_NOT_EDIT: TVMS Rouge output button/dimming-active/status frame, not the real physical input/button state. Raw CAN ID 0x1BFD1430, PGN 0x1BFD14, SA 0x30. In button 4-8 testing this frame stayed idle while 0x1BFD0030 carried actual input states.";
+CM_ SG_ 2617054256 TVMSRouge_ButtonActivity_BaseChannel "D1 base channel for output/dimming activity. Do not use this frame as the Rouge physical input/button state; use 0x1BFD0030 instead.";
 CM_ SG_ 2617054256 TVMSRouge_ButtonActivity_BasePlus0 "Button/dimming activity for channel base+0. 0x02=active/held/dimming, 0x00=inactive, other values ignored.";
 CM_ SG_ 2617054256 TVMSRouge_ButtonActivity_BasePlus1 "Button/dimming activity for channel base+1. 0x02=active/held/dimming, 0x00=inactive, other values ignored.";
 CM_ SG_ 2617054256 TVMSRouge_ButtonActivity_BasePlus2 "Button/dimming activity for channel base+2. 0x02=active/held/dimming, 0x00=inactive, other values ignored.";
@@ -776,8 +800,10 @@ CM_ "v62 update: Added confirmed Manager30 vehicle input trigger decode. Config 
 CM_ "v63 update: Added confirmed Redvision Display setting-change broadcast decode. Raw CAN ID 0x0F00FF20 from source 0x20 uses D1 as setting ID and D5-D6 little-endian value for battery type, capacity, max charge current, low SOC alarm, low voltage alarm, and vehicle input trigger.";
 CM_ "v64 update: Added unconfirmed TVMS master command entries based on config/label pages: TVMS1280 item/channel 0x0F is Master switch, TVMS Rouge item/channel 0x0B is Master. ESPHome exposes them as HA switches using the existing TVMS on/off command shape.";
 CM_ "v65 update: Added ESPHome test entities for TVMS1280 digital inputs 1-3. Channel map supplied by user: digital inputs are 0x01-0x03, outputs are 0x04-0x0D, inverter is 0x0E, master is 0x0F. Live-state PGN is still candidate; current test path uses 0x1BFD0024 channel feedback.";
+CM_ "v66 update: Confirmed TVMS Rouge physical input/button states on 0x1BFD0030. D1=0x01 maps D2-D8 to inputs/buttons 1-7; D1=0x08 maps D2 to input/button 8. State values: 0x00 inactive, 0x01 active. 0x1BFD1430 remained idle in this test and is retained only as output/dimming activity status.";
+CM_ "v67 update: Added Manager30 charging mode and charging stage decode. RedVision 0x0F00FF20 D1=0x43 D5 sets mode: 0=Touring, 1=Storage. Manager30 0x03F10801 D1 bit0 confirms mode. Manager30 0x03F20001 D1 reports stage: 0x21=Soft-start, 0x30=Boost, 0x40=Absorption, 0x70=Float. 0x4D remains a charge-cycle/stage request candidate.";
 
-CM_ SG_ 2617049636 TVMS1280_Temp2_C "NOTE: TVMS1280 Voltage Input 1 candidate is currently decoded in ESPHome from 0x1BFD0224 page/mux 0x11 D2 / 10. It is expected to read near 0.0 V when the external voltage input is disconnected. This overlaps the temp/tank/status PGN and is kept as a diagnostic candidate until fully confirmed.";
-CM_ SG_ 2617049636 TVMS1280_Temp1_C "NOTE: TVMS1280 Voltage Input 2 candidate is currently decoded in ESPHome from 0x1BFD0224 page/mux 0x14 D2 / 10 and has appeared around 11.9-12.0 V in logs. This overlaps the temp/tank/status PGN and is kept as a diagnostic candidate until fully confirmed.";
+CM_ SG_ 2617049636 TVMS1280_Temp2_C "NOTE: TVMS1280 voltage inputs are item/channel 0x11 and 0x12 within the 0x1BFD0224 mux 0x11 page. Voltage Input 1 is D2-D3 millivolts, Voltage Input 2 is D4-D5 millivolts.";
+CM_ SG_ 2617049636 TVMS1280_Temp1_C "NOTE: Temp1 is MUX 0x14 D2. Voltage Input 2 is not on this page; it is item/channel 0x12 in MUX 0x11 D4-D5 millivolts.";
 
 CM_ "TVMS1280_DIGITAL_INPUTS_NOTE: Hardware has 3 digital inputs mapped to channels 0x01, 0x02, and 0x03. ESPHome exposes candidate binary sensors from 0x1BFD0024 channel feedback for field testing. A one-at-a-time input toggle capture is still needed before marking the live-state decode confirmed.";

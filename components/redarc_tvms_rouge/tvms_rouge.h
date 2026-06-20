@@ -61,7 +61,7 @@ class TVMSRougeComponent : public Component {
   void set_input_voltage_sensor(sensor::Sensor *s) { this->input_voltage_sensor_ = s; }
   void set_input_current_sensor(sensor::Sensor *s) { this->input_current_sensor_ = s; }
   void set_level_sensor(uint8_t output, sensor::Sensor *s) { if (output >= 1 && output <= 10) this->level_sensors_[output] = s; }
-  void set_button_sensor(uint8_t output, binary_sensor::BinarySensor *s) { if (output >= 1 && output <= 10) this->button_sensors_[output] = s; }
+  void set_button_sensor(uint8_t input, binary_sensor::BinarySensor *s) { if (input >= 1 && input <= 8) this->button_sensors_[input] = s; }
 
   void set_true_off_threshold(float v) { this->true_off_threshold_percent_ = v; }
 

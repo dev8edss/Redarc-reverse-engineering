@@ -64,6 +64,7 @@ for _i in range(1, 11):
     _AUTO_IDS[cv.GenerateID(f"light_out_{_i}")] = cv.declare_id(TVMSRougeLight)
     _AUTO_IDS[cv.GenerateID(f"light_state_{_i}")] = cv.declare_id(light.LightState)
     _AUTO_IDS[cv.GenerateID(f"level_sensor_{_i}")] = cv.declare_id(_SensorClass)
+for _i in range(1, 9):
     _AUTO_IDS[cv.GenerateID(f"button_sensor_{_i}")] = cv.declare_id(_BSClass)
 _AUTO_IDS[cv.GenerateID("tank1_id")] = cv.declare_id(_SensorClass)
 _AUTO_IDS[cv.GenerateID("tank2_id")] = cv.declare_id(_SensorClass)
@@ -136,17 +137,19 @@ async def to_code(config):
                            entity_category=ENTITY_CATEGORY_DIAGNOSTIC)
     cg.add(var.set_input_current_sensor(s))
 
-    # Output level sensors and button state binary sensors
+    # Output level sensors
     for i in range(1, 11):
         ls = await _make_sensor(config[f"level_sensor_{i}"], f"{p} Output {i} Level",
                                 unit="%", state_class=STATE_CLASS_MEASUREMENT, decimals=0,
                                 entity_category=ENTITY_CATEGORY_DIAGNOSTIC)
         cg.add(var.set_level_sensor(i, ls))
 
+    # Physical input/button state binary sensors
+    for i in range(1, 9):
         bs = cg.new_Pvariable(config[f"button_sensor_{i}"])
         bs_cfg = {
             CONF_ID: config[f"button_sensor_{i}"],
-            CONF_NAME: f"{p} Output {i} Button Active",
+            CONF_NAME: f"{p} Input Button {i}",
             CONF_DISABLED_BY_DEFAULT: False,
             CONF_ICON: "",
             CONF_ENTITY_CATEGORY: ENTITY_CATEGORY_DIAGNOSTIC,

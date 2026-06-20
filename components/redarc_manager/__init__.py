@@ -20,6 +20,7 @@ CONF_BATTERY_SENSOR = "battery_sensor_id"
 manager30_ns = cg.esphome_ns.namespace("redarc_manager")
 Manager30Component = manager30_ns.class_("Manager30Component", cg.Component)
 VehicleInputTriggerSelect = manager30_ns.class_("VehicleInputTriggerSelect", select.Select)
+ChargingModeSelect = manager30_ns.class_("ChargingModeSelect", select.Select)
 
 _battery_sensor_ns = cg.esphome_ns.namespace("redarc_battery_sensor")
 _BatterySensorComponent = _battery_sensor_ns.class_("BatterySensorComponent", cg.Component)
@@ -54,7 +55,9 @@ CONFIG_SCHEMA = cv.Schema({
     cv.GenerateID("clock_date_id"): cv.declare_id(_TextSensorClass),
     cv.GenerateID("clock_time_id"): cv.declare_id(_TextSensorClass),
     cv.GenerateID("clock_datetime_id"): cv.declare_id(_TextSensorClass),
+    cv.GenerateID("charging_stage_id"): cv.declare_id(_TextSensorClass),
     cv.GenerateID("vehicle_input_trigger_select_id"): cv.declare_id(VehicleInputTriggerSelect),
+    cv.GenerateID("charging_mode_select_id"): cv.declare_id(ChargingModeSelect),
 }).extend(cv.COMPONENT_SCHEMA)
 
 
@@ -179,7 +182,15 @@ async def to_code(config):
     ts = await _make_text_sensor(config["clock_datetime_id"], f"{p} CAN Date Time")
     cg.add(var.set_clock_datetime_text_sensor(ts))
 
+    ts = await _make_text_sensor(config["charging_stage_id"], f"{p} Charging Stage")
+    cg.add(var.set_charging_stage_text_sensor(ts))
+
     sel = await _make_select(config["vehicle_input_trigger_select_id"], f"{p} Vehicle Input Trigger",
                              ["Auto", "12V", "24V", "Ignition", "On"])
     cg.add(sel.set_parent(var))
     cg.add(var.set_vehicle_input_trigger_select(sel))
+
+    sel = await _make_select(config["charging_mode_select_id"], f"{p} Charging Mode",
+                             ["Touring", "Storage"])
+    cg.add(sel.set_parent(var))
+    cg.add(var.set_charging_mode_select(sel))

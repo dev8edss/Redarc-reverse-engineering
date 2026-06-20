@@ -7,9 +7,9 @@ This package splits the RedVision / TVMS CAN bridge into ESPHome external compon
 | Component | Purpose |
 |---|---|
 | `redarc_common` | Shared CAN byte helpers, source-address helpers, and current/voltage decoding helpers. |
-| `tvms_rouge` | TVMS Rouge dimmable output lights, direct set-level and OFF commands, output level feedback, hardware-button/dimming-active binary sensors, input voltage, candidate input current, and tank sensors. |
+| `tvms_rouge` | TVMS Rouge dimmable output lights, direct set-level and OFF commands, output level feedback, physical input/button binary sensors, input voltage, candidate input current, and tank sensors. |
 | `tvms_1280` | TVMS1280 relay output switches, inverter switch, output feedback from RedVision/display changes, tank sensors, temperature sensors, supply voltage, voltage-input diagnostic candidates, and notes for the 3 unused digital inputs. |
-| `manager30` | Manager30 output current, battery voltage, source-derived device current, solar current/voltage/power, solar Wh/yield, and AC input voltage. |
+| `manager30` | Manager30 output current, battery voltage, source-derived device current, solar current/voltage/power, solar Wh/yield, AC input voltage, charging mode select, and charging stage text. |
 | `battery_sensor` | Battery shunt current, voltage, SOC, and temperature. |
 | `redvision_display` | RedVision display/rebroadcast current values for display/source comparison. |
 
@@ -134,8 +134,8 @@ Use `LISTENONLY` only for passive monitoring YAMLs where nothing is transmitted.
 | ON command | `0x0F003020` | `CB 00 FF <channel> 01 00 00 00` |
 | OFF command | `0x0F003020` | `CB 00 FF <channel> 00 00 00 00` |
 | Actual output level | `0x1BFD1230` | `D1=base channel`, `D2-D8=0-100% levels for base+0..base+6` |
-| Hardware button / dim-active | `0x1BFD1430` | `D1=base channel`, `D2-D8`; `0x02=active`, `0x00=inactive`, ignore other values |
-| Coarse output status | `0x1BFD0030` | `D1=base channel`, `D2-D8`; `0x00=off`, `0x01=on`, `0xF8/0xFF/special values=ignore/unknown` |
+| Physical input/button state | `0x1BFD0030` | `D1=0x01` maps `D2-D8` to inputs/buttons 1-7; `D1=0x08` maps `D2` to input/button 8; `0x00=inactive`, `0x01=active` |
+| Output button / dim-active | `0x1BFD1430` | Output/dimming activity only; stayed idle during physical input/button testing |
 | Tank feedback | `0x1BFD0230` | Tank 1 and Tank 2 percentage feedback |
 | Input/status voltage | `0x13F10830` | `D1-D2` little-endian, scale `0.01 V/count`; examples `F0 04 = 12.64 V`, `EC 04 = 12.60 V` |
 
@@ -159,7 +159,7 @@ tvms_rouge:
   output_command_id: 0x0F003020
   level_feedback_id: 0x1BFD1230
   tank_feedback_id: 0x1BFD0230
-  button_status_id: 0x1BFD1430
+  button_status_id: 0x1BFD0030
   input_status_id: 0x13F10830
 
   true_off_threshold: 1.0
@@ -172,16 +172,14 @@ tvms_rouge:
     accuracy_decimals: 2
 
   button_states:
-    - name: "TVMS Rouge Output 1 Button Active"
-    - name: "TVMS Rouge Output 2 Button Active"
-    - name: "TVMS Rouge Output 3 Button Active"
-    - name: "TVMS Rouge Output 4 Button Active"
-    - name: "TVMS Rouge Output 5 Button Active"
-    - name: "TVMS Rouge Output 6 Button Active"
-    - name: "TVMS Rouge Output 7 Button Active"
-    - name: "TVMS Rouge Output 8 Button Active"
-    - name: "TVMS Rouge Output 9 Button Active"
-    - name: "TVMS Rouge Output 10 Button Active"
+    - name: "TVMS Rouge Input Button 1"
+    - name: "TVMS Rouge Input Button 2"
+    - name: "TVMS Rouge Input Button 3"
+    - name: "TVMS Rouge Input Button 4"
+    - name: "TVMS Rouge Input Button 5"
+    - name: "TVMS Rouge Input Button 6"
+    - name: "TVMS Rouge Input Button 7"
+    - name: "TVMS Rouge Input Button 8"
 ```
 
 If `button_status_id`, `button_states`, `input_status_id`, or `input_voltage` are rejected as invalid YAML options, ESPHome is loading an older `tvms_rouge` schema. Push the latest component code and clear `/data/external_components/*`.
@@ -241,26 +239,16 @@ The project now labels TVMS1280 relay outputs as `0-9` to match the zero-based c
 |---|---:|---|
 | ON/OFF command | `0x0F002420` | `CB 00 FF <channel> <00 off / 01 on> 00 00 00` |
 | Output feedback | `0x1BFD0024` | `D1=base channel`, `D2-D8=states for base+0..base+6`; `0x00=off`, `0x01=on`, `0xF8/0xFF=ignore` |
-| Temp/tank/status | `0x1BFD0224` | Muxed temp/tank/status frame used for temperatures, tanks, and voltage-input diagnostic candidates |
+| Temp/tank/status | `0x1BFD0224` | Muxed temp/tank/status frame used for temperatures, tanks, and voltage inputs |
 | Channel/status companion | `0x1BFCF024` | Partly decoded/status only; not the primary HA state source |
-| Supply/input status | `0x13F10824` | `D1-D2` little-endian, scale `0.01 V/count`; interpreted as TVMS1280 supply voltage / Voltage Input 2 |
+| Static input/status candidate | `0x13F10824` | Not used as the live TVMS1280 voltage input source |
 
 Recommended TVMS1280 voltage diagnostic YAML options:
 
 ```yaml
 tvms_1280:
-  input_status_id: 0x13F10824
-
-  supply_voltage:
-    name: "TVMS1280 Supply Voltage"
-    unit_of_measurement: "V"
-    device_class: voltage
-    state_class: measurement
-    accuracy_decimals: 2
-    entity_category: diagnostic
-
   voltage_input_1:
-    name: "TVMS1280 Voltage Input 1 Candidate"
+    name: "TVMS1280 Voltage Input 1"
     unit_of_measurement: "V"
     device_class: voltage
     state_class: measurement
@@ -268,7 +256,7 @@ tvms_1280:
     entity_category: diagnostic
 
   voltage_input_2:
-    name: "TVMS1280 Voltage Input 2 Candidate"
+    name: "TVMS1280 Voltage Input 2"
     unit_of_measurement: "V"
     device_class: voltage
     state_class: measurement
@@ -276,19 +264,18 @@ tvms_1280:
     entity_category: diagnostic
 ```
 
-Current diagnostic interpretation:
+Current voltage-input interpretation:
 
-- `13F10824 D1-D2 / 100` is TVMS1280 supply voltage / Voltage Input 2 and appears around `12.64 V`.
-- `1BFD0224` mux/page `0x11`, `D2 / 10` is a candidate for Voltage Input 1 and should read close to `0.0 V` if disconnected.
-- `1BFD0224` mux/page `0x14`, `D2 / 10` is a candidate voltage/status field that has appeared around `11.9-12.0 V`.
-- The voltage-input candidates overlap the existing temp/tank/status PGN and should remain diagnostic until confirmed against the RedVision app/display.
+- TVMS1280 Voltage Input 1 is item/channel `0x11` on `1BFD0224` mux/page `0x11`, `D2-D3` little-endian millivolts.
+- TVMS1280 Voltage Input 2 is item/channel `0x12` on the same page, `D4-D5` little-endian millivolts.
+- `13F10824` is not used as the live TVMS1280 voltage input source.
 
 ### Digital inputs
 
 - TVMS1280 hardware has **3 digital inputs**.
 - Channel map for testing: digital inputs are `0x01`, `0x02`, and `0x03`; outputs are `0x04`-`0x0D`; inverter is `0x0E`.
 - ESPHome exposes candidate Home Assistant binary sensors for the 3 digital input states using `0x1BFD0024` channel feedback.
-- Do not treat these as Rouge-style hardware button inputs. The Rouge button/dimming-active state is `0x1BFD1430`; TVMS1280 digital inputs are separate hardware inputs.
+- Do not treat these as Rouge-style hardware button inputs. Rouge physical input/button state is `0x1BFD0030`; `0x1BFD1430` is only output/dimming activity.
 - A one-at-a-time input toggle capture is still needed before marking the live-state decode confirmed.
 
 ## Manager30
@@ -299,6 +286,10 @@ Current diagnostic interpretation:
 | Solar current/voltage/power source | `0x03F20801` | Solar current and voltage decode; ESPHome publishes exact live power as current × voltage |
 | AC input voltage | `0x03F20401` | `D5-D6` little-endian, `1 V/count`; confirmed mains/240 V style signal |
 | Solar energy/yield | `0x03FCD601` | Decode only when `D1 == 0x00`; `D2-D5` little-endian uint32 = Wh; capture showed `14 -> 19 Wh` |
+| Charging mode status | `0x03F10801` | `D1 bit0`: `0=Touring`, `1=Storage`; preferred status source |
+| Charging stage/status | `0x03F20001` | `D1`: `0x21=Soft-start`, `0x30=Boost`, `0x40=Absorption`, `0x70=Float`; also a fast mode mirror before `0x03F10801` is seen |
+| Charging mode command | `0x0F00FF20` | RedVision/source `0x20`, `43 00 FF FF <mode> 00 00 00`; `<mode>` is `0x00=Touring`, `0x01=Storage` |
+| Charge-cycle request candidate | `0x0F00FF20` | `4D 00 FF FF 01 00 00 00`; likely force boost / restart charge cycle, kept candidate until more tests |
 
 Recommended solar Wh YAML option:
 

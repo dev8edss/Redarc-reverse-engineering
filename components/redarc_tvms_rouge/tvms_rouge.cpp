@@ -103,7 +103,7 @@ void TVMSRougeComponent::setup() {
 
 void TVMSRougeComponent::dump_config() {
   ESP_LOGCONFIG(TAG, "TVMS Rouge SA=0x%02X HA=0x%02X", this->source_address_, this->host_address_);
-  ESP_LOGCONFIG(TAG, "  Output cmd: 0x%08X  DGN: 0x1F108, 0x1FD02, 0x1FD12, 0x1FD14", this->output_command_id_);
+  ESP_LOGCONFIG(TAG, "  Output cmd: 0x%08X  DGN: 0x1F108, 0x1FD00, 0x1FD02, 0x1FD12", this->output_command_id_);
   LOG_SENSOR("  ", "Input Voltage", this->input_voltage_sensor_);
   LOG_SENSOR("  ", "Input Current", this->input_current_sensor_);
   LOG_SWITCH("  ", "Master", this->master_switch_);
@@ -206,8 +206,6 @@ void TVMSRougeComponent::handle_can_frame(uint32_t can_id, const std::vector<uin
   }
 
   if (redarc_common::rvc_matches(can_id, 0x1FD14UL, this->source_address_)) {
-    // Button state changes are not throttled; they are edge events.
-    this->handle_button_status_frame_(data);
     return;
   }
 
@@ -228,13 +226,7 @@ void TVMSRougeComponent::handle_can_frame(uint32_t can_id, const std::vector<uin
   }
 
   if (redarc_common::rvc_matches(can_id, 0x1FD00UL, this->source_address_)) {
-    const uint8_t base_channel = data[0];
-    for (uint8_t i = 1; i < 8; i++) {
-      const uint8_t value = data[i];
-      if (value != 0x00 && value != 0x01) continue;
-      const uint8_t channel = base_channel + i - 1;
-      if (channel == 0x0B) this->publish_channel_(channel, value == 0x01);
-    }
+    this->handle_button_status_frame_(data);
     return;
   }
 
@@ -270,22 +262,20 @@ void TVMSRougeComponent::publish_channel_(uint8_t channel, bool state) {
 void TVMSRougeComponent::handle_button_status_frame_(const std::vector<uint8_t> &data) {
   if (data.size() < 8) return;
 
-  const uint8_t base_channel = data[0];
+  const uint8_t base_input = data[0];
   for (uint8_t i = 1; i <= 7; i++) {
-    const uint8_t channel = base_channel + i - 1;
-    if (channel < 0x0C || channel > 0x15) continue;
+    const uint8_t input_number = base_input + i - 1;
+    if (input_number < 1 || input_number > 8) continue;
 
     const uint8_t value = data[i];
-    if (value != 0x00 && value != 0x02) continue;
+    if (value != 0x00 && value != 0x01) continue;
 
-    const uint8_t output_number = channel - 0x0B;
-    this->set_button_state_(output_number, value == 0x02);
+    this->set_button_state_(input_number, value == 0x01);
   }
 }
 
-
 void TVMSRougeComponent::set_button_state_(uint8_t output_number, bool active) {
-  if (output_number < 1 || output_number > 10) return;
+  if (output_number < 1 || output_number > 8) return;
   if (this->button_state_known_[output_number] && this->button_states_[output_number] == active) return;
 
   this->button_state_known_[output_number] = true;
