@@ -373,8 +373,8 @@ BO_ 2617049124 TVMS1280_Output_Feedback_Status: 8 TVMS_1280
  SG_ TVMS1280_Feedback_BasePlus4 : 40|8@1+ (1,0) [0|255] "state" Vector__XXX
  SG_ TVMS1280_Feedback_BasePlus5 : 48|8@1+ (1,0) [0|255] "state" Vector__XXX
  SG_ TVMS1280_Feedback_BasePlus6 : 56|8@1+ (1,0) [0|255] "state" Vector__XXX
-CM_ BO_ 2617049124 "CONFIRMED_CORRECT_DO_NOT_EDIT: TVMS1280 output feedback. Raw CAN ID 0x1BFD0024, PGN 0x1BFD00, SA 0x24. D1 is base channel; D2-D8 are states for base+0..base+6.";
-CM_ SG_ 2617049124 TVMS1280_Feedback_BaseChannel "D1 base channel. Example base 0x08 with D3=0x01 means channel 0x09 ON; D4 maps channel 0x0A.";
+CM_ BO_ 2617049124 "PARTLY_CONFIRMED: TVMS1280 channel feedback. Raw CAN ID 0x1BFD0024, PGN 0x1BFD00, SA 0x24. D1 is base channel; D2-D8 are states for base+0..base+6. Output channels 0x04-0x0D are confirmed; digital input channels 0x01-0x03 are candidate/test entities.";
+CM_ SG_ 2617049124 TVMS1280_Feedback_BaseChannel "D1 base channel. Example base 0x08 with D3=0x01 means channel 0x09 ON; D4 maps channel 0x0A. Candidate digital inputs should appear as channels 0x01, 0x02, and 0x03 if they share this feedback frame.";
 CM_ SG_ 2617049124 TVMS1280_Feedback_BasePlus0 "State for channel base+0. 0x00=OFF, 0x01=ON, 0xF8/0xFF=unavailable/ignore.";
 CM_ SG_ 2617049124 TVMS1280_Feedback_BasePlus1 "State for channel base+1. 0x00=OFF, 0x01=ON, 0xF8/0xFF=unavailable/ignore.";
 CM_ SG_ 2617049124 TVMS1280_Feedback_BasePlus2 "State for channel base+2. 0x00=OFF, 0x01=ON, 0xF8/0xFF=unavailable/ignore.";
@@ -382,8 +382,8 @@ CM_ SG_ 2617049124 TVMS1280_Feedback_BasePlus3 "State for channel base+3. 0x00=O
 CM_ SG_ 2617049124 TVMS1280_Feedback_BasePlus4 "State for channel base+4. 0x00=OFF, 0x01=ON, 0xF8/0xFF=unavailable/ignore.";
 CM_ SG_ 2617049124 TVMS1280_Feedback_BasePlus5 "State for channel base+5. 0x00=OFF, 0x01=ON, 0xF8/0xFF=unavailable/ignore.";
 CM_ SG_ 2617049124 TVMS1280_Feedback_BasePlus6 "State for channel base+6. 0x00=OFF, 0x01=ON, 0xF8/0xFF=unavailable/ignore.";
-BA_ "Decode_Status" BO_ 2617049124 "CONFIRMED_CORRECT_DO_NOT_EDIT";
-BA_ "Decode_Status" SG_ 2617049124 TVMS1280_Feedback_BaseChannel "CONFIRMED_CORRECT_DO_NOT_EDIT";
+BA_ "Decode_Status" BO_ 2617049124 "PARTLY_CONFIRMED";
+BA_ "Decode_Status" SG_ 2617049124 TVMS1280_Feedback_BaseChannel "PARTLY_CONFIRMED";
 BA_ "Decode_Status" SG_ 2617049124 TVMS1280_Feedback_BasePlus0 "CONFIRMED_CORRECT_DO_NOT_EDIT";
 BA_ "Decode_Status" SG_ 2617049124 TVMS1280_Feedback_BasePlus1 "CONFIRMED_CORRECT_DO_NOT_EDIT";
 BA_ "Decode_Status" SG_ 2617049124 TVMS1280_Feedback_BasePlus2 "CONFIRMED_CORRECT_DO_NOT_EDIT";
@@ -766,8 +766,9 @@ CM_ "v61 update: Added confirmed Battery Sensor battery type decode. Config writ
 CM_ "v62 update: Added confirmed Manager30 vehicle input trigger decode. Config write raw CAN ID 0x0F0001FA uses D1=0x68, D3=0x03, D5-D6 little-endian trigger; status raw CAN ID 0x03F20601 reports trigger in D8. Mapping: 0=Auto, 1=12V, 2=24V, 3=Ignition, 5=On.";
 CM_ "v63 update: Added confirmed Redvision Display setting-change broadcast decode. Raw CAN ID 0x0F00FF20 from source 0x20 uses D1 as setting ID and D5-D6 little-endian value for battery type, capacity, max charge current, low SOC alarm, low voltage alarm, and vehicle input trigger.";
 CM_ "v64 update: Added unconfirmed TVMS master command entries based on config/label pages: TVMS1280 item/channel 0x0F is Master switch, TVMS Rouge item/channel 0x0B is Master. ESPHome exposes them as HA switches using the existing TVMS on/off command shape.";
+CM_ "v65 update: Added ESPHome test entities for TVMS1280 digital inputs 1-3. Channel map supplied by user: digital inputs are 0x01-0x03, outputs are 0x04-0x0D, inverter is 0x0E, master is 0x0F. Live-state PGN is still candidate; current test path uses 0x1BFD0024 channel feedback.";
 
 CM_ SG_ 2617049636 TVMS1280_Temp2_C "NOTE: TVMS1280 Voltage Input 1 candidate is currently decoded in ESPHome from 0x1BFD0224 page/mux 0x11 D2 / 10. It is expected to read near 0.0 V when the external voltage input is disconnected. This overlaps the temp/tank/status PGN and is kept as a diagnostic candidate until fully confirmed.";
 CM_ SG_ 2617049636 TVMS1280_Temp1_C "NOTE: TVMS1280 Voltage Input 2 candidate is currently decoded in ESPHome from 0x1BFD0224 page/mux 0x14 D2 / 10 and has appeared around 11.9-12.0 V in logs. This overlaps the temp/tank/status PGN and is kept as a diagnostic candidate until fully confirmed.";
 
-CM_ "TVMS1280_DIGITAL_INPUTS_NOTE: Hardware has 3 digital inputs, currently unused. No ESPHome entities or DBC signals should be added until a one-at-a-time input toggle capture confirms the PGN and bit/byte mapping.";
+CM_ "TVMS1280_DIGITAL_INPUTS_NOTE: Hardware has 3 digital inputs mapped to channels 0x01, 0x02, and 0x03. ESPHome exposes candidate binary sensors from 0x1BFD0024 channel feedback for field testing. A one-at-a-time input toggle capture is still needed before marking the live-state decode confirmed.";

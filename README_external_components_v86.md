@@ -286,10 +286,10 @@ Current diagnostic interpretation:
 ### Digital inputs
 
 - TVMS1280 hardware has **3 digital inputs**.
-- In the current installation they are **not being used**.
-- No confirmed CAN PGN/byte decode for the 3 digital input states has been identified yet.
-- Do not treat these as Rouge-style hardware button inputs. The Rouge button/dimming-active state is `0x1BFD1430`; TVMS1280 digital inputs are separate hardware inputs and currently have no Home Assistant entities.
-- Candidate frames to watch during future testing are the TVMS1280 status/input frames already seen on the bus: `0x1BFD0224`, `0x1BFCF024`, `0x1BFCF224`, and `0x13F10824`.
+- Channel map for testing: digital inputs are `0x01`, `0x02`, and `0x03`; outputs are `0x04`-`0x0D`; inverter is `0x0E`.
+- ESPHome exposes candidate Home Assistant binary sensors for the 3 digital input states using `0x1BFD0024` channel feedback.
+- Do not treat these as Rouge-style hardware button inputs. The Rouge button/dimming-active state is `0x1BFD1430`; TVMS1280 digital inputs are separate hardware inputs.
+- A one-at-a-time input toggle capture is still needed before marking the live-state decode confirmed.
 
 ## Manager30
 

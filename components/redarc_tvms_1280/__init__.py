@@ -1,6 +1,6 @@
 import esphome.codegen as cg
 import esphome.config_validation as cv
-from esphome.components import sensor, switch
+from esphome.components import binary_sensor, sensor, switch
 from esphome.const import (
     CONF_ACCURACY_DECIMALS, CONF_DEVICE_CLASS, CONF_DISABLED_BY_DEFAULT,
     CONF_ENTITY_CATEGORY, CONF_FORCE_UPDATE, CONF_ICON, CONF_ID, CONF_NAME,
@@ -22,7 +22,7 @@ except AttributeError:
     _SWITCH_RESTORE_MODE_OFF = _switch_ns.enum("SwitchRestoreMode", is_class=True).SWITCH_RESTORE_DEFAULT_OFF
 
 CODEOWNERS = ["@dev8edss"]
-AUTO_LOAD = ["sensor", "switch", "redarc_common"]
+AUTO_LOAD = ["binary_sensor", "sensor", "switch", "redarc_common"]
 MULTI_CONF = False
 
 CONF_SOURCE_ADDRESS = "source_address"
@@ -40,8 +40,12 @@ _SC_MAP = {
     "measurement": _StateClass.STATE_CLASS_MEASUREMENT,
     "total_increasing": _StateClass.STATE_CLASS_TOTAL_INCREASING,
 }
+_bs_ns = cg.esphome_ns.namespace("binary_sensor")
+_BSClass = _bs_ns.class_("BinarySensor")
 
 _AUTO_IDS = {}
+for _i in range(1, 4):
+    _AUTO_IDS[cv.GenerateID(f"digital_input_{_i}_id")] = cv.declare_id(_BSClass)
 for _i in range(1, 7):
     _AUTO_IDS[cv.GenerateID(f"tank_{_i}_id")] = cv.declare_id(_SensorClass)
 for _i in range(10):
@@ -139,6 +143,19 @@ async def to_code(config):
         cg.add(var.set_tank_sensor(i, s))
 
     # Output switches (channels 0x04–0x0D)
+    # Digital input binary sensors (candidate decode from channel status 0x01..0x03)
+    for i in range(1, 4):
+        bs = cg.new_Pvariable(config[f"digital_input_{i}_id"])
+        bs_cfg = {
+            CONF_ID: config[f"digital_input_{i}_id"],
+            CONF_NAME: f"{p} Digital Input {i}",
+            CONF_DISABLED_BY_DEFAULT: False,
+            CONF_ICON: "",
+            CONF_ENTITY_CATEGORY: ENTITY_CATEGORY_DIAGNOSTIC,
+        }
+        await binary_sensor.register_binary_sensor(bs, bs_cfg)
+        cg.add(var.set_digital_input_sensor(i, bs))
+
     for i in range(10):
         sw = cg.new_Pvariable(config[f"output_{i}_id"])
         cg.add(sw.set_parent(var))

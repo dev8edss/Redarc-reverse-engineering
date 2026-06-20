@@ -46,13 +46,13 @@ For this project, the full 29-bit CAN ID is always recorded in the DBC and ESPHo
 | Battery Sensor `0x08` | Battery shunt / BMS sensor | confirmed |
 | RedVision 1 `0x20` | Display used to press buttons and send commands | confirmed |
 | RedVision 2 `0x21` | Display / status display | confirmed |
-| TVMS1280 `0x24` | 10 relay outputs, 1 inverter output, 6 tank inputs, 2 temperature sensors, 2 voltage inputs, 3 digital inputs | confirmed hardware; voltage-input fields are partly diagnostic; digital inputs are currently unused and not decoded |
+| TVMS1280 `0x24` | 10 relay outputs, 1 inverter output, 6 tank inputs, 2 temperature sensors, 2 voltage inputs, 3 digital inputs | confirmed hardware; voltage-input fields are partly diagnostic; digital inputs are exposed as test/candidate entities |
 | TVMS Rouge `0x30` | 10 dimmable outputs, 8 hardware button inputs, 2 analog tank sensors, input voltage, input current candidate | confirmed hardware; input-current decode is diagnostic/candidate |
 
 Important corrections:
 
 - TVMS1280 does **not** have Rouge-style hardware button/dimming inputs.
-- TVMS1280 **does** have 3 digital inputs, but they are currently unused in this installation and no confirmed CAN state decode has been identified yet.
+- TVMS1280 **does** have 3 digital inputs on channels `0x01`, `0x02`, and `0x03`; ESPHome exposes candidate binary sensors from the 1280 channel feedback frame for testing.
 - Button/dimming-active data seen so far belongs to TVMS Rouge hardware button inputs and/or RedVision display activity, not TVMS1280.
 - TVMS1280 output state should be taken from `0x1BFD0024`, not from button-style frames.
 
@@ -226,7 +226,7 @@ Component behaviour:
 | TVMS1280 `0x24` | `0x1BFD0224` | `0x1BFD02` | D1=`0x11` | `TVMS1280_Voltage_Input_1_Candidate` | D2 | raw / 10 V | DIAGNOSTIC CANDIDATE; expected near 0 V when disconnected |
 | TVMS1280 `0x24` | `0x1BFD0224` | `0x1BFD02` | D1=`0x14` | `TVMS1280_Voltage_Input_2_Candidate` | D2 | raw / 10 V | DIAGNOSTIC CANDIDATE; observed around 11.9–12.0 V |
 | RedVision 1 `0x20` | `0x0F002420` | `0x0F0024` | — | `TVMS1280_Output_Command` | D4/D5 | D4 channel, D5 `0x00/0x01` | CONFIRMED COMMAND PATTERN |
-| TVMS1280 `0x24` | unknown; candidates `0x1BFD0224` / `0x1BFCF024` / `0x1BFCF224` / `0x13F10824` | unknown | — | `TVMS1280_Digital_Inputs_1_to_3` | unknown | hardware has 3 digital inputs; currently unused; no confirmed CAN decode | HARDWARE KNOWN / CAN DECODE UNKNOWN |
+| TVMS1280 `0x24` | `0x1BFD0024` candidate | `0x1BFD00` | D1 base | `TVMS1280_Digital_Inputs_1_to_3` | channels `0x01`-`0x03` | `0x00=off`, `0x01=on`, `0xF8/0xFF=ignore` | TEST CANDIDATE |
 
 ## Derived values
 
@@ -235,7 +235,7 @@ Component behaviour:
 | `Device_Current_A` from source nodes | `Manager_Output_Current_A - Battery_Current_A` | Battery current is positive while charging and negative while discharging. |
 | `Solar_Input_Power_W` exact/live | `Solar_Input_Current_A × Solar_Input_Voltage` | Standard DBC cannot multiply fields, so ESPHome/Home Assistant should calculate exact live watts. |
 | `Solar_Energy_Wh` | `0x03FCD601 D1=0x00 D2-D5 uint32 little-endian` | Capture showed 14 Wh through 19 Wh. |
-| `TVMS1280_Digital_Inputs_1_to_3` | CAN decode unknown | Hardware has 3 digital inputs, currently unused; capture/testing required before adding HA entities. |
+| `TVMS1280_Digital_Inputs_1_to_3` | candidate from `0x1BFD0024` channel status | Hardware channels are `0x01`-`0x03`; HA binary sensors are present for testing and need one-at-a-time toggle confirmation. |
 
 ## Current decoding patterns
 
@@ -292,9 +292,9 @@ Observed payloads:
 
 ## TVMS1280 digital inputs
 
-TVMS1280 hardware has **3 digital inputs**. They are currently not used in this installation.
+TVMS1280 hardware has **3 digital inputs** on channels `0x01`, `0x02`, and `0x03`.
 
-No confirmed CAN PGN or byte mapping has been identified for these inputs yet. Do not map them to Rouge button/dimming-active frames. Future reverse-engineering should toggle one digital input at a time and compare the TVMS1280 status/input frames, especially `0x1BFD0224`, `0x1BFCF024`, `0x1BFCF224`, and `0x13F10824`.
+ESPHome exposes candidate binary sensors using `0x1BFD0024` channel feedback. Do not map them to Rouge button/dimming-active frames. A one-at-a-time toggle capture is still needed before marking the live-state decode confirmed.
 
 ## ESPHome device setup
 
