@@ -5,6 +5,19 @@ namespace redarc_tvms_1280 {
 
 static const char *const TAG = "redarc_tvms_1280";
 
+namespace {
+static constexpr uint8_t TVMS1280_ITEM_INPUT_1 = 0x01;
+static constexpr uint8_t TVMS1280_ITEM_INPUT_3 = 0x03;
+static constexpr uint8_t TVMS1280_ITEM_OUTPUT_1 = 0x04;
+static constexpr uint8_t TVMS1280_ITEM_OUTPUT_10 = 0x0D;
+static constexpr uint8_t TVMS1280_ITEM_INVERTER = 0x0E;
+static constexpr uint8_t TVMS1280_ITEM_MASTER = 0x0F;
+static constexpr uint8_t TVMS1280_ITEM_VOLTAGE_INPUT_1 = 0x11;
+static constexpr uint8_t TVMS1280_ITEM_TEMP_2 = 0x14;
+static constexpr uint8_t TVMS1280_ITEM_TANK_3 = 0x17;
+static constexpr uint8_t TVMS1280_ITEM_TANK_6 = 0x1A;
+}  // namespace
+
 void TVMS1280Switch::write_state(bool state) {
   if (this->parent_ != nullptr) this->parent_->send_channel(this->channel_, state);
   this->publish_state(state);
@@ -45,13 +58,13 @@ void TVMS1280Component::publish_output_(uint8_t output_number, bool state) {
 }
 
 void TVMS1280Component::publish_channel_(uint8_t channel, bool state) {
-  if (channel >= 0x01 && channel <= 0x03) {
+  if (channel >= TVMS1280_ITEM_INPUT_1 && channel <= TVMS1280_ITEM_INPUT_3) {
     if (this->digital_input_sensors_[channel] != nullptr) this->digital_input_sensors_[channel]->publish_state(state);
-  } else if (channel >= 0x04 && channel <= 0x0D) {
-    this->publish_output_(channel - 0x04, state);
-  } else if (channel == 0x0E && this->inverter_switch_ != nullptr) {
+  } else if (channel >= TVMS1280_ITEM_OUTPUT_1 && channel <= TVMS1280_ITEM_OUTPUT_10) {
+    this->publish_output_(channel - TVMS1280_ITEM_OUTPUT_1, state);
+  } else if (channel == TVMS1280_ITEM_INVERTER && this->inverter_switch_ != nullptr) {
     this->inverter_switch_->publish_state(state);
-  } else if (channel == 0x0F && this->master_switch_ != nullptr) {
+  } else if (channel == TVMS1280_ITEM_MASTER && this->master_switch_ != nullptr) {
     this->master_switch_->publish_state(state);
   }
 }
@@ -68,7 +81,7 @@ void TVMS1280Component::handle_can_frame(uint32_t can_id, const std::vector<uint
   }
 
   if (redarc_common::rvc_matches(can_id, 0x1FD02UL, this->source_address_)) {
-    if (data[0] == 0x11) {
+    if (data[0] == TVMS1280_ITEM_VOLTAGE_INPUT_1) {
       if (now - this->last_mux_0x11_ms_ < this->filter_interval_ms_) return;
       this->last_mux_0x11_ms_ = now;
       if (this->voltage_input1_sensor_ != nullptr) {
@@ -80,13 +93,13 @@ void TVMS1280Component::handle_can_frame(uint32_t can_id, const std::vector<uint
         this->voltage_input2_sensor_->publish_state((float) raw_mv2 / 1000.0f);
       }
       if (this->temp2_sensor_ != nullptr) this->temp2_sensor_->publish_state((float) data[5] - 100.0f);
-    } else if (data[0] == 0x14) {
+    } else if (data[0] == TVMS1280_ITEM_TEMP_2) {
       if (now - this->last_mux_0x14_ms_ < this->filter_interval_ms_) return;
       this->last_mux_0x14_ms_ = now;
       if (this->temp1_sensor_ != nullptr) this->temp1_sensor_->publish_state((float) data[1] - 100.0f);
       if (this->tank_sensors_[1] != nullptr) this->tank_sensors_[1]->publish_state((float) data[3]);
       if (this->tank_sensors_[2] != nullptr) this->tank_sensors_[2]->publish_state((float) data[5]);
-    } else if (data[0] == 0x17) {
+    } else if (data[0] == TVMS1280_ITEM_TANK_3) {
       if (now - this->last_mux_0x17_ms_ < this->filter_interval_ms_) return;
       this->last_mux_0x17_ms_ = now;
       if (this->tank_sensors_[3] != nullptr) this->tank_sensors_[3]->publish_state((float) data[1]);
@@ -94,10 +107,14 @@ void TVMS1280Component::handle_can_frame(uint32_t can_id, const std::vector<uint
       // DBC v50 confirmed: TVMS1280_Tank5_Percent is MUX 0x17, D6, raw percent.
       // Earlier experimental builds used x1.25; remove that now-confirmed wrong scale.
       if (this->tank_sensors_[5] != nullptr) this->tank_sensors_[5]->publish_state((float) data[5]);
-    } else if (data[0] == 0x1A) {
+    } else if (data[0] == TVMS1280_ITEM_TANK_6) {
       if (now - this->last_mux_0x1A_ms_ < this->filter_interval_ms_) return;
       this->last_mux_0x1A_ms_ = now;
       if (this->tank_sensors_[6] != nullptr) this->tank_sensors_[6]->publish_state((float) data[1]);
+    } else if (now - this->last_unknown_mux_ms_ >= this->filter_interval_ms_) {
+      this->last_unknown_mux_ms_ = now;
+      ESP_LOGV(TAG, "TVMS1280 unknown 0x1FD02 item page 0x%02X: %02X %02X %02X %02X %02X %02X %02X %02X",
+               data[0], data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7]);
     }
     return;
   }
@@ -125,7 +142,7 @@ void TVMS1280Component::handle_can_frame(uint32_t can_id, const std::vector<uint
   }
 
   if (redarc_common::rvc_matches(can_id, 0x1FCF0UL, this->source_address_)) {
-    if (data[1] == 0x0E && this->inverter_switch_ != nullptr) this->inverter_switch_->publish_state(data[0] != 0);
+    if (data[1] == TVMS1280_ITEM_INVERTER && this->inverter_switch_ != nullptr) this->inverter_switch_->publish_state(data[0] != 0);
     return;
   }
 }

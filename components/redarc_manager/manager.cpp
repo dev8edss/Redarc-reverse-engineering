@@ -179,9 +179,10 @@ void Manager30Component::handle_can_frame(uint32_t can_id, const std::vector<uin
   // power was about 87 W. D1=0x01/0x02 companion frames were observed but
   // remain unknown and are ignored.
   if (redarc_common::rvc_matches(can_id, 0x1FCD6UL, this->source_address_)) {
+    if (data[0] != 0x00) return;
     if (now - this->last_solar_energy_ms_ < this->filter_interval_ms_) return;
     this->last_solar_energy_ms_ = now;
-    if (this->solar_energy_sensor_ != nullptr && data[0] == 0x00) {
+    if (this->solar_energy_sensor_ != nullptr) {
       const uint32_t wh = redarc_common::u32_le(data, 1);
       this->solar_energy_sensor_->publish_state((float) wh);
     }

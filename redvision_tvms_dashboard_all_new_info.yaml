@@ -13,7 +13,6 @@ cards:
       `Manager30 Output Current - Battery Current`
 
       Battery current is positive while charging and negative while discharging.
-
   - square: false
     type: grid
     title: Power Summary
@@ -79,7 +78,6 @@ cards:
           green: 12.4
           yellow: 11.8
           red: 0
-
   - type: entities
     title: Battery, Manager30 and AC
     show_header_toggle: false
@@ -123,7 +121,6 @@ cards:
       - entity: sensor.redvision_can_bridge_battery_temperature
         name: Battery Temperature
         icon: mdi:thermometer
-
   - type: entities
     title: Battery Settings
     show_header_toggle: false
@@ -146,7 +143,6 @@ cards:
       - entity: button.redvision_can_bridge_battery_calibrate_soc_full
         name: Calibrate SOC Full
         icon: mdi:battery-sync
-
   - type: entities
     title: TVMS Voltage and Current Inputs
     show_header_toggle: false
@@ -163,7 +159,6 @@ cards:
       - entity: sensor.redvision_can_bridge_tvms1280_voltage_input_2
         name: TVMS1280 Voltage Input 2
         icon: mdi:meter-electric-outline
-
   - type: history-graph
     title: Current History
     hours_to_show: 6
@@ -176,7 +171,6 @@ cards:
         name: Devices
       - entity: sensor.redvision_can_bridge_tvms_rouge_input_current
         name: Rouge Input
-
   - type: history-graph
     title: Voltage History
     hours_to_show: 6
@@ -193,7 +187,6 @@ cards:
         name: TVMS1280 V In 2
       - entity: sensor.redvision_can_bridge_manager30_ac_input_voltage
         name: AC Input
-
   - type: grid
     title: Solar
     columns: 4
@@ -221,7 +214,6 @@ cards:
         name: Solar Current
         entity: sensor.redvision_can_bridge_manager30_solar_current
         icon: mdi:current-dc
-
   - type: history-graph
     title: Solar History
     hours_to_show: 6
@@ -234,7 +226,6 @@ cards:
         name: Solar V
       - entity: sensor.redvision_can_bridge_manager30_solar_current
         name: Solar A
-
   - type: grid
     title: TVMS Rouge Outputs
     columns: 2
@@ -304,7 +295,6 @@ cards:
         show_brightness_control: true
         collapsible_controls: true
         layout: vertical
-
   - type: entities
     title: TVMS Rouge Output Levels
     show_header_toggle: false
@@ -329,7 +319,6 @@ cards:
         name: Output 9 Level
       - entity: sensor.redvision_can_bridge_tvms_rouge_output_10_level
         name: Output 10 Level
-
   - type: entities
     title: TVMS Rouge Input Buttons
     show_header_toggle: false
@@ -351,7 +340,6 @@ cards:
         name: Input Button 7
       - entity: binary_sensor.redvision_can_bridge_tvms_rouge_input_button_8
         name: Input Button 8
-
   - type: entities
     title: TVMS1280 Outputs
     show_header_toggle: false
@@ -381,7 +369,6 @@ cards:
         name: Output 9
       - entity: switch.redvision_can_bridge_tvms1280_inverter
         name: Inverter
-
   - type: entities
     title: TVMS1280 Digital Inputs
     show_header_toggle: false
@@ -393,7 +380,6 @@ cards:
         name: Digital Input 2
       - entity: binary_sensor.redvision_can_bridge_tvms1280_digital_input_3
         name: Digital Input 3
-
   - type: grid
     title: Water Tanks
     columns: 2
@@ -473,7 +459,6 @@ cards:
           green: 50
           yellow: 20
           red: 0
-
   - type: entities
     title: Temperatures
     show_header_toggle: false
@@ -487,10 +472,8 @@ cards:
       - entity: sensor.redvision_can_bridge_battery_temperature
         name: Battery Sensor Temperature
         icon: mdi:thermometer
-
   - type: markdown
     content: "# Diagnostics"
-
   - type: markdown
     content: >
       # RedVision Diagnostics
@@ -500,35 +483,32 @@ cards:
 
       Redvision values should broadly match the source-node values, but the
       Manager30 and Battery Sensor values are the primary measurements.
-
   - type: entities
     title: Redvision Display/Rebroadcast Values
     show_header_toggle: false
     entities:
-      - entity: sensor.redvision_can_bridge_redvision1_battery_current_display
-        name: Redvision 1 Battery Current Display
-      - entity: sensor.redvision_can_bridge_redvision1_device_current_display
-        name: Redvision 1 Device Current Display
-      - entity: sensor.redvision_can_bridge_redvision2_manager_output_current_display
-        name: Redvision 2 Manager Output Current Display
-
+      - entity: sensor.redvision_can_bridge_redvision_battery_current_display
+        name: Redvision Battery Current Display
+      - entity: sensor.redvision_can_bridge_redvision_device_current_display
+        name: Redvision Device Current Display
+      - entity: sensor.redvision_can_bridge_redvision_manager_output_current_display
+        name: Redvision Manager Output Current Display
   - type: history-graph
     title: Source vs Redvision Current Comparison
     hours_to_show: 6
     entities:
       - entity: sensor.redvision_can_bridge_manager30_output_current
         name: Manager Source
-      - entity: sensor.redvision_can_bridge_redvision2_manager_output_current_display
-        name: Manager Redvision 2
+      - entity: sensor.redvision_can_bridge_redvision_manager_output_current_display
+        name: Manager Redvision
       - entity: sensor.redvision_can_bridge_battery_current
         name: Battery Source
-      - entity: sensor.redvision_can_bridge_redvision1_battery_current_display
-        name: Battery Redvision 1
+      - entity: sensor.redvision_can_bridge_redvision_battery_current_display
+        name: Battery Redvision
       - entity: sensor.redvision_can_bridge_manager30_device_current
         name: Device Derived
-      - entity: sensor.redvision_can_bridge_redvision1_device_current_display
-        name: Device Redvision 1
-
+      - entity: sensor.redvision_can_bridge_redvision_device_current_display
+        name: Device Redvision
   - type: entities
     title: Raw Values
     show_header_toggle: false
@@ -537,5 +517,5 @@ cards:
         name: Manager30 Output Current Raw
       - entity: sensor.redvision_can_bridge_battery_current_raw
         name: Battery Current Raw
-      - entity: sensor.redvision_can_bridge_redvision2_manager_output_current_display_raw
-        name: Redvision 2 Manager Output Current Display Raw
+      - entity: sensor.redvision_can_bridge_redvision_manager_output_current_display_raw
+        name: Redvision Manager Output Current Display Raw

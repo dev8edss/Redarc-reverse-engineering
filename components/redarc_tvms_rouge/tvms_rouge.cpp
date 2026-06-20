@@ -5,6 +5,17 @@ namespace redarc_tvms_rouge {
 
 static const char *const TAG = "redarc_tvms_rouge";
 
+namespace {
+static constexpr uint8_t ROUGE_ITEM_DIGITAL_INPUT_1 = 0x01;
+static constexpr uint8_t ROUGE_ITEM_DIGITAL_INPUT_8 = 0x08;
+static constexpr uint8_t ROUGE_ITEM_TANK_1 = 0x09;
+static constexpr uint8_t ROUGE_ITEM_MASTER = 0x0B;
+static constexpr uint8_t ROUGE_ITEM_OUTPUT_1 = 0x0C;
+static constexpr uint8_t ROUGE_ITEM_OUTPUT_10 = 0x15;
+static constexpr uint8_t ROUGE_ITEM_INPUT_VOLTAGE = 0x16;
+static constexpr uint8_t ROUGE_ITEM_INPUT_CURRENT = 0x17;
+}  // namespace
+
 void TVMSRougeSwitch::write_state(bool state) {
   if (this->parent_ != nullptr) this->parent_->send_master(state);
   this->publish_state(state);
@@ -143,9 +154,9 @@ void TVMSRougeComponent::send_level_(uint8_t channel, uint8_t percent) {
 
 void TVMSRougeComponent::send_master(bool state) {
   if (state) {
-    this->send_on_(0x0B);
+    this->send_on_(ROUGE_ITEM_MASTER);
   } else {
-    this->send_off_(0x0B);
+    this->send_off_(ROUGE_ITEM_MASTER);
   }
   ESP_LOGI(TAG, "Master channel 0x0B %s", state ? "ON" : "OFF");
 }
@@ -182,25 +193,30 @@ void TVMSRougeComponent::handle_can_frame(uint32_t can_id, const std::vector<uin
   const uint32_t now = millis();
 
   if (redarc_common::rvc_matches(can_id, 0x1FD02UL, this->source_address_)) {
-    if (data[0] == 0x09) {
+    if (data[0] == ROUGE_ITEM_TANK_1) {
       if (now - this->last_tank_ms_ >= this->filter_interval_ms_) {
         this->last_tank_ms_ = now;
         if (this->tank1_sensor_ != nullptr) this->tank1_sensor_->publish_state((float) data[1]);
         if (this->tank2_sensor_ != nullptr) this->tank2_sensor_->publish_state((float) data[2]);
       }
-    } else if (data[0] == 0x16) {
-      if (now - this->last_input_current_ms_ >= this->filter_interval_ms_) {
-        this->last_input_current_ms_ = now;
+    } else if (data[0] == ROUGE_ITEM_INPUT_VOLTAGE) {
+      if (now - this->last_input_voltage_ms_ >= this->filter_interval_ms_) {
+        this->last_input_voltage_ms_ = now;
         if (this->input_voltage_sensor_ != nullptr) {
           const uint16_t raw_mv = (uint16_t) data[1] | ((uint16_t) data[2] << 8);
           this->input_voltage_sensor_->publish_state((float) raw_mv / 1000.0f);
         }
-        if (this->input_current_sensor_ != nullptr && data[2] != 0xFF) {
-          const float current = data[2] / 10.0f;
-          if (current >= 0.0f && current <= 25.5f)
-            this->input_current_sensor_->publish_state(current);
-        }
       }
+    } else if (data[0] == ROUGE_ITEM_INPUT_CURRENT) {
+      if (now - this->last_input_current_ms_ >= this->filter_interval_ms_) {
+        this->last_input_current_ms_ = now;
+        ESP_LOGV(TAG, "Rouge input-current page candidate: %02X %02X %02X %02X %02X %02X %02X %02X",
+                 data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7]);
+      }
+    } else if (now - this->last_unknown_1fd02_ms_ >= this->filter_interval_ms_) {
+      this->last_unknown_1fd02_ms_ = now;
+      ESP_LOGV(TAG, "Rouge unknown 0x1FD02 item page 0x%02X: %02X %02X %02X %02X %02X %02X %02X %02X",
+               data[0], data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7]);
     }
     return;
   }
@@ -242,13 +258,13 @@ void TVMSRougeComponent::handle_can_frame(uint32_t can_id, const std::vector<uin
 }
 
 void TVMSRougeComponent::publish_channel_(uint8_t channel, bool state) {
-  if (channel == 0x0B) {
+  if (channel == ROUGE_ITEM_MASTER) {
     if (this->master_switch_ != nullptr) this->master_switch_->publish_state(state);
     return;
   }
-  if (channel < 0x0C || channel > 0x15) return;
+  if (channel < ROUGE_ITEM_OUTPUT_1 || channel > ROUGE_ITEM_OUTPUT_10) return;
 
-  const uint8_t output_number = channel - 0x0B;
+  const uint8_t output_number = channel - ROUGE_ITEM_MASTER;
   if (!state) {
     this->set_feedback_level_(output_number, 0.0f);
     return;
@@ -262,21 +278,18 @@ void TVMSRougeComponent::publish_channel_(uint8_t channel, bool state) {
 void TVMSRougeComponent::handle_channel_status_frame_(const std::vector<uint8_t> &data) {
   if (data.size() < 8) return;
 
-  // DGN 0x1FD00 is a paginated channel-state array (same layout the TVMS1280 uses):
-  // data[0] is the base channel number and data[1..7] are the states for
-  // base..base+6. Only 0x00/0x01 are valid on/off states; 0xF8/0xFF (no data) and
-  // dimming-level bytes are ignored. Channel map: 0x01-0x08 = input buttons,
-  // 0x0B = master, 0x0C-0x15 = outputs. Output brightness is reported separately
-  // via 0x1FD12, so outputs are not decoded here.
+  // DGN 0x1FD00 is a paginated byte-state array. D1 is the base item ID and
+  // D2-D8 are states for base..base+6. Only 0x00/0x01 are valid states;
+  // 0xF8/0xFF no-data markers and dimming-level bytes are ignored.
   const uint8_t base_channel = data[0];
   for (uint8_t i = 1; i <= 7; i++) {
     const uint8_t value = data[i];
     if (value != 0x00 && value != 0x01) continue;
 
     const uint8_t channel = base_channel + i - 1;
-    if (channel >= 0x01 && channel <= 0x08) {
+    if (channel >= ROUGE_ITEM_DIGITAL_INPUT_1 && channel <= ROUGE_ITEM_DIGITAL_INPUT_8) {
       this->set_button_state_(channel, value == 0x01);
-    } else if (channel == 0x0B && this->master_switch_ != nullptr) {
+    } else if (channel == ROUGE_ITEM_MASTER && this->master_switch_ != nullptr) {
       this->master_switch_->publish_state(value == 0x01);
     }
   }

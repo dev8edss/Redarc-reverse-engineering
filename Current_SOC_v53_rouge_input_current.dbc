@@ -141,7 +141,7 @@ CM_ SG_ 2617049648 WaterTank_MUX "D1 message type/mux. 0x09 = water tank levels.
 CM_ SG_ 2617049648 WaterTank1_Percent "D2 = Tank 1 level percent. 0x00 = 0%, 0x64 = 100%. Scale: raw percent.";
 CM_ SG_ 2617049648 WaterTank2_Percent "D3 = Tank 2 level percent. 0x00 = 0%, 0x64 = 100%. Scale: raw percent.";
 CM_ SG_ 2617049648 TVMSRouge_Input_Voltage "CONFIRMED_CORRECT_DO_NOT_EDIT: MUX 0x16, D2-D3 little-endian uint16 millivolts. Live input voltage. ESPHome: data[1]|(data[2]<<8) / 1000.0.";
-CM_ SG_ 2617049648 TVMSRouge_Input_Current_A_Candidate "CANDIDATE: Label pages identify item 0x17 as Input Current. In 0x1BFD0230 with D1/base=0x16, D3 maps to item 0x17. Observed payloads include 16 C2 2F FF FF FF FF FF, 16 C1 2F FF FF FF FF FF, 16 BC 2F FF FF FF FF FF, so D3=0x2F likely means 4.7 A using /10 A. Needs controlled current-change confirmation before marking confirmed.";
+CM_ SG_ 2617049648 TVMSRouge_Input_Current_A_Candidate "DECODE_WRONG_PENDING_RETEST: Label pages identify item 0x17 as Input Current, but 0x1BFD0230 D1=0x16 D3 is the high byte of the confirmed D2-D3 input-voltage millivolt field. Do not publish D3/10 A as current. Find the real current page, likely item/mux 0x17 or another frame, with controlled load-current testing.";
 VAL_ 2617049648 WaterTank_MUX 9 "WaterTankLevels" 22 "InputVoltageCurrentCandidates";
 
 
@@ -176,7 +176,7 @@ BA_ "Decode_Status"
 
 
 CM_ "v35 update: mux 0x1A D2 renamed from TVMS1280_Tank5_Percent to TVMS1280_Tank6_Percent per confirmed physical mapping.";
-CM_ "v53 update: Added TVMS Rouge Input Current candidate. Label pages show item 0x17 = Input Current; candidate decode is 0x1BFD0230 D1=0x16, D3/10 A. Marked candidate until controlled load-current testing confirms it.";
+CM_ "v53 update: Added TVMS Rouge Input Current candidate. Superseded by later review: D3 in 0x1BFD0230 D1=0x16 belongs to the confirmed D2-D3 voltage field, so D3/10 A must not be used as current.";
 
 BO_ 2617049636 PGN_1BFD02_TVMS1280_TempTankStatus: 8 TVMS_1280
  SG_ TVMS1280_Status_MUX M : 0|8@1+ (1,0) [0|255] "" Vector__XXX
@@ -789,10 +789,11 @@ BA_ "Decode_Status" SG_ 2549941296 TVMSRouge_Label_Item "CONFIRMED_CORRECT_DO_NO
 BA_ "Decode_Status" SG_ 2549941296 TVMSRouge_Label_Segment "CONFIRMED_CORRECT_DO_NOT_EDIT";
 BA_ "VFrameFormat" BO_ 2549941296 1;
 
-CM_ "v54 update: Added explicit TVMS Rouge label-page decode for raw CAN ID 0x17FD0430. Label item 0x17 is InputCurrent, supporting the 0x1BFD0230 D1=0x16 D3/10 A input-current candidate.";
+CM_ "v54 update: Added explicit TVMS Rouge label-page decode for raw CAN ID 0x17FD0430. Label item 0x17 is InputCurrent. Later review shows this does not support the 0x1BFD0230 D1=0x16 D3/10 A candidate because D3 is part of input voltage.";
 CM_ "v56 update: Added confirmed Battery Sensor configured-capacity decode. Config write raw CAN ID 0x0F0008FA uses D5-D6 little-endian Ah; status echo raw CAN ID 0x13F10008 uses D2-D3 little-endian Ah. Confirmed from battery 450ah - 350 - 400.csv sequence 450, 400, 350, 400 Ah.";
 CM_ "v57 update: Added confirmed Battery Sensor max charge current decode. Config write raw CAN ID 0x0F0008FA with D1=0x14 uses D5-D6 little-endian A; status echo raw CAN ID 0x13F10008 uses D5 raw A. Confirmed corrected sequence 20, 14, 10, 30 A.";
 CM_ "v58 update: Added confirmed Battery Sensor alarm config writes. Raw CAN ID 0x0F0008FA D1=0x41 uses D5-D6 little-endian percent for low SOC alarm; D1=0x42 uses D5-D6 little-endian millivolts for low voltage alarm. Confirmed sequences 10,15,20,30% and 10.0,11.0,11.5,12.0 V.";
+CM_ "v72 decode model: TVMS status DGNs commonly use D1 as the base item/channel ID. For byte-state pages D2-D8 map to base..base+6. For analog pages, each item may consume multiple bytes, so the next byte is not automatically the next item. Example: Rouge item 0x16 InputVoltage uses D2-D3 little-endian millivolts; D3 must not be decoded as item 0x17 InputCurrent.";
 CM_ "v59 update: Added confirmed Battery Sensor alarm report fields on raw CAN ID 0x13F10A08. D2 reports low SOC alarm percent; D3-D4 little-endian millivolts report low voltage alarm. Confirmed around write transitions in more battery config.csv.";
 CM_ "v60 update: Added confirmed Battery Sensor SOC calibration target command. Raw CAN ID 0x0F0008FA D1=0x15 uses D5-D6 little-endian percent; calibrate battery start of charge full 5 times.csv captured five repeats of 100%.";
 CM_ "v61 update: Added confirmed Battery Sensor battery type decode. Config write raw CAN ID 0x0F0008FA D1=0x11 uses D5-D6 little-endian type; status raw CAN ID 0x13F10008 D1 reports type. Mapping: 0=Gel, 1=AGM, 2=LeadAcid, 3=Calcium, 4=Lithium.";

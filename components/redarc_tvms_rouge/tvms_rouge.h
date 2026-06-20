@@ -92,7 +92,9 @@ class TVMSRougeComponent : public Component {
   uint8_t host_address_{0x20};
   uint32_t filter_interval_ms_{5000};
   uint32_t last_tank_ms_{0};
+  uint32_t last_input_voltage_ms_{0};
   uint32_t last_input_current_ms_{0};
+  uint32_t last_unknown_1fd02_ms_{0};
   uint32_t output_command_id_{0};
 
   std::array<float, 11> levels_{};
