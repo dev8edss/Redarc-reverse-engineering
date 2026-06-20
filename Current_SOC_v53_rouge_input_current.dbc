@@ -180,9 +180,10 @@ BO_ 2617049636 PGN_1BFD02_TVMS1280_TempTankStatus: 8 TVMS_1280
  SG_ TVMS1280_Tank5_Percent m23 : 40|8@1+ (1,0) [0|100] "%" Vector__XXX
  SG_ TVMS1280_Tank6_Percent m26 : 8|8@1+ (1,0) [0|100] "%" Vector__XXX
  SG_ TVMS1280_Temp2_C m17 : 40|8@1+ (1,-100) [-100|155] "degC" Vector__XXX
+ SG_ TVMS1280_Voltage_Input2 m17 : 24|16@1+ (0.001,0) [0|65.535] "V" Vector__XXX
 
 CM_ BO_ 2617049636 "Confirmed TVMS_1280 temp/tank status. Raw CAN ID 0x1BFD0224, PGN 0xFD02, source address 0x24. Also a candidate frame to watch for the 3 currently unused TVMS1280 digital inputs, but no digital-input decode is confirmed.";
-CM_ SG_ 2617049636 TVMS1280_Status_MUX "D1 multiplexor. 0x11 contains Temp2. 0x14 contains Temp1, Tank1 and Tank2. 0x17 contains Tank3, Tank4 and Tank5. 0x1A contains Tank6.";
+CM_ SG_ 2617049636 TVMS1280_Status_MUX "D1 multiplexor. 0x11 contains Temp2 and Voltage Input 2. 0x14 contains Temp1, Tank1 and Tank2. 0x17 contains Tank3, Tank4 and Tank5. 0x1A contains Tank6.";
 CM_ SG_ 2617049636 TVMS1280_Temp1_C "MUX 0x14, D2. Temperature formula raw - 100.";
 CM_ SG_ 2617049636 TVMS1280_Tank1_Percent "MUX 0x14, D4. Raw percent.";
 CM_ SG_ 2617049636 TVMS1280_Tank2_Percent "MUX 0x14, D6. Raw percent.";
@@ -191,7 +192,8 @@ CM_ SG_ 2617049636 TVMS1280_Tank4_Percent "MUX 0x17, D4. Raw percent.";
 CM_ SG_ 2617049636 TVMS1280_Tank5_Percent "CONFIRMED_CORRECT_DO_NOT_EDIT: MUX 0x17, D6. Confirmed TVMS1280 Tank 5 percent. Raw value is percent; 0x00=0%, 0x64=100%.";
 CM_ SG_ 2617049636 TVMS1280_Tank6_Percent "MUX 0x1A, D2. Raw percent.";
 CM_ SG_ 2617049636 TVMS1280_Temp2_C "MUX 0x11, D6. Temperature formula raw - 100.";
-VAL_ 2617049636 TVMS1280_Status_MUX 17 "Temp2" 20 "Temp1_Tank1_Tank2" 23 "Tank3_Tank4_Tank5" 26 "Tank6";
+CM_ SG_ 2617049636 TVMS1280_Voltage_Input2 "CONFIRMED_CORRECT_DO_NOT_EDIT: MUX 0x11, D4-D5 little-endian uint16 millivolts. Voltage Input 2 (same signal as supply voltage). Confirmed ~13531-13536 mV (~13.5 V) in voltage input 1280 555 36.csv capture. ESPHome: data[3]|(data[4]<<8) / 1000.0.";
+VAL_ 2617049636 TVMS1280_Status_MUX 17 "Temp2_SupplyVoltage" 20 "Temp1_Tank1_Tank2" 23 "Tank3_Tank4_Tank5" 26 "Tank6";
 
 
 CM_ "v36 update: TVMS1280 Tank5 confirmed on raw CAN ID 0x1BFD0224, mux 0x17, D6. Tank5 uses scale 1.25 because 0x50 represents 100% in the tank 5 100-0.csv capture.";
@@ -260,6 +262,7 @@ BA_ "Decode_Status" SG_ 2617049636 TVMS1280_Tank4_Percent "CONFIRMED_CORRECT_DO_
 BA_ "Decode_Status" SG_ 2617049636 TVMS1280_Tank5_Percent "CONFIRMED_CORRECT_DO_NOT_EDIT";
 BA_ "Decode_Status" SG_ 2617049636 TVMS1280_Tank6_Percent "CONFIRMED_CORRECT_DO_NOT_EDIT";
 BA_ "Decode_Status" SG_ 2617049636 TVMS1280_Temp2_C "CONFIRMED_CORRECT_DO_NOT_EDIT";
+BA_ "Decode_Status" SG_ 2617049636 TVMS1280_Voltage_Input2 "CONFIRMED_CORRECT_DO_NOT_EDIT";
 
 CM_ SG_ 2213677569 Manager_Battery_Voltage "CONFIRMED_CORRECT_DO_NOT_EDIT: Manager30 battery voltage confirmed. Raw CAN ID 0x03F20A01, D5-D6 little-endian, scale 0.001 V/count.";
 BA_ "Decode_Status" SG_ 2213677569 Manager_Battery_Voltage "CONFIRMED_CORRECT_DO_NOT_EDIT";
@@ -710,10 +713,10 @@ BO_ 2482047012 PGN_13F108_TVMS1280_InputStatus: 8 TVMS_1280
  SG_ TVMS1280_Input_Status_D6 : 40|8@1+ (1,0) [0|255] "raw" Vector__XXX
  SG_ TVMS1280_Input_Status_D7 : 48|8@1+ (1,0) [0|255] "raw" Vector__XXX
  SG_ TVMS1280_Input_Status_D8 : 56|8@1+ (1,0) [0|255] "raw" Vector__XXX
-CM_ BO_ 2482047012 "PARTLY_CONFIRMED: TVMS1280 input/status frame. Raw CAN ID 0x13F10824, PGN 0x13F108, SA 0x24. This is a candidate frame to observe while testing the 3 unused TVMS1280 digital inputs; current confirmed decode is supply voltage only.";
-CM_ SG_ 2482047012 TVMS1280_Supply_Voltage "CONFIRMED_CORRECT_DO_NOT_EDIT: D1-D2 little-endian, scale 0.01 V/count. Example F0 04 = 12.64 V. Interpreted as TVMS1280 supply voltage / Voltage Input 2.";
+CM_ BO_ 2482047012 "PARTLY_CONFIRMED: TVMS1280 input/status frame. Raw CAN ID 0x13F10824, PGN 0x13F108, SA 0x24. Candidate frame to observe while testing the 3 unused TVMS1280 digital inputs. Supply voltage decode moved to PGN 0x1FD02 mux 0x11; D1-D2 here is a static frame value and not a live reading.";
+CM_ SG_ 2482047012 TVMS1280_Supply_Voltage "DECODE_WRONG: Frame 0x13F10824 sends static data in every capture (payload never changes). D1-D2 gave a plausible value in early logs but is NOT a live voltage. Supply voltage moved to PGN 0x1FD02 mux 0x11 D4-D5 LE millivolts. See TVMS1280_Supply_Voltage in PGN_1BFD02_TVMS1280_TempTankStatus.";
 BA_ "Decode_Status" BO_ 2482047012 "PARTLY_CONFIRMED";
-BA_ "Decode_Status" SG_ 2482047012 TVMS1280_Supply_Voltage "CONFIRMED_CORRECT_DO_NOT_EDIT";
+BA_ "Decode_Status" SG_ 2482047012 TVMS1280_Supply_Voltage "DECODE_WRONG";
 BA_ "Decode_Status" SG_ 2482047012 TVMS1280_Input_Status_D3 "UNCONFIRMED_PENDING_TEST";
 BA_ "Decode_Status" SG_ 2482047012 TVMS1280_Input_Status_D4 "UNCONFIRMED_PENDING_TEST";
 BA_ "Decode_Status" SG_ 2482047012 TVMS1280_Input_Status_D5 "UNCONFIRMED_PENDING_TEST";

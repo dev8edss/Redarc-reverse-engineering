@@ -37,7 +37,6 @@ class TVMS1280Component : public Component {
   void set_filter_interval_ms(uint32_t ms) { this->filter_interval_ms_ = ms; }
   void set_temp1_sensor(sensor::Sensor *s) { this->temp1_sensor_ = s; }
   void set_temp2_sensor(sensor::Sensor *s) { this->temp2_sensor_ = s; }
-  void set_supply_voltage_sensor(sensor::Sensor *s) { this->supply_voltage_sensor_ = s; }
   void set_voltage_input1_sensor(sensor::Sensor *s) { this->voltage_input1_sensor_ = s; }
   void set_voltage_input2_sensor(sensor::Sensor *s) { this->voltage_input2_sensor_ = s; }
   void set_tank_sensor(uint8_t tank, sensor::Sensor *s) { if (tank >= 1 && tank <= 6) this->tank_sensors_[tank] = s; }
@@ -62,7 +61,6 @@ class TVMS1280Component : public Component {
   uint32_t filter_interval_ms_{5000};
   uint32_t last_input_status_ms_{0};
   uint32_t last_mux_0x11_ms_{0};
-  uint32_t last_mux_0x12_ms_{0};
   uint32_t last_mux_0x14_ms_{0};
   uint32_t last_mux_0x17_ms_{0};
   uint32_t last_mux_0x1A_ms_{0};
@@ -72,7 +70,6 @@ class TVMS1280Component : public Component {
   TVMS1280Switch *master_switch_{nullptr};
   sensor::Sensor *temp1_sensor_{nullptr};
   sensor::Sensor *temp2_sensor_{nullptr};
-  sensor::Sensor *supply_voltage_sensor_{nullptr};
   sensor::Sensor *voltage_input1_sensor_{nullptr};
   sensor::Sensor *voltage_input2_sensor_{nullptr};
   std::array<sensor::Sensor *, 7> tank_sensors_{};

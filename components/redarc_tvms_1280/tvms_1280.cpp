@@ -68,14 +68,6 @@ void TVMS1280Component::handle_can_frame(uint32_t can_id, const std::vector<uint
   const uint32_t now = millis();
 
   if (redarc_common::rvc_matches(can_id, 0x1F108UL, this->source_address_)) {
-    if (now - this->last_input_status_ms_ < this->filter_interval_ms_) return;
-    this->last_input_status_ms_ = now;
-    if (this->supply_voltage_sensor_ != nullptr) {
-      // TVMS1280 module input/status frame. Logs show D1-D2 decode as
-      // little-endian centivolts, e.g. F0 04 -> 0x04F0 / 100 = 12.64 V.
-      const uint16_t raw = (uint16_t) data[0] | ((uint16_t) data[1] << 8);
-      this->supply_voltage_sensor_->publish_state((float) raw / 100.0f);
-    }
     return;
   }
 
@@ -85,12 +77,12 @@ void TVMS1280Component::handle_can_frame(uint32_t can_id, const std::vector<uint
       this->last_mux_0x11_ms_ = now;
       if (this->voltage_input1_sensor_ != nullptr && tvms1280_valid_byte_voltage_(data[1]))
         this->voltage_input1_sensor_->publish_state((float) data[1] / 10.0f);
+      if (this->voltage_input2_sensor_ != nullptr) {
+        // D4:D5 little-endian uint16 in millivolts (Voltage Input 2 / supply).
+        const uint16_t raw_mv = (uint16_t) data[3] | ((uint16_t) data[4] << 8);
+        this->voltage_input2_sensor_->publish_state((float) raw_mv / 1000.0f);
+      }
       if (this->temp2_sensor_ != nullptr) this->temp2_sensor_->publish_state((float) data[5] - 100.0f);
-    } else if (data[0] == 0x12) {
-      if (now - this->last_mux_0x12_ms_ < this->filter_interval_ms_) return;
-      this->last_mux_0x12_ms_ = now;
-      if (this->voltage_input2_sensor_ != nullptr && tvms1280_valid_byte_voltage_(data[1]))
-        this->voltage_input2_sensor_->publish_state((float) data[1] / 10.0f);
     } else if (data[0] == 0x14) {
       if (now - this->last_mux_0x14_ms_ < this->filter_interval_ms_) return;
       this->last_mux_0x14_ms_ = now;
