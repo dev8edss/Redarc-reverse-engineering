@@ -387,9 +387,9 @@ BA_ "Decode_Status" SG_ 66127873 Manager30_ChargingMode_Status "CONFIRMED_CORREC
 
 BO_ 66191361 PGN_03F200_Manager30_ChargingStage: 8 Manager30
  SG_ Manager30_ChargingStage : 0|8@1+ (1,0) [0|255] "stage" Vector__XXX
-CM_ BO_ 66191361 "CONFIRMED_CORRECT_DO_NOT_EDIT: Manager30 fast charging stage/status frame. Raw CAN ID 0x03F20001, PGN 0x03F200, SA 0x01. D1 reports charging stage/state. D1 bit0 also mirrors Touring/Storage before cleaner 0x03F10801 status is seen.";
-CM_ SG_ 66191361 Manager30_ChargingStage "CONFIRMED_CORRECT_DO_NOT_EDIT: D1 charging stage/status. Observed 0x21=Soft-start, 0x30=Boost, 0x40=Absorption, 0x70=Float.";
-VAL_ 66191361 Manager30_ChargingStage 33 "SoftStart" 48 "Boost" 64 "Absorption" 112 "Float" ;
+CM_ BO_ 66191361 "CONFIRMED_CORRECT_DO_NOT_EDIT: Manager30 fast charging stage/status frame. Raw CAN ID 0x03F20001, PGN 0x03F200, SA 0x01. D1 reports charging stage/state. D1 bit0 mirrors Touring/Storage: values ending in 1 are Storage mode.";
+CM_ SG_ 66191361 Manager30_ChargingStage "CONFIRMED_CORRECT_DO_NOT_EDIT: D1 charging stage/status. 0x21=Soft-start, 0x30/0x31=Boost, 0x40/0x41=Absorption, 0x70/0x71=Float, 0x80/0x81=Maintenance. Low bit 1 means Storage mode.";
+VAL_ 66191361 Manager30_ChargingStage 33 "SoftStart" 48 "Boost" 49 "Boost_Storage" 64 "Absorption" 65 "Absorption_Storage" 112 "Float" 113 "Float_Storage" 128 "Maintenance" 129 "Maintenance_Storage" ;
 BA_ "Decode_Status" BO_ 66191361 "CONFIRMED_CORRECT_DO_NOT_EDIT";
 BA_ "Decode_Status" SG_ 66191361 Manager30_ChargingStage "CONFIRMED_CORRECT_DO_NOT_EDIT";
 
@@ -801,7 +801,7 @@ CM_ "v63 update: Added confirmed Redvision Display setting-change broadcast deco
 CM_ "v64 update: Added unconfirmed TVMS master command entries based on config/label pages: TVMS1280 item/channel 0x0F is Master switch, TVMS Rouge item/channel 0x0B is Master. ESPHome exposes them as HA switches using the existing TVMS on/off command shape.";
 CM_ "v65 update: Added ESPHome test entities for TVMS1280 digital inputs 1-3. Channel map supplied by user: digital inputs are 0x01-0x03, outputs are 0x04-0x0D, inverter is 0x0E, master is 0x0F. Live-state PGN is still candidate; current test path uses 0x1BFD0024 channel feedback.";
 CM_ "v66 update: Confirmed TVMS Rouge physical input/button states on 0x1BFD0030. D1=0x01 maps D2-D8 to inputs/buttons 1-7; D1=0x08 maps D2 to input/button 8. State values: 0x00 inactive, 0x01 active. 0x1BFD1430 remained idle in this test and is retained only as output/dimming activity status.";
-CM_ "v67 update: Added Manager30 charging mode and charging stage decode. RedVision 0x0F00FF20 D1=0x43 D5 sets mode: 0=Touring, 1=Storage. Manager30 0x03F10801 D1 bit0 confirms mode. Manager30 0x03F20001 D1 reports stage: 0x21=Soft-start, 0x30=Boost, 0x40=Absorption, 0x70=Float. 0x4D remains a charge-cycle/stage request candidate.";
+CM_ "v67 update: Added Manager30 charging mode and charging stage decode. RedVision 0x0F00FF20 D1=0x43 D5 sets mode: 0=Touring, 1=Storage. Manager30 0x03F10801 D1 bit0 confirms mode. Manager30 0x03F20001 D1 reports stage: 0x21=Soft-start, 0x30/0x31=Boost, 0x40/0x41=Absorption, 0x70/0x71=Float, 0x80/0x81=Maintenance; low bit 1 means Storage mode. 0x4D remains a charge-cycle/stage request candidate.";
 
 CM_ SG_ 2617049636 TVMS1280_Temp2_C "NOTE: TVMS1280 voltage inputs are item/channel 0x11 and 0x12 within the 0x1BFD0224 mux 0x11 page. Voltage Input 1 is D2-D3 millivolts, Voltage Input 2 is D4-D5 millivolts.";
 CM_ SG_ 2617049636 TVMS1280_Temp1_C "NOTE: Temp1 is MUX 0x14 D2. Voltage Input 2 is not on this page; it is item/channel 0x12 in MUX 0x11 D4-D5 millivolts.";

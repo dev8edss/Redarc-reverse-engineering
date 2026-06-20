@@ -198,7 +198,7 @@ Component behaviour:
 | Manager30 `0x01` | `0x03F20801` | `0x03F208` | — | `Solar_Input_Power_W` | derived | current × voltage | DERIVED IN ESPHOME/HA |
 | Manager30 `0x01` | `0x03FCD601` | `0x03FCD6` | D1=`0x00` | `Solar_Energy_Wh` | D2-D5 | uint32 little-endian Wh | CONFIRMED FROM 14→19 Wh CAPTURE |
 | Manager30 `0x01` | `0x03F10801` | `0x03F108` | — | `Charging_Mode_Status` | D1 bit0 | `0=Touring`, `1=Storage` | CONFIRMED CORRECT DO NOT EDIT |
-| Manager30 `0x01` | `0x03F20001` | `0x03F200` | — | `Charging_Stage` | D1 | `0x21=Soft-start`, `0x30=Boost`, `0x40=Absorption`, `0x70=Float` | CONFIRMED CORRECT DO NOT EDIT |
+| Manager30 `0x01` | `0x03F20001` | `0x03F200` | — | `Charging_Stage` | D1 | `0x21=Soft-start`, `0x30/0x31=Boost`, `0x40/0x41=Absorption`, `0x70/0x71=Float`, `0x80/0x81=Maintenance`; low bit 1 means Storage | CONFIRMED CORRECT DO NOT EDIT |
 | RedVision 1 `0x20` | `0x0F00FF20` | `0x0F00FF` | D1=`0x43` | `Manager30_Charging_Mode_Command` | D5 | `0x00=Touring`, `0x01=Storage` | CONFIRMED COMMAND PATTERN |
 | RedVision 1 `0x20` | `0x0F00FF20` | `0x0F00FF` | D1=`0x4D` | `Manager30_Charge_Cycle_Request_Candidate` | D5 | `0x01` likely request boost / restart charge cycle | PARTLY CONFIRMED |
 | Battery Sensor `0x08` | `0x13F10208` | `0x13F102` | — | `Battery_Current_A` | D1-D4 | raw / 1000 - 1000 | CONFIRMED CORRECT DO NOT EDIT |
@@ -365,7 +365,7 @@ Current full component/YAML set can publish:
 - Manager30 derived solar power
 - Manager30 solar energy/yield Wh
 - Manager30 charging mode select, Touring/Storage
-- Manager30 charging stage text, Soft-start/Boost/Absorption/Float
+- Manager30 charging stage text, Soft-start/Boost/Absorption/Float/Maintenance
 - Battery Sensor current
 - source-derived device current
 - Battery SOC

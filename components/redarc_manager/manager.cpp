@@ -214,13 +214,20 @@ void Manager30Component::publish_charging_stage_(uint8_t stage) {
       name = "Soft-start";
       break;
     case 0x30:
+    case 0x31:
       name = "Boost";
       break;
     case 0x40:
+    case 0x41:
       name = "Absorption";
       break;
     case 0x70:
+    case 0x71:
       name = "Float";
+      break;
+    case 0x80:
+    case 0x81:
+      name = "Maintenance";
       break;
     default:
       break;
