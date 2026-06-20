@@ -81,8 +81,8 @@ void Manager30Component::handle_can_frame(uint32_t can_id, const std::vector<uin
     if (now - this->last_clock_ms_ < this->filter_interval_ms_) return;
     this->last_clock_ms_ = now;
     const uint8_t raw_day_flags = data[0];
-    const uint8_t day = raw_day_flags & 0x1FU;
-    const uint8_t flags = raw_day_flags & 0xE0U;
+    const uint8_t day = (raw_day_flags >> 3) + 1U;
+    const uint8_t flags = raw_day_flags & 0x07U;
     const uint8_t month = data[1];
     const uint16_t year = redarc_common::u16_le(data, 2);
     const uint8_t hour = data[4];

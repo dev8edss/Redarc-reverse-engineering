@@ -333,17 +333,17 @@ BA_ "Decode_Status" SG_ 2213677057 Solar_Input_Power_W_Est "UNCONFIRMED_PENDING_
 BA_ "Decode_Status" SG_ 2213677057 Solar_Input_Voltage "UNCONFIRMED_PENDING_TEST";
 
 BO_ 2213741569 PGN_03F304_Manager30_Clock: 8 Manager30
- SG_ Manager30_Clock_Day_Of_Month : 0|5@1+ (1,0) [1|31] "day" Vector__XXX
- SG_ Manager30_Clock_Flags_Raw : 5|3@1+ (1,0) [0|7] "raw" Vector__XXX
+ SG_ Manager30_Clock_Flags_Raw : 0|3@1+ (1,0) [0|7] "raw" Vector__XXX
+ SG_ Manager30_Clock_Day_Of_Month : 3|5@1+ (1,1) [1|31] "day" Vector__XXX
  SG_ Manager30_Clock_Month : 8|8@1+ (1,0) [1|12] "month" Vector__XXX
  SG_ Manager30_Clock_Year : 16|16@1+ (1,0) [2000|2100] "year" Vector__XXX
  SG_ Manager30_Clock_Hour : 32|8@1+ (1,0) [0|23] "hour" Vector__XXX
  SG_ Manager30_Clock_Minute : 40|8@1+ (1,0) [0|59] "minute" Vector__XXX
  SG_ Manager30_Clock_Second : 48|8@1+ (1,0) [0|59] "second" Vector__XXX
  SG_ Manager30_Clock_Pad : 56|8@1+ (1,0) [0|255] "raw" Vector__XXX
-CM_ BO_ 2213741569 "PARTLY_CONFIRMED: Manager30 clock/time frame. Raw CAN ID 0x03F30401, PGN 0x03F304, SA 0x01. Observed payload 95 06 EA 07 0D 30 0A FF decodes as 2026-06-21 13:48:10 if D1 low 5 bits are day-of-month. D8 is padding.";
-CM_ SG_ 2213741569 Manager30_Clock_Day_Of_Month "PARTLY_CONFIRMED: D1 low 5 bits look like day-of-month. Example 0x95 & 0x1F = 21.";
-CM_ SG_ 2213741569 Manager30_Clock_Flags_Raw "UNCONFIRMED_PENDING_TEST: D1 upper 3 bits. Example 0x95 >> 5 = 4.";
+CM_ BO_ 2213741569 "PARTLY_CONFIRMED: Manager30 clock/time frame. Raw CAN ID 0x03F30401, PGN 0x03F304, SA 0x01. Observed payload 9E 06 EA 07 0B 29 08 FF decodes as 2026-06-20 11:41:08 and C4 06 EA 07 0B 2F 19 FF decodes as 2026-06-25 11:47:25 using day = (D1 >> 3) + 1. D8 is padding.";
+CM_ SG_ 2213741569 Manager30_Clock_Flags_Raw "UNCONFIRMED_PENDING_TEST: D1 low 3 bits. Examples: 0x9E & 0x07 = 6, 0xC4 & 0x07 = 4.";
+CM_ SG_ 2213741569 Manager30_Clock_Day_Of_Month "PARTLY_CONFIRMED: D1 high 5 bits plus 1 gives day-of-month. Examples: 0x9E >> 3 = 19, +1 = 20; 0xC4 >> 3 = 24, +1 = 25.";
 CM_ SG_ 2213741569 Manager30_Clock_Month "PARTLY_CONFIRMED: D2 month number. Observed 0x06 in June captures.";
 CM_ SG_ 2213741569 Manager30_Clock_Year "PARTLY_CONFIRMED: D3-D4 little-endian year. Observed EA 07 = 2026.";
 CM_ SG_ 2213741569 Manager30_Clock_Hour "PARTLY_CONFIRMED: D5 hour, 24-hour clock. Observed 0x0D = 13 in 1:48 PM capture.";
@@ -358,7 +358,7 @@ BA_ "Decode_Status" SG_ 2213741569 Manager30_Clock_Hour "PARTLY_CONFIRMED";
 BA_ "Decode_Status" SG_ 2213741569 Manager30_Clock_Minute "PARTLY_CONFIRMED";
 BA_ "Decode_Status" SG_ 2213741569 Manager30_Clock_Second "PARTLY_CONFIRMED";
 
-CM_ "v55 update: Added Manager30 clock candidate on raw CAN ID 0x03F30401. Month/year/hour/minute/second are partly confirmed from find unknown.csv; D1 low 5 bits look like day-of-month, upper 3 bits remain unknown flags.";
+CM_ "v55 update: Added Manager30 clock candidate on raw CAN ID 0x03F30401. Month/year/hour/minute/second are partly confirmed from find unknown.csv; D1 high 5 bits plus 1 gives day-of-month, low 3 bits remain unknown flags.";
 
 CM_ "v49 update: TVMS1280_Tank5_Percent corrected to raw percent scaling (1,0). Previous raw x 1.25 scaling removed.";
 
