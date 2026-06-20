@@ -57,10 +57,6 @@ void TVMS1280Component::publish_channel_(uint8_t channel, bool state) {
 }
 
 
-static bool tvms1280_valid_byte_voltage_(uint8_t value) {
-  return value != 0xF8 && value != 0xFF;
-}
-
 void TVMS1280Component::handle_can_frame(uint32_t can_id, const std::vector<uint8_t> &data) {
   can_id = redarc_common::rvc_id(can_id);
   if (data.size() < 8) return;
@@ -75,12 +71,13 @@ void TVMS1280Component::handle_can_frame(uint32_t can_id, const std::vector<uint
     if (data[0] == 0x11) {
       if (now - this->last_mux_0x11_ms_ < this->filter_interval_ms_) return;
       this->last_mux_0x11_ms_ = now;
-      if (this->voltage_input1_sensor_ != nullptr && tvms1280_valid_byte_voltage_(data[1]))
-        this->voltage_input1_sensor_->publish_state((float) data[1] / 10.0f);
+      if (this->voltage_input1_sensor_ != nullptr) {
+        const uint16_t raw_mv1 = (uint16_t) data[1] | ((uint16_t) data[2] << 8);
+        this->voltage_input1_sensor_->publish_state((float) raw_mv1 / 1000.0f);
+      }
       if (this->voltage_input2_sensor_ != nullptr) {
-        // D4:D5 little-endian uint16 in millivolts (Voltage Input 2 / supply).
-        const uint16_t raw_mv = (uint16_t) data[3] | ((uint16_t) data[4] << 8);
-        this->voltage_input2_sensor_->publish_state((float) raw_mv / 1000.0f);
+        const uint16_t raw_mv2 = (uint16_t) data[3] | ((uint16_t) data[4] << 8);
+        this->voltage_input2_sensor_->publish_state((float) raw_mv2 / 1000.0f);
       }
       if (this->temp2_sensor_ != nullptr) this->temp2_sensor_->publish_state((float) data[5] - 100.0f);
     } else if (data[0] == 0x14) {

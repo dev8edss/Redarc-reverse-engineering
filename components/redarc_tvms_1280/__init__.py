@@ -108,10 +108,9 @@ async def to_code(config):
                            state_class=STATE_CLASS_MEASUREMENT, decimals=0)
     cg.add(var.set_temp2_sensor(s))
 
-    s = await _make_sensor(config["voltage_input1_id"], f"{p} Voltage Input 1 Candidate",
+    s = await _make_sensor(config["voltage_input1_id"], f"{p} Voltage Input 1",
                            unit="V", device_class="voltage",
-                           state_class=STATE_CLASS_MEASUREMENT, decimals=1,
-                           entity_category=ENTITY_CATEGORY_DIAGNOSTIC)
+                           state_class=STATE_CLASS_MEASUREMENT, decimals=2)
     cg.add(var.set_voltage_input1_sensor(s))
 
     s = await _make_sensor(config["voltage_input2_id"], f"{p} Voltage Input 2",
