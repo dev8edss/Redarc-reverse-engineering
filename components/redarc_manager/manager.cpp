@@ -323,7 +323,7 @@ void Manager30Component::publish_can_status_(bool abnormal, const char *message)
 void Manager30Component::request_solar_history_() {
   auto *bus = redarc_common::RedarcCanDispatcher::instance().canbus();
   if (bus == nullptr) return;
-  bus->send_data(0x1BFCD620UL, true, {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00});
+  bus->send_data(0x0FFCD620UL, true, {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00});
   ESP_LOGD(TAG, "Requested Manager30 solar generation history");
 }
 
