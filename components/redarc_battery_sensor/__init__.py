@@ -17,6 +17,12 @@ CONF_SOURCE_ADDRESS = "source_address"
 CONF_FILTER_INTERVAL = "filter_interval"
 CONF_SOC_HISTORY_POLL_INTERVAL = "soc_history_poll_interval"
 
+
+def zero_or_positive_time_period_milliseconds(value):
+    if value in (0, "0", "0s", "0ms"):
+        return 0
+    return cv.positive_time_period_milliseconds(value)
+
 battery_sensor_ns = cg.esphome_ns.namespace("redarc_battery_sensor")
 BatterySensorComponent = battery_sensor_ns.class_("BatterySensorComponent", cg.Component)
 BatterySOCCalibrateButton = battery_sensor_ns.class_("BatterySOCCalibrateButton", button.Button)
@@ -37,7 +43,7 @@ CONFIG_SCHEMA = cv.Schema({
     cv.GenerateID(): cv.declare_id(BatterySensorComponent),
     cv.Optional(CONF_SOURCE_ADDRESS, default=0x08): cv.hex_uint8_t,
     cv.Optional(CONF_FILTER_INTERVAL, default="5s"): cv.positive_time_period_milliseconds,
-    cv.Optional(CONF_SOC_HISTORY_POLL_INTERVAL, default="60s"): cv.time_period_milliseconds,
+    cv.Optional(CONF_SOC_HISTORY_POLL_INTERVAL, default="60s"): zero_or_positive_time_period_milliseconds,
     cv.GenerateID("current_id"): cv.declare_id(_SensorClass),
     cv.GenerateID("voltage_id"): cv.declare_id(_SensorClass),
     cv.GenerateID("temperature_id"): cv.declare_id(_SensorClass),

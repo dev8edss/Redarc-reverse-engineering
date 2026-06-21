@@ -18,6 +18,12 @@ CONF_FILTER_INTERVAL = "filter_interval"
 CONF_BATTERY_SENSOR = "battery_sensor_id"
 CONF_SOLAR_HISTORY_POLL_INTERVAL = "solar_history_poll_interval"
 
+
+def zero_or_positive_time_period_milliseconds(value):
+    if value in (0, "0", "0s", "0ms"):
+        return 0
+    return cv.positive_time_period_milliseconds(value)
+
 manager30_ns = cg.esphome_ns.namespace("redarc_manager")
 Manager30Component = manager30_ns.class_("Manager30Component", cg.Component)
 VehicleInputTriggerSelect = manager30_ns.class_("VehicleInputTriggerSelect", select.Select)
@@ -47,7 +53,7 @@ CONFIG_SCHEMA = cv.Schema({
     cv.GenerateID(): cv.declare_id(Manager30Component),
     cv.Optional(CONF_SOURCE_ADDRESS, default=0x01): cv.hex_uint8_t,
     cv.Optional(CONF_FILTER_INTERVAL, default="5s"): cv.positive_time_period_milliseconds,
-    cv.Optional(CONF_SOLAR_HISTORY_POLL_INTERVAL, default="60s"): cv.time_period_milliseconds,
+    cv.Optional(CONF_SOLAR_HISTORY_POLL_INTERVAL, default="60s"): zero_or_positive_time_period_milliseconds,
     cv.Optional(CONF_BATTERY_SENSOR): cv.use_id(_BatterySensorComponent),
     cv.GenerateID("output_current_id"): cv.declare_id(_SensorClass),
     cv.GenerateID("battery_voltage_id"): cv.declare_id(_SensorClass),
