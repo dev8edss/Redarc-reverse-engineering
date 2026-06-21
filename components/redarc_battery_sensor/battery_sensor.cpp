@@ -7,7 +7,7 @@ namespace esphome {
 namespace redarc_battery_sensor {
 
 static const char *const TAG = "redarc_battery_sensor";
-static const uint32_t SOC_HISTORY_REQUEST_IDS[] = {0x0FFCD020UL, 0x0FFCD220UL, 0x0FFCD420UL};
+static const uint32_t SOC_HISTORY_REQUEST_IDS[] = {0x0FFCD0FAUL, 0x0FFCD2FAUL, 0x0FFCD4FAUL};
 static const uint32_t SOC_HISTORY_REQUEST_SPACING_MS = 100;
 
 void BatterySOCCalibrateButton::press_action() {
