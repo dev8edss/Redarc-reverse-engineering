@@ -15,6 +15,7 @@ static const uint8_t SOC_HISTORY_REQUEST_DATA[][8] = {
     {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}};
 static const uint8_t SOC_HISTORY_REQUEST_COUNT = sizeof(SOC_HISTORY_REQUEST_IDS) / sizeof(SOC_HISTORY_REQUEST_IDS[0]);
 static const uint32_t SOC_HISTORY_REQUEST_SPACING_MS = 100;
+static const uint32_t HISTORY_PREAMBLE_DELAY_MS = 3000;
 
 void BatterySOCCalibrateButton::press_action() {
   if (this->parent_ == nullptr) return;
@@ -46,9 +47,22 @@ void BatterySensorComponent::loop() {
   const uint32_t now = millis();
   if (this->send_pending_soc_history_request_(now)) return;
   if (this->soc_history_poll_interval_ms_ == 0) return;
-  if (this->last_soc_history_poll_ms_ == 0 || now - this->last_soc_history_poll_ms_ >= this->soc_history_poll_interval_ms_) {
+
+  if (this->pending_soc_history_poll_) {
+    if (now - this->pending_soc_history_preamble_ms_ < HISTORY_PREAMBLE_DELAY_MS) return;
+    this->pending_soc_history_poll_ = false;
     this->last_soc_history_poll_ms_ = now;
     this->request_soc_history_();
+    return;
+  }
+
+  const uint32_t lead_ms =
+      this->soc_history_poll_interval_ms_ > HISTORY_PREAMBLE_DELAY_MS ? HISTORY_PREAMBLE_DELAY_MS : 0;
+  if (this->last_soc_history_poll_ms_ == 0 ||
+      now - this->last_soc_history_poll_ms_ >= this->soc_history_poll_interval_ms_ - lead_ms) {
+    this->send_history_preamble_();
+    this->pending_soc_history_preamble_ms_ = now;
+    this->pending_soc_history_poll_ = true;
   }
 }
 
@@ -217,6 +231,13 @@ void BatterySensorComponent::request_soc_history_() {
   this->pending_soc_history_request_index_ = 0;
   this->last_soc_history_request_ms_ = 0;
   ESP_LOGD(TAG, "Scheduled battery SOC history requests");
+}
+
+void BatterySensorComponent::send_history_preamble_() {
+  auto *bus = redarc_common::RedarcCanDispatcher::instance().canbus();
+  if (bus == nullptr) return;
+  bus->send_data(0x0F00FF20UL, true, {0x4D, 0x00, 0xFF, 0xFF, 0x01, 0x00, 0x00, 0x00});
+  ESP_LOGD(TAG, "Sent history polling preamble before SOC history request");
 }
 
 bool BatterySensorComponent::send_pending_soc_history_request_(uint32_t now) {

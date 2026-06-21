@@ -6,6 +6,7 @@ namespace redarc_manager {
 
 static const char *const TAG = "redarc_manager";
 static const uint32_t SOLAR_HISTORY_INITIAL_OFFSET_MS = 30000;
+static const uint32_t HISTORY_PREAMBLE_DELAY_MS = 3000;
 
 void VehicleInputTriggerSelect::control(size_t index) {
   static const uint16_t VALUES[] = {0, 1, 2, 3, 5};
@@ -33,9 +34,21 @@ void Manager30Component::loop() {
     this->last_solar_history_poll_ms_ = now + SOLAR_HISTORY_INITIAL_OFFSET_MS - this->solar_history_poll_interval_ms_;
     return;
   }
-  if (now - this->last_solar_history_poll_ms_ >= this->solar_history_poll_interval_ms_) {
+
+  if (this->pending_solar_history_poll_) {
+    if (now - this->pending_solar_history_preamble_ms_ < HISTORY_PREAMBLE_DELAY_MS) return;
+    this->pending_solar_history_poll_ = false;
     this->last_solar_history_poll_ms_ = now;
     this->request_solar_history_();
+    return;
+  }
+
+  const uint32_t lead_ms =
+      this->solar_history_poll_interval_ms_ > HISTORY_PREAMBLE_DELAY_MS ? HISTORY_PREAMBLE_DELAY_MS : 0;
+  if (now - this->last_solar_history_poll_ms_ >= this->solar_history_poll_interval_ms_ - lead_ms) {
+    this->send_history_preamble_();
+    this->pending_solar_history_preamble_ms_ = now;
+    this->pending_solar_history_poll_ = true;
   }
 }
 
@@ -328,6 +341,13 @@ void Manager30Component::request_solar_history_() {
   if (bus == nullptr) return;
   bus->send_data(0x1BFCD620UL, true, {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00});
   ESP_LOGD(TAG, "Requested Manager30 solar generation history");
+}
+
+void Manager30Component::send_history_preamble_() {
+  auto *bus = redarc_common::RedarcCanDispatcher::instance().canbus();
+  if (bus == nullptr) return;
+  bus->send_data(0x0F00FF20UL, true, {0x4D, 0x00, 0xFF, 0xFF, 0x01, 0x00, 0x00, 0x00});
+  ESP_LOGD(TAG, "Sent history polling preamble before solar history request");
 }
 
 bool Manager30Component::is_valid_charging_stage_(uint8_t stage) const {

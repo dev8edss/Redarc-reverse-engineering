@@ -74,6 +74,7 @@ class Manager30Component : public Component {
   void publish_solar_day_1_5_history_();
   void inspect_status_heartbeat_(uint32_t can_id, const std::vector<uint8_t> &data);
   void publish_can_status_(bool abnormal, const char *message);
+  void send_history_preamble_();
   void request_solar_history_();
   bool is_valid_charging_stage_(uint8_t stage) const;
   bool is_valid_vehicle_trigger_(uint8_t trigger) const;
@@ -84,7 +85,9 @@ class Manager30Component : public Component {
   uint32_t last_solar_ms_{0};
   uint32_t last_solar_energy_ms_{0};
   uint32_t last_solar_history_poll_ms_{0};
+  uint32_t pending_solar_history_preamble_ms_{0};
   uint32_t solar_history_poll_interval_ms_{60000};
+  bool pending_solar_history_poll_{false};
   uint32_t last_ac_ms_{0};
   uint32_t last_charger_status_ms_{0};
   uint32_t last_manager_status_ms_{0};
