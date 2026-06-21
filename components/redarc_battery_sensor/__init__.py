@@ -68,12 +68,13 @@ CONFIG_SCHEMA = cv.Schema({
 
 
 async def _make_sensor(config_id, name, unit=None, device_class=None,
-                       state_class=None, decimals=None, entity_category=None):
+                       state_class=None, decimals=None, entity_category=None,
+                       force_update=False):
     cfg = {
         CONF_ID: config_id,
         CONF_NAME: name,
         CONF_DISABLED_BY_DEFAULT: False,
-        CONF_FORCE_UPDATE: False,
+        CONF_FORCE_UPDATE: force_update,
         CONF_ICON: "",
         CONF_ENTITY_CATEGORY: entity_category if entity_category is not None else ENTITY_CATEGORY_NONE,
     }
@@ -165,7 +166,8 @@ async def to_code(config):
 
     s = await _make_sensor(config["soc_id"], f"{p} SOC",
                            unit="%", device_class="battery",
-                           state_class=STATE_CLASS_MEASUREMENT, decimals=0)
+                           state_class=STATE_CLASS_MEASUREMENT, decimals=0,
+                           force_update=True)
     cg.add(var.set_soc_sensor(s))
 
     s = await _make_sensor(config["battery_type_id"], f"{p} Battery Type",
