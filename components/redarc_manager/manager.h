@@ -6,6 +6,7 @@
 #include "esphome/components/text_sensor/text_sensor.h"
 #include "esphome/components/redarc_battery_sensor/battery_sensor.h"
 #include "esphome/components/redarc_common/redarc_common.h"
+#include <array>
 #include <vector>
 
 namespace esphome {
@@ -44,6 +45,7 @@ class Manager30Component : public Component {
   void set_solar_voltage_sensor(sensor::Sensor *s) { this->solar_voltage_sensor_ = s; }
   void set_solar_power_sensor(sensor::Sensor *s) { this->solar_power_sensor_ = s; }
   void set_solar_energy_sensor(sensor::Sensor *s) { this->solar_energy_sensor_ = s; }
+  void set_solar_daily_energy_sensor(uint8_t day, sensor::Sensor *s) { if (day < 8) this->solar_daily_energy_sensors_[day] = s; }
   void set_ac_input_voltage_sensor(sensor::Sensor *s) { this->ac_input_voltage_sensor_ = s; }
   void set_vehicle_input_trigger_sensor(sensor::Sensor *s) { this->vehicle_input_trigger_sensor_ = s; }
   void set_clock_flags_sensor(sensor::Sensor *s) { this->clock_flags_sensor_ = s; }
@@ -63,6 +65,8 @@ class Manager30Component : public Component {
  protected:
   void publish_charging_mode_(uint8_t mode);
   void publish_charging_stage_(uint8_t stage);
+  void publish_solar_daily_energy_(uint8_t day, uint16_t wh);
+  void publish_solar_energy_total_();
 
   uint8_t source_address_{0x01};
   uint32_t filter_interval_ms_{5000};
@@ -84,6 +88,9 @@ class Manager30Component : public Component {
   sensor::Sensor *solar_voltage_sensor_{nullptr};
   sensor::Sensor *solar_power_sensor_{nullptr};
   sensor::Sensor *solar_energy_sensor_{nullptr};
+  std::array<sensor::Sensor *, 8> solar_daily_energy_sensors_{};
+  std::array<uint16_t, 8> solar_daily_wh_{};
+  std::array<bool, 8> solar_daily_known_{};
   sensor::Sensor *ac_input_voltage_sensor_{nullptr};
   sensor::Sensor *vehicle_input_trigger_sensor_{nullptr};
   sensor::Sensor *clock_flags_sensor_{nullptr};

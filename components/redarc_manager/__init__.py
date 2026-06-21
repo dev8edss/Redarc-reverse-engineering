@@ -6,7 +6,7 @@ from esphome.const import (
     CONF_ENTITY_CATEGORY, CONF_FORCE_UPDATE, CONF_ICON, CONF_ID, CONF_NAME,
     CONF_STATE_CLASS, CONF_UNIT_OF_MEASUREMENT,
     ENTITY_CATEGORY_DIAGNOSTIC, ENTITY_CATEGORY_NONE,
-    STATE_CLASS_MEASUREMENT, STATE_CLASS_TOTAL_INCREASING,
+    STATE_CLASS_MEASUREMENT,
 )
 
 CODEOWNERS = ["@dev8edss"]
@@ -36,6 +36,10 @@ _SC_MAP = {
 _text_sensor_ns = cg.esphome_ns.namespace("text_sensor")
 _TextSensorClass = _text_sensor_ns.class_("TextSensor")
 
+_AUTO_IDS = {}
+for _i in range(8):
+    _AUTO_IDS[cv.GenerateID(f"solar_day_{_i}_energy_id")] = cv.declare_id(_SensorClass)
+
 CONFIG_SCHEMA = cv.Schema({
     cv.GenerateID(): cv.declare_id(Manager30Component),
     cv.Optional(CONF_SOURCE_ADDRESS, default=0x01): cv.hex_uint8_t,
@@ -58,6 +62,7 @@ CONFIG_SCHEMA = cv.Schema({
     cv.GenerateID("charging_stage_id"): cv.declare_id(_TextSensorClass),
     cv.GenerateID("vehicle_input_trigger_select_id"): cv.declare_id(VehicleInputTriggerSelect),
     cv.GenerateID("charging_mode_select_id"): cv.declare_id(ChargingModeSelect),
+    **_AUTO_IDS,
 }).extend(cv.COMPONENT_SCHEMA)
 
 
@@ -155,8 +160,15 @@ async def to_code(config):
 
     s = await _make_sensor(config["solar_energy_id"], f"{p} Solar Energy",
                            unit="Wh", device_class="energy",
-                           state_class=STATE_CLASS_TOTAL_INCREASING, decimals=0)
+                           state_class=STATE_CLASS_MEASUREMENT, decimals=0)
     cg.add(var.set_solar_energy_sensor(s))
+
+    for i in range(8):
+        label = "Today" if i == 0 else f"Day -{i}"
+        s = await _make_sensor(config[f"solar_day_{i}_energy_id"], f"{p} Solar {label}",
+                               unit="Wh", device_class="energy",
+                               state_class=STATE_CLASS_MEASUREMENT, decimals=0)
+        cg.add(var.set_solar_daily_energy_sensor(i, s))
 
     s = await _make_sensor(config["ac_input_voltage_id"], f"{p} AC Input Voltage",
                            unit="V", device_class="voltage",

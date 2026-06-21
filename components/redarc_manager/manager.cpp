@@ -174,18 +174,21 @@ void Manager30Component::handle_can_frame(uint32_t can_id, const std::vector<uin
     return;
   }
 
-  // Manager30 solar energy/yield counter. Logs show 0x03FCD601 with D1=0x00
-  // increments D2-D5 little-endian in Wh; example: 14 -> 19 Wh while solar
-  // power was about 87 W. D1=0x01/0x02 companion frames were observed but
-  // remain unknown and are ignored.
+  // Manager30 solar generation history. A request on 0x0FFCD6FA is followed by
+  // pages on 0x03FCD601. D1 is the page index; D2-D3, D4-D5 and D6-D7 are
+  // little-endian Wh buckets. Page 0 starts with today, then previous days.
   if (redarc_common::rvc_matches(can_id, 0x1FCD6UL, this->source_address_)) {
-    if (data[0] != 0x00) return;
-    if (now - this->last_solar_energy_ms_ < this->filter_interval_ms_) return;
-    this->last_solar_energy_ms_ = now;
-    if (this->solar_energy_sensor_ != nullptr) {
-      const uint32_t wh = redarc_common::u32_le(data, 1);
-      this->solar_energy_sensor_->publish_state((float) wh);
+    const uint8_t page = data[0];
+    if (page > 2) return;
+    const uint8_t base_day = page * 3U;
+    for (uint8_t slot = 0; slot < 3; slot++) {
+      const uint8_t day = base_day + slot;
+      if (day >= 8) break;
+      const uint8_t offset = 1U + slot * 2U;
+      this->publish_solar_daily_energy_(day, redarc_common::u16_le(data, offset));
     }
+    this->last_solar_energy_ms_ = now;
+    this->publish_solar_energy_total_();
     return;
   }
 
@@ -199,6 +202,26 @@ void Manager30Component::handle_can_frame(uint32_t can_id, const std::vector<uin
     }
     return;
   }
+}
+
+void Manager30Component::publish_solar_daily_energy_(uint8_t day, uint16_t wh) {
+  if (day >= 8) return;
+  this->solar_daily_wh_[day] = wh;
+  this->solar_daily_known_[day] = true;
+  if (this->solar_daily_energy_sensors_[day] != nullptr)
+    this->solar_daily_energy_sensors_[day]->publish_state((float) wh);
+}
+
+void Manager30Component::publish_solar_energy_total_() {
+  if (this->solar_energy_sensor_ == nullptr) return;
+  uint32_t total = 0;
+  bool any = false;
+  for (uint8_t i = 0; i < 8; i++) {
+    if (!this->solar_daily_known_[i]) continue;
+    total += this->solar_daily_wh_[i];
+    any = true;
+  }
+  if (any) this->solar_energy_sensor_->publish_state((float) total);
 }
 
 void Manager30Component::publish_charging_mode_(uint8_t mode) {
