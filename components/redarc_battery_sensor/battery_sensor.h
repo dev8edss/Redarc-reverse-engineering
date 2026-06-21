@@ -84,6 +84,7 @@ class BatterySensorComponent : public Component {
 
  protected:
   void request_soc_history_();
+  bool send_pending_soc_history_request_(uint32_t now);
   void handle_soc_history_page_(uint32_t dgn, const std::vector<uint8_t> &data);
   void publish_soc_hourly_history_();
   void publish_soc_daily_history_();
@@ -94,6 +95,8 @@ class BatterySensorComponent : public Component {
   uint32_t filter_interval_ms_{5000};
   uint32_t soc_history_poll_interval_ms_{60000};
   uint32_t last_soc_history_poll_ms_{0};
+  uint32_t last_soc_history_request_ms_{0};
+  uint8_t pending_soc_history_request_index_{3};
   uint32_t last_current_ms_{0};
   uint32_t last_soc_ms_{0};
   uint32_t last_capacity_ms_{0};

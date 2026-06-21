@@ -5,6 +5,7 @@ namespace esphome {
 namespace redarc_manager {
 
 static const char *const TAG = "redarc_manager";
+static const uint32_t SOLAR_HISTORY_INITIAL_OFFSET_MS = 30000;
 
 void VehicleInputTriggerSelect::control(size_t index) {
   static const uint16_t VALUES[] = {0, 1, 2, 3, 5};
@@ -28,6 +29,7 @@ void Manager30Component::setup() {
 void Manager30Component::loop() {
   if (this->solar_history_poll_interval_ms_ == 0) return;
   const uint32_t now = millis();
+  if (this->last_solar_history_poll_ms_ == 0 && now < SOLAR_HISTORY_INITIAL_OFFSET_MS) return;
   if (this->last_solar_history_poll_ms_ != 0 &&
       now - this->last_solar_history_poll_ms_ < this->solar_history_poll_interval_ms_)
     return;
@@ -38,6 +40,7 @@ void Manager30Component::loop() {
 void Manager30Component::dump_config() {
   ESP_LOGCONFIG(TAG, "Manager30 SA 0x%02X", this->source_address_);
   ESP_LOGCONFIG(TAG, "  Solar history poll interval: %u ms", (unsigned) this->solar_history_poll_interval_ms_);
+  ESP_LOGCONFIG(TAG, "  Solar history initial offset: %u ms", (unsigned) SOLAR_HISTORY_INITIAL_OFFSET_MS);
   LOG_SENSOR("  ", "Vehicle Input Trigger", this->vehicle_input_trigger_sensor_);
   LOG_TEXT_SENSOR("  ", "CAN Date", this->clock_date_text_sensor_);
   LOG_TEXT_SENSOR("  ", "CAN Time", this->clock_time_text_sensor_);
