@@ -27,14 +27,23 @@ void Manager30Component::setup() {
 }
 
 void Manager30Component::loop() {
-  // Active solar history polling is disabled while Manager30 reset behavior is under investigation.
+  const uint32_t now = millis();
+  if (this->solar_history_poll_interval_ms_ == 0) return;
+  if (this->last_solar_history_poll_ms_ == 0) {
+    this->last_solar_history_poll_ms_ = now + SOLAR_HISTORY_INITIAL_OFFSET_MS - this->solar_history_poll_interval_ms_;
+    return;
+  }
+  if (now - this->last_solar_history_poll_ms_ >= this->solar_history_poll_interval_ms_) {
+    this->last_solar_history_poll_ms_ = now;
+    this->request_solar_history_();
+  }
 }
 
 void Manager30Component::dump_config() {
   ESP_LOGCONFIG(TAG, "Manager30 SA 0x%02X", this->source_address_);
   ESP_LOGCONFIG(TAG, "  Solar history poll interval: %u ms", (unsigned) this->solar_history_poll_interval_ms_);
   ESP_LOGCONFIG(TAG, "  Solar history initial offset: %u ms", (unsigned) SOLAR_HISTORY_INITIAL_OFFSET_MS);
-  ESP_LOGCONFIG(TAG, "  Solar history active requests: disabled");
+  ESP_LOGCONFIG(TAG, "  Solar history active requests: %s", this->solar_history_poll_interval_ms_ == 0 ? "disabled" : "display DGN");
   LOG_SENSOR("  ", "Vehicle Input Trigger", this->vehicle_input_trigger_sensor_);
   LOG_TEXT_SENSOR("  ", "CAN Date", this->clock_date_text_sensor_);
   LOG_TEXT_SENSOR("  ", "CAN Time", this->clock_time_text_sensor_);
@@ -190,7 +199,7 @@ void Manager30Component::handle_can_frame(uint32_t can_id, const std::vector<uin
     return;
   }
 
-  // Manager30 solar generation history. A request on 0x0FFCD6FA is followed by
+  // Manager30 solar generation history. A request on 0x1BFCD620 is followed by
   // pages on 0x03FCD601. D1 is the page index; D2-D3, D4-D5 and D6-D7 are
   // little-endian Wh buckets. Page 0 starts with today, then previous days.
   if (redarc_common::rvc_matches(can_id, 0x1FCD6UL, this->source_address_)) {
@@ -317,7 +326,7 @@ void Manager30Component::publish_can_status_(bool abnormal, const char *message)
 void Manager30Component::request_solar_history_() {
   auto *bus = redarc_common::RedarcCanDispatcher::instance().canbus();
   if (bus == nullptr) return;
-  bus->send_data(0x0FFCD620UL, true, {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00});
+  bus->send_data(0x1BFCD620UL, true, {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00});
   ESP_LOGD(TAG, "Requested Manager30 solar generation history");
 }
 

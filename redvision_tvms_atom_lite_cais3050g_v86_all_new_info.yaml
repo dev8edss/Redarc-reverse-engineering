@@ -14,7 +14,7 @@ substitutions:
   can_mode: NORMAL
 
   sensor_average_interval: 5s
-  history_poll_interval: 0s
+  history_poll_interval: 60s
   rouge_transition_length: 750ms
   board: m5stack-atom
   esp32_framework_type: esp-idf

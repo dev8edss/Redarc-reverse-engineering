@@ -8,10 +8,8 @@ namespace redarc_battery_sensor {
 
 static const char *const TAG = "redarc_battery_sensor";
 static const uint32_t SOC_HISTORY_REQUEST_IDS[] = {
-    0x0F03FFFAUL, 0x0F03FFFAUL, 0x0FFCD0FAUL, 0x0FFCD2FAUL, 0x0FFCD4FAUL};
+    0x1BFCD020UL, 0x1BFCD220UL, 0x1BFCD420UL};
 static const uint8_t SOC_HISTORY_REQUEST_DATA[][8] = {
-    {0x07, 0xF2, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
-    {0x05, 0xF2, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
     {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
     {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
     {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}};
@@ -45,13 +43,19 @@ void BatterySensorComponent::setup() {
 }
 
 void BatterySensorComponent::loop() {
-  // Active SOC history polling is disabled while Manager30 reset behavior is under investigation.
+  const uint32_t now = millis();
+  if (this->send_pending_soc_history_request_(now)) return;
+  if (this->soc_history_poll_interval_ms_ == 0) return;
+  if (this->last_soc_history_poll_ms_ == 0 || now - this->last_soc_history_poll_ms_ >= this->soc_history_poll_interval_ms_) {
+    this->last_soc_history_poll_ms_ = now;
+    this->request_soc_history_();
+  }
 }
 
 void BatterySensorComponent::dump_config() {
   ESP_LOGCONFIG(TAG, "Battery Sensor SA 0x%02X", this->source_address_);
   ESP_LOGCONFIG(TAG, "  SOC history poll interval: %u ms", (unsigned) this->soc_history_poll_interval_ms_);
-  ESP_LOGCONFIG(TAG, "  SOC history active requests: disabled");
+  ESP_LOGCONFIG(TAG, "  SOC history active requests: %s", this->soc_history_poll_interval_ms_ == 0 ? "disabled" : "display DGNs");
   LOG_SENSOR("  ", "Battery Type", this->battery_type_sensor_);
   LOG_SENSOR("  ", "Configured Capacity", this->configured_capacity_sensor_);
   LOG_SENSOR("  ", "Max Charge Current", this->max_charge_current_sensor_);
