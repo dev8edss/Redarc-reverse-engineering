@@ -326,6 +326,8 @@ void Manager30Component::request_solar_history_() {
 
 bool Manager30Component::is_valid_charging_stage_(uint8_t stage) const {
   switch (stage) {
+    case 0x00:
+    case 0x01:
     case 0x21:
     case 0x30:
     case 0x31:
@@ -355,6 +357,10 @@ void Manager30Component::publish_charging_stage_(uint8_t stage) {
 
   const char *name = nullptr;
   switch (stage) {
+    case 0x00:
+    case 0x01:
+      name = "Not Charging";
+      break;
     case 0x21:
       name = "Soft-start";
       break;
