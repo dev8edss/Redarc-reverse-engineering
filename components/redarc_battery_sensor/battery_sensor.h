@@ -96,7 +96,7 @@ class BatterySensorComponent : public Component {
   uint32_t soc_history_poll_interval_ms_{60000};
   uint32_t last_soc_history_poll_ms_{0};
   uint32_t last_soc_history_request_ms_{0};
-  uint8_t pending_soc_history_request_index_{3};
+  uint8_t pending_soc_history_request_index_{0xFF};
   uint32_t last_current_ms_{0};
   uint32_t last_soc_ms_{0};
   uint32_t last_capacity_ms_{0};

@@ -7,7 +7,15 @@ namespace esphome {
 namespace redarc_battery_sensor {
 
 static const char *const TAG = "redarc_battery_sensor";
-static const uint32_t SOC_HISTORY_REQUEST_IDS[] = {0x0FFCD0FAUL, 0x0FFCD2FAUL, 0x0FFCD4FAUL};
+static const uint32_t SOC_HISTORY_REQUEST_IDS[] = {
+    0x0F03FFFAUL, 0x0F03FFFAUL, 0x0FFCD0FAUL, 0x0FFCD2FAUL, 0x0FFCD4FAUL};
+static const uint8_t SOC_HISTORY_REQUEST_DATA[][8] = {
+    {0x07, 0xF2, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+    {0x05, 0xF2, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+    {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+    {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+    {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}};
+static const uint8_t SOC_HISTORY_REQUEST_COUNT = sizeof(SOC_HISTORY_REQUEST_IDS) / sizeof(SOC_HISTORY_REQUEST_IDS[0]);
 static const uint32_t SOC_HISTORY_REQUEST_SPACING_MS = 100;
 
 void BatterySOCCalibrateButton::press_action() {
@@ -215,24 +223,26 @@ void BatterySensorComponent::request_soc_history_() {
 }
 
 bool BatterySensorComponent::send_pending_soc_history_request_(uint32_t now) {
-  if (this->pending_soc_history_request_index_ >= 3) return false;
+  if (this->pending_soc_history_request_index_ >= SOC_HISTORY_REQUEST_COUNT) return false;
   if (this->last_soc_history_request_ms_ != 0 &&
       now - this->last_soc_history_request_ms_ < SOC_HISTORY_REQUEST_SPACING_MS)
     return true;
 
   auto *bus = redarc_common::RedarcCanDispatcher::instance().canbus();
   if (bus == nullptr) {
-    this->pending_soc_history_request_index_ = 3;
+    this->pending_soc_history_request_index_ = 0xFF;
     return false;
   }
 
-  const std::vector<uint8_t> request = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
   const uint8_t request_index = this->pending_soc_history_request_index_;
+  const std::vector<uint8_t> request(
+      SOC_HISTORY_REQUEST_DATA[request_index],
+      SOC_HISTORY_REQUEST_DATA[request_index] + sizeof(SOC_HISTORY_REQUEST_DATA[request_index]));
   bus->send_data(SOC_HISTORY_REQUEST_IDS[request_index], true, request);
   this->pending_soc_history_request_index_++;
   this->last_soc_history_request_ms_ = now;
-  ESP_LOGD(TAG, "Requested battery SOC history page %u", (unsigned) request_index);
-  return this->pending_soc_history_request_index_ < 3;
+  ESP_LOGD(TAG, "Sent battery SOC history request step %u", (unsigned) request_index);
+  return this->pending_soc_history_request_index_ < SOC_HISTORY_REQUEST_COUNT;
 }
 
 void BatterySensorComponent::handle_soc_history_page_(uint32_t dgn, const std::vector<uint8_t> &data) {
