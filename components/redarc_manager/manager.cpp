@@ -6,7 +6,7 @@ namespace redarc_manager {
 
 static const char *const TAG = "redarc_manager";
 static const uint32_t SOLAR_HISTORY_INITIAL_OFFSET_MS = 30000;
-static const uint32_t HISTORY_PREAMBLE_DELAY_MS = 3000;
+static const uint32_t HISTORY_PREAMBLE_DELAY_MS = 15;
 
 void VehicleInputTriggerSelect::control(size_t index) {
   static const uint16_t VALUES[] = {0, 1, 2, 3, 5};
@@ -346,7 +346,7 @@ void Manager30Component::request_solar_history_() {
 void Manager30Component::send_history_preamble_() {
   auto *bus = redarc_common::RedarcCanDispatcher::instance().canbus();
   if (bus == nullptr) return;
-  bus->send_data(0x0F00FF20UL, true, {0x4D, 0x00, 0xFF, 0xFF, 0x01, 0x00, 0x00, 0x00});
+  bus->send_data(0x0FE6FF20UL, true, {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF});
   ESP_LOGD(TAG, "Sent history polling preamble before solar history request");
 }
 

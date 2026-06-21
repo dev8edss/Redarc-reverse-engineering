@@ -15,7 +15,7 @@ static const uint8_t SOC_HISTORY_REQUEST_DATA[][8] = {
     {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}};
 static const uint8_t SOC_HISTORY_REQUEST_COUNT = sizeof(SOC_HISTORY_REQUEST_IDS) / sizeof(SOC_HISTORY_REQUEST_IDS[0]);
 static const uint32_t SOC_HISTORY_REQUEST_SPACING_MS = 100;
-static const uint32_t HISTORY_PREAMBLE_DELAY_MS = 3000;
+static const uint32_t HISTORY_PREAMBLE_DELAY_MS = 15;
 
 void BatterySOCCalibrateButton::press_action() {
   if (this->parent_ == nullptr) return;
@@ -236,7 +236,7 @@ void BatterySensorComponent::request_soc_history_() {
 void BatterySensorComponent::send_history_preamble_() {
   auto *bus = redarc_common::RedarcCanDispatcher::instance().canbus();
   if (bus == nullptr) return;
-  bus->send_data(0x0F00FF20UL, true, {0x4D, 0x00, 0xFF, 0xFF, 0x01, 0x00, 0x00, 0x00});
+  bus->send_data(0x0FE6FF20UL, true, {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF});
   ESP_LOGD(TAG, "Sent history polling preamble before SOC history request");
 }
 
