@@ -138,6 +138,18 @@ cards:
         name: Calibrate SOC Full
         icon: mdi:battery-sync
   - type: entities
+    title: Battery SOC History
+    show_header_toggle: false
+    entities:
+      - entity: sensor.redvision_can_bridge_battery_soc_hourly_history
+        name: Hourly SOC
+      - entity: sensor.redvision_can_bridge_battery_soc_daily_range_history
+        name: Daily Low-High SOC
+      - entity: sensor.redvision_can_bridge_battery_soc_daily_low_history
+        name: Daily Low SOC
+      - entity: sensor.redvision_can_bridge_battery_soc_daily_high_history
+        name: Daily High SOC
+  - type: entities
     title: TVMS Voltage and Current Inputs
     show_header_toggle: false
     entities:
@@ -235,6 +247,8 @@ cards:
         name: 8 Day Total
       - entity: sensor.redvision_can_bridge_manager30_solar_today
         name: Today
+      - entity: sensor.redvision_can_bridge_manager30_solar_day_1_5_history
+        name: Day -1..-5
       - entity: sensor.redvision_can_bridge_manager30_solar_day_1
         name: Day -1
       - entity: sensor.redvision_can_bridge_manager30_solar_day_2

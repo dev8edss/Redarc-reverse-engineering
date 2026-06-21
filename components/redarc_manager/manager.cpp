@@ -25,8 +25,19 @@ void Manager30Component::setup() {
   this->publish_can_status_(false, "Normal");
 }
 
+void Manager30Component::loop() {
+  if (this->solar_history_poll_interval_ms_ == 0) return;
+  const uint32_t now = millis();
+  if (this->last_solar_history_poll_ms_ != 0 &&
+      now - this->last_solar_history_poll_ms_ < this->solar_history_poll_interval_ms_)
+    return;
+  this->last_solar_history_poll_ms_ = now;
+  this->request_solar_history_();
+}
+
 void Manager30Component::dump_config() {
   ESP_LOGCONFIG(TAG, "Manager30 SA 0x%02X", this->source_address_);
+  ESP_LOGCONFIG(TAG, "  Solar history poll interval: %u ms", (unsigned) this->solar_history_poll_interval_ms_);
   LOG_SENSOR("  ", "Vehicle Input Trigger", this->vehicle_input_trigger_sensor_);
   LOG_TEXT_SENSOR("  ", "CAN Date", this->clock_date_text_sensor_);
   LOG_TEXT_SENSOR("  ", "CAN Time", this->clock_time_text_sensor_);
@@ -34,6 +45,7 @@ void Manager30Component::dump_config() {
   LOG_TEXT_SENSOR("  ", "Charging Stage", this->charging_stage_text_sensor_);
   LOG_BINARY_SENSOR("  ", "CAN Status Abnormal", this->can_status_abnormal_sensor_);
   LOG_TEXT_SENSOR("  ", "CAN Status", this->can_status_text_sensor_);
+  LOG_TEXT_SENSOR("  ", "Solar Day -1..-5 History", this->solar_day_1_5_history_text_sensor_);
   LOG_SELECT("  ", "Vehicle Input Trigger", this->vehicle_input_trigger_select_);
   LOG_SELECT("  ", "Charging Mode", this->charging_mode_select_);
 }
@@ -229,6 +241,26 @@ void Manager30Component::publish_solar_energy_total_() {
     any = true;
   }
   if (any) this->solar_energy_sensor_->publish_state((float) total);
+  if (any) this->publish_solar_day_1_5_history_();
+}
+
+void Manager30Component::publish_solar_day_1_5_history_() {
+  if (this->solar_day_1_5_history_text_sensor_ == nullptr) return;
+
+  char buffer[48];
+  size_t used = 0;
+  buffer[0] = '\0';
+  for (uint8_t day = 1; day <= 5; day++) {
+    const unsigned value = this->solar_daily_known_[day] ? (unsigned) this->solar_daily_wh_[day] : 255U;
+    const int written = std::snprintf(buffer + used, sizeof(buffer) - used, day == 1 ? "%u" : ",%u", value);
+    if (written <= 0) break;
+    used += (size_t) written;
+    if (used >= sizeof(buffer)) {
+      buffer[sizeof(buffer) - 1] = '\0';
+      break;
+    }
+  }
+  this->solar_day_1_5_history_text_sensor_->publish_state(buffer);
 }
 
 void Manager30Component::inspect_status_heartbeat_(uint32_t can_id, const std::vector<uint8_t> &data) {
@@ -283,6 +315,13 @@ void Manager30Component::publish_can_status_(bool abnormal, const char *message)
   } else {
     ESP_LOGI(TAG, "CAN status normal");
   }
+}
+
+void Manager30Component::request_solar_history_() {
+  auto *bus = redarc_common::RedarcCanDispatcher::instance().canbus();
+  if (bus == nullptr) return;
+  bus->send_data(0x0FFCD6FAUL, true, {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00});
+  ESP_LOGD(TAG, "Requested Manager30 solar generation history");
 }
 
 bool Manager30Component::is_valid_charging_stage_(uint8_t stage) const {

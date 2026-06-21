@@ -14,6 +14,8 @@ substitutions:
   can_mode: NORMAL
 
   sensor_average_interval: 5s
+  solar_history_poll_interval: 60s
+  soc_history_poll_interval: 60s
   rouge_transition_length: 750ms
   board: m5stack-atom
   esp32_framework_type: esp-idf
@@ -41,11 +43,13 @@ redarc_battery_sensor:
   id: Battery
   source_address: 0x08
   filter_interval: ${sensor_average_interval}
+  soc_history_poll_interval: ${soc_history_poll_interval}
 
 redarc_manager:
   id: Manager30
   source_address: 0x01
   filter_interval: ${sensor_average_interval}
+  solar_history_poll_interval: ${solar_history_poll_interval}
   battery_sensor_id: Battery
 
 # Multiple redvision displays are supported — add entries as needed.
