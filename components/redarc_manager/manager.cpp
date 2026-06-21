@@ -26,11 +26,18 @@ void Manager30Component::setup() {
 }
 
 void Manager30Component::loop() {
-
+  if (this->solar_history_poll_interval_ms_ == 0) return;
+  const uint32_t now = millis();
+  if (this->last_solar_history_poll_ms_ != 0 &&
+      now - this->last_solar_history_poll_ms_ < this->solar_history_poll_interval_ms_)
+    return;
+  this->last_solar_history_poll_ms_ = now;
+  this->request_solar_history_();
 }
 
 void Manager30Component::dump_config() {
   ESP_LOGCONFIG(TAG, "Manager30 SA 0x%02X", this->source_address_);
+  ESP_LOGCONFIG(TAG, "  Solar history poll interval: %u ms", (unsigned) this->solar_history_poll_interval_ms_);
   LOG_SENSOR("  ", "Vehicle Input Trigger", this->vehicle_input_trigger_sensor_);
   LOG_TEXT_SENSOR("  ", "CAN Date", this->clock_date_text_sensor_);
   LOG_TEXT_SENSOR("  ", "CAN Time", this->clock_time_text_sensor_);
@@ -308,6 +315,13 @@ void Manager30Component::publish_can_status_(bool abnormal, const char *message)
   } else {
     ESP_LOGI(TAG, "CAN status normal");
   }
+}
+
+void Manager30Component::request_solar_history_() {
+  auto *bus = redarc_common::RedarcCanDispatcher::instance().canbus();
+  if (bus == nullptr) return;
+  bus->send_data(0x1BFCD620UL, true, {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00});
+  ESP_LOGD(TAG, "Requested Manager30 solar generation history");
 }
 
 bool Manager30Component::is_valid_charging_stage_(uint8_t stage) const {

@@ -208,9 +208,9 @@ void BatterySensorComponent::request_soc_history_() {
   auto *bus = redarc_common::RedarcCanDispatcher::instance().canbus();
   if (bus == nullptr) return;
   const std::vector<uint8_t> request = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-  bus->send_data(0x0FFCD0FAUL, true, request);
-  bus->send_data(0x0FFCD2FAUL, true, request);
-  bus->send_data(0x0FFCD4FAUL, true, request);
+  bus->send_data(0x1BFCD020UL, true, request);
+  bus->send_data(0x1BFCD220UL, true, request);
+  bus->send_data(0x1BFCD420UL, true, request);
   ESP_LOGD(TAG, "Requested battery SOC history");
 }
 
