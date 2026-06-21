@@ -22,16 +22,18 @@ void ChargingModeSelect::control(size_t index) {
 void Manager30Component::setup() {
   redarc_common::RedarcCanDispatcher::instance().add_listener(
       [this](uint32_t id, const std::vector<uint8_t> &data) { this->handle_can_frame(id, data); });
+  this->publish_can_status_(false, "Normal");
 }
 
 void Manager30Component::dump_config() {
   ESP_LOGCONFIG(TAG, "Manager30 SA 0x%02X", this->source_address_);
   LOG_SENSOR("  ", "Vehicle Input Trigger", this->vehicle_input_trigger_sensor_);
-  LOG_SENSOR("  ", "Clock Flags Raw", this->clock_flags_sensor_);
   LOG_TEXT_SENSOR("  ", "CAN Date", this->clock_date_text_sensor_);
   LOG_TEXT_SENSOR("  ", "CAN Time", this->clock_time_text_sensor_);
   LOG_TEXT_SENSOR("  ", "CAN Date Time", this->clock_datetime_text_sensor_);
   LOG_TEXT_SENSOR("  ", "Charging Stage", this->charging_stage_text_sensor_);
+  LOG_BINARY_SENSOR("  ", "CAN Status Abnormal", this->can_status_abnormal_sensor_);
+  LOG_TEXT_SENSOR("  ", "CAN Status", this->can_status_text_sensor_);
   LOG_SELECT("  ", "Vehicle Input Trigger", this->vehicle_input_trigger_select_);
   LOG_SELECT("  ", "Charging Mode", this->charging_mode_select_);
 }
@@ -58,9 +60,15 @@ void Manager30Component::send_charging_mode(uint8_t mode) {
 
 void Manager30Component::handle_can_frame(uint32_t can_id, const std::vector<uint8_t> &data) {
   can_id = redarc_common::rvc_id(can_id);
-  if (data.size() < 8) return;
+  if (data.size() < 8) {
+    char msg[64];
+    std::snprintf(msg, sizeof(msg), "Short CAN frame 0x%08X dlc=%u", (unsigned) can_id, (unsigned) data.size());
+    this->publish_can_status_(true, msg);
+    return;
+  }
 
   const uint32_t now = millis();
+  this->inspect_status_heartbeat_(can_id, data);
 
   if (can_id == 0x0F0001FAUL && data[0] == 0x68 && data[2] == 0x03) {
     const uint16_t raw = redarc_common::u16_le(data, 4);
@@ -126,7 +134,7 @@ void Manager30Component::handle_can_frame(uint32_t can_id, const std::vector<uin
     const uint8_t hour = data[4];
     const uint8_t minute = data[5];
     const uint8_t second = data[6];
-    if (this->clock_flags_sensor_ != nullptr) this->clock_flags_sensor_->publish_state((float) flags);
+    (void) flags;
     if (year >= 2000 && year <= 2100 && month >= 1 && month <= 12 && day >= 1 && day <= 31 &&
         hour <= 23 && minute <= 59 && second <= 59) {
       char date[11];
@@ -153,7 +161,6 @@ void Manager30Component::handle_can_frame(uint32_t can_id, const std::vector<uin
     const uint32_t raw = redarc_common::u32_le(data, 0);
     const float amps = redarc_common::current_32_centered(raw);
     if (this->output_current_sensor_ != nullptr) this->output_current_sensor_->publish_state(amps);
-    if (this->output_current_raw_sensor_ != nullptr) this->output_current_raw_sensor_->publish_state((float) raw);
     if (this->battery_voltage_sensor_ != nullptr) this->battery_voltage_sensor_->publish_state((float) redarc_common::u16_le(data, 4) * 0.001f);
     if (this->source_device_current_sensor_ != nullptr && this->battery_sensor_ != nullptr && this->battery_sensor_->has_current()) {
       this->source_device_current_sensor_->publish_state(amps - this->battery_sensor_->current_a());
@@ -222,6 +229,81 @@ void Manager30Component::publish_solar_energy_total_() {
     any = true;
   }
   if (any) this->solar_energy_sensor_->publish_state((float) total);
+}
+
+void Manager30Component::inspect_status_heartbeat_(uint32_t can_id, const std::vector<uint8_t> &data) {
+  const uint32_t dgn = redarc_common::rvc_dgn(can_id);
+  const uint8_t sa = redarc_common::rvc_source_address(can_id);
+  char msg[96];
+
+  if (dgn == 0x1F200UL && sa == this->source_address_) {
+    if (!this->is_valid_charging_stage_(data[0])) {
+      std::snprintf(msg, sizeof(msg), "Manager30 unknown charging stage 0x%02X", data[0]);
+      this->publish_can_status_(true, msg);
+    } else {
+      this->publish_can_status_(false, "Normal");
+    }
+    return;
+  }
+
+  if (dgn == 0x1F206UL && sa == this->source_address_) {
+    if (data[7] != 0xFF && !this->is_valid_vehicle_trigger_(data[7])) {
+      std::snprintf(msg, sizeof(msg), "Manager30 invalid vehicle trigger 0x%02X", data[7]);
+      this->publish_can_status_(true, msg);
+    } else {
+      this->publish_can_status_(false, "Normal");
+    }
+    return;
+  }
+
+  if (dgn == 0x1FD00UL && (sa == 0x24 || sa == 0x30)) {
+    for (uint8_t i = 1; i < 8; i++) {
+      const uint8_t value = data[i];
+      if (value == 0x00 || value == 0x01 || value == 0xF8 || value == 0xFF) continue;
+      std::snprintf(msg, sizeof(msg), "SA 0x%02X status page 0x%02X unexpected byte D%u=0x%02X",
+                    sa, data[0], (unsigned) (i + 1), value);
+      this->publish_can_status_(true, msg);
+      return;
+    }
+    this->publish_can_status_(false, "Normal");
+  }
+}
+
+void Manager30Component::publish_can_status_(bool abnormal, const char *message) {
+  if (this->can_status_published_ && abnormal == this->can_status_abnormal_) {
+    if (abnormal && this->can_status_text_sensor_ != nullptr) this->can_status_text_sensor_->publish_state(message);
+    return;
+  }
+  this->can_status_published_ = true;
+  this->can_status_abnormal_ = abnormal;
+  if (this->can_status_abnormal_sensor_ != nullptr) this->can_status_abnormal_sensor_->publish_state(abnormal);
+  if (this->can_status_text_sensor_ != nullptr) this->can_status_text_sensor_->publish_state(message);
+  if (abnormal) {
+    ESP_LOGW(TAG, "CAN status abnormal: %s", message);
+  } else {
+    ESP_LOGI(TAG, "CAN status normal");
+  }
+}
+
+bool Manager30Component::is_valid_charging_stage_(uint8_t stage) const {
+  switch (stage) {
+    case 0x21:
+    case 0x30:
+    case 0x31:
+    case 0x40:
+    case 0x41:
+    case 0x70:
+    case 0x71:
+    case 0x80:
+    case 0x81:
+      return true;
+    default:
+      return false;
+  }
+}
+
+bool Manager30Component::is_valid_vehicle_trigger_(uint8_t trigger) const {
+  return trigger <= 3 || trigger == 5;
 }
 
 void Manager30Component::publish_charging_mode_(uint8_t mode) {

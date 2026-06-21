@@ -48,8 +48,6 @@ void TVMS1280Component::send_channel(uint8_t channel, bool state) {
   auto *bus = redarc_common::RedarcCanDispatcher::instance().canbus();
   if (bus == nullptr) return;
   bus->send_data(this->command_id_, true, {0xCB, 0x00, 0xFF, channel, (uint8_t) (state ? 0x01 : 0x00), 0x00, 0x00, 0x00});
-  if (this->last_command_channel_sensor_ != nullptr) this->last_command_channel_sensor_->publish_state((float) channel);
-  if (this->last_command_state_sensor_ != nullptr) this->last_command_state_sensor_->publish_state(state ? 1.0f : 0.0f);
 }
 
 void TVMS1280Component::publish_output_(uint8_t output_number, bool state) {

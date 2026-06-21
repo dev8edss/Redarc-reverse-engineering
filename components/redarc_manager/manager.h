@@ -1,6 +1,7 @@
 #pragma once
 #include "esphome/core/component.h"
 #include "esphome/core/log.h"
+#include "esphome/components/binary_sensor/binary_sensor.h"
 #include "esphome/components/select/select.h"
 #include "esphome/components/sensor/sensor.h"
 #include "esphome/components/text_sensor/text_sensor.h"
@@ -38,7 +39,6 @@ class Manager30Component : public Component {
   void set_filter_interval_ms(uint32_t ms) { this->filter_interval_ms_ = ms; }
   void set_battery_sensor(redarc_battery_sensor::BatterySensorComponent *b) { this->battery_sensor_ = b; }
   void set_output_current_sensor(sensor::Sensor *s) { this->output_current_sensor_ = s; }
-  void set_output_current_raw_sensor(sensor::Sensor *s) { this->output_current_raw_sensor_ = s; }
   void set_battery_voltage_sensor(sensor::Sensor *s) { this->battery_voltage_sensor_ = s; }
   void set_source_device_current_sensor(sensor::Sensor *s) { this->source_device_current_sensor_ = s; }
   void set_solar_current_sensor(sensor::Sensor *s) { this->solar_current_sensor_ = s; }
@@ -48,11 +48,12 @@ class Manager30Component : public Component {
   void set_solar_daily_energy_sensor(uint8_t day, sensor::Sensor *s) { if (day < 8) this->solar_daily_energy_sensors_[day] = s; }
   void set_ac_input_voltage_sensor(sensor::Sensor *s) { this->ac_input_voltage_sensor_ = s; }
   void set_vehicle_input_trigger_sensor(sensor::Sensor *s) { this->vehicle_input_trigger_sensor_ = s; }
-  void set_clock_flags_sensor(sensor::Sensor *s) { this->clock_flags_sensor_ = s; }
   void set_clock_date_text_sensor(text_sensor::TextSensor *s) { this->clock_date_text_sensor_ = s; }
   void set_clock_time_text_sensor(text_sensor::TextSensor *s) { this->clock_time_text_sensor_ = s; }
   void set_clock_datetime_text_sensor(text_sensor::TextSensor *s) { this->clock_datetime_text_sensor_ = s; }
   void set_charging_stage_text_sensor(text_sensor::TextSensor *s) { this->charging_stage_text_sensor_ = s; }
+  void set_can_status_abnormal_sensor(binary_sensor::BinarySensor *s) { this->can_status_abnormal_sensor_ = s; }
+  void set_can_status_text_sensor(text_sensor::TextSensor *s) { this->can_status_text_sensor_ = s; }
   void set_vehicle_input_trigger_select(VehicleInputTriggerSelect *s) { this->vehicle_input_trigger_select_ = s; }
   void set_charging_mode_select(ChargingModeSelect *s) { this->charging_mode_select_ = s; }
 
@@ -67,6 +68,10 @@ class Manager30Component : public Component {
   void publish_charging_stage_(uint8_t stage);
   void publish_solar_daily_energy_(uint8_t day, uint16_t wh);
   void publish_solar_energy_total_();
+  void inspect_status_heartbeat_(uint32_t can_id, const std::vector<uint8_t> &data);
+  void publish_can_status_(bool abnormal, const char *message);
+  bool is_valid_charging_stage_(uint8_t stage) const;
+  bool is_valid_vehicle_trigger_(uint8_t trigger) const;
 
   uint8_t source_address_{0x01};
   uint32_t filter_interval_ms_{5000};
@@ -81,7 +86,6 @@ class Manager30Component : public Component {
   bool charging_mode_status_seen_{false};
   redarc_battery_sensor::BatterySensorComponent *battery_sensor_{nullptr};
   sensor::Sensor *output_current_sensor_{nullptr};
-  sensor::Sensor *output_current_raw_sensor_{nullptr};
   sensor::Sensor *battery_voltage_sensor_{nullptr};
   sensor::Sensor *source_device_current_sensor_{nullptr};
   sensor::Sensor *solar_current_sensor_{nullptr};
@@ -93,11 +97,14 @@ class Manager30Component : public Component {
   std::array<bool, 8> solar_daily_known_{};
   sensor::Sensor *ac_input_voltage_sensor_{nullptr};
   sensor::Sensor *vehicle_input_trigger_sensor_{nullptr};
-  sensor::Sensor *clock_flags_sensor_{nullptr};
   text_sensor::TextSensor *clock_date_text_sensor_{nullptr};
   text_sensor::TextSensor *clock_time_text_sensor_{nullptr};
   text_sensor::TextSensor *clock_datetime_text_sensor_{nullptr};
   text_sensor::TextSensor *charging_stage_text_sensor_{nullptr};
+  binary_sensor::BinarySensor *can_status_abnormal_sensor_{nullptr};
+  text_sensor::TextSensor *can_status_text_sensor_{nullptr};
+  bool can_status_abnormal_{false};
+  bool can_status_published_{false};
   VehicleInputTriggerSelect *vehicle_input_trigger_select_{nullptr};
   ChargingModeSelect *charging_mode_select_{nullptr};
 };

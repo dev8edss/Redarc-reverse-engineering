@@ -160,7 +160,6 @@ void BatterySensorComponent::handle_can_frame(uint32_t can_id, const std::vector
     if (now - this->last_current_ms_ >= this->filter_interval_ms_) {
       this->last_current_ms_ = now;
       if (this->current_sensor_ != nullptr) this->current_sensor_->publish_state(amps);
-      if (this->current_raw_sensor_ != nullptr) this->current_raw_sensor_->publish_state((float) raw);
       if (this->voltage_sensor_ != nullptr) this->voltage_sensor_->publish_state((float) redarc_common::u16_le(data, 4) * 0.001f);
       if (this->temperature_sensor_ != nullptr) this->temperature_sensor_->publish_state((float) data[6] - 60.0f);
     }

@@ -31,8 +31,6 @@ void RedvisionDisplayComponent::handle_can_frame(uint32_t can_id, const std::vec
     const uint16_t raw_load = redarc_common::u16_le(data, 4);
     if (this->battery_current_display_sensor_ != nullptr) this->battery_current_display_sensor_->publish_state(redarc_common::current_display_16_centered(raw_batt));
     if (this->device_current_display_sensor_ != nullptr) this->device_current_display_sensor_->publish_state(redarc_common::current_display_16_centered(raw_load));
-    if (this->battery_current_display_raw_sensor_ != nullptr) this->battery_current_display_raw_sensor_->publish_state((float) raw_batt);
-    if (this->device_current_display_raw_sensor_ != nullptr) this->device_current_display_raw_sensor_->publish_state((float) raw_load);
     return;
   }
 
@@ -41,7 +39,6 @@ void RedvisionDisplayComponent::handle_can_frame(uint32_t can_id, const std::vec
     this->last_display_ms_ = now;
     const uint16_t raw_mgr = redarc_common::u16_le(data, 6);
     if (this->manager_output_current_display_sensor_ != nullptr) this->manager_output_current_display_sensor_->publish_state(redarc_common::current_display_16_centered(raw_mgr));
-    if (this->manager_output_current_display_raw_sensor_ != nullptr) this->manager_output_current_display_raw_sensor_->publish_state((float) raw_mgr);
     return;
   }
 

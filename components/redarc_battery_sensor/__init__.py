@@ -35,7 +35,6 @@ CONFIG_SCHEMA = cv.Schema({
     cv.Optional(CONF_SOURCE_ADDRESS, default=0x08): cv.hex_uint8_t,
     cv.Optional(CONF_FILTER_INTERVAL, default="5s"): cv.positive_time_period_milliseconds,
     cv.GenerateID("current_id"): cv.declare_id(_SensorClass),
-    cv.GenerateID("current_raw_id"): cv.declare_id(_SensorClass),
     cv.GenerateID("voltage_id"): cv.declare_id(_SensorClass),
     cv.GenerateID("temperature_id"): cv.declare_id(_SensorClass),
     cv.GenerateID("soc_id"): cv.declare_id(_SensorClass),
@@ -127,11 +126,6 @@ async def to_code(config):
                            unit="A", device_class="current",
                            state_class=STATE_CLASS_MEASUREMENT, decimals=3)
     cg.add(var.set_current_sensor(s))
-
-    s = await _make_sensor(config["current_raw_id"], f"{p} Current Raw",
-                           state_class=STATE_CLASS_MEASUREMENT, decimals=0,
-                           entity_category=ENTITY_CATEGORY_DIAGNOSTIC)
-    cg.add(var.set_current_raw_sensor(s))
 
     s = await _make_sensor(config["voltage_id"], f"{p} Voltage",
                            unit="V", device_class="voltage",

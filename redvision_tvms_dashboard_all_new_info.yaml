@@ -85,9 +85,6 @@ cards:
       - entity: sensor.redvision_can_bridge_manager30_output_current
         name: Manager30 Output Current
         icon: mdi:battery-charging
-      - entity: sensor.redvision_can_bridge_manager30_output_current_raw
-        name: Manager30 Output Current Raw
-        icon: mdi:counter
       - entity: sensor.redvision_can_bridge_manager30_battery_voltage
         name: Manager30 Battery Voltage
         icon: mdi:car-battery
@@ -106,9 +103,6 @@ cards:
       - entity: sensor.redvision_can_bridge_battery_current
         name: Battery Current
         icon: mdi:current-dc
-      - entity: sensor.redvision_can_bridge_battery_current_raw
-        name: Battery Current Raw
-        icon: mdi:counter
       - entity: sensor.redvision_can_bridge_manager30_device_current
         name: Device Current
         icon: mdi:flash
@@ -503,12 +497,20 @@ cards:
         icon: mdi:thermometer
   - type: markdown
     content: "# Diagnostics"
+  - type: entities
+    title: CAN Status
+    show_header_toggle: false
+    state_color: true
+    entities:
+      - entity: binary_sensor.redvision_can_bridge_manager30_can_status_abnormal
+        name: CAN Status Abnormal
+      - entity: sensor.redvision_can_bridge_manager30_can_status
+        name: Last CAN Status Change
   - type: markdown
     content: >
       # RedVision Diagnostics
 
-      These cards show the Redvision display/rebroadcast values and raw source
-      counters.
+      These cards show CAN status and Redvision display/rebroadcast values.
 
       Redvision values should broadly match the source-node values, but the
       Manager30 and Battery Sensor values are the primary measurements.
@@ -538,13 +540,3 @@ cards:
         name: Device Derived
       - entity: sensor.redvision_can_bridge_redvision_device_current_display
         name: Device Redvision
-  - type: entities
-    title: Raw Values
-    show_header_toggle: false
-    entities:
-      - entity: sensor.redvision_can_bridge_manager30_output_current_raw
-        name: Manager30 Output Current Raw
-      - entity: sensor.redvision_can_bridge_battery_current_raw
-        name: Battery Current Raw
-      - entity: sensor.redvision_can_bridge_redvision_manager_output_current_display_raw
-        name: Redvision Manager Output Current Display Raw

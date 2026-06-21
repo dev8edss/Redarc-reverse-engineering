@@ -15,9 +15,6 @@ class RedvisionDisplayComponent : public Component {
   void set_battery_current_display_sensor(sensor::Sensor *s) { this->battery_current_display_sensor_ = s; }
   void set_device_current_display_sensor(sensor::Sensor *s) { this->device_current_display_sensor_ = s; }
   void set_manager_output_current_display_sensor(sensor::Sensor *s) { this->manager_output_current_display_sensor_ = s; }
-  void set_battery_current_display_raw_sensor(sensor::Sensor *s) { this->battery_current_display_raw_sensor_ = s; }
-  void set_device_current_display_raw_sensor(sensor::Sensor *s) { this->device_current_display_raw_sensor_ = s; }
-  void set_manager_output_current_display_raw_sensor(sensor::Sensor *s) { this->manager_output_current_display_raw_sensor_ = s; }
   void setup() override;
   void dump_config() override;
   void handle_can_frame(uint32_t can_id, const std::vector<uint8_t> &data);
@@ -29,9 +26,6 @@ class RedvisionDisplayComponent : public Component {
   sensor::Sensor *battery_current_display_sensor_{nullptr};
   sensor::Sensor *device_current_display_sensor_{nullptr};
   sensor::Sensor *manager_output_current_display_sensor_{nullptr};
-  sensor::Sensor *battery_current_display_raw_sensor_{nullptr};
-  sensor::Sensor *device_current_display_raw_sensor_{nullptr};
-  sensor::Sensor *manager_output_current_display_raw_sensor_{nullptr};
 };
 
 }  // namespace redarc_redvision_display

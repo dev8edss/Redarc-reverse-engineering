@@ -54,8 +54,6 @@ _AUTO_IDS[cv.GenerateID("temp1_id")] = cv.declare_id(_SensorClass)
 _AUTO_IDS[cv.GenerateID("temp2_id")] = cv.declare_id(_SensorClass)
 _AUTO_IDS[cv.GenerateID("voltage_input1_id")] = cv.declare_id(_SensorClass)
 _AUTO_IDS[cv.GenerateID("voltage_input2_id")] = cv.declare_id(_SensorClass)
-_AUTO_IDS[cv.GenerateID("last_cmd_channel_id")] = cv.declare_id(_SensorClass)
-_AUTO_IDS[cv.GenerateID("last_cmd_state_id")] = cv.declare_id(_SensorClass)
 _AUTO_IDS[cv.GenerateID("inverter_id")] = cv.declare_id(TVMS1280Switch)
 _AUTO_IDS[cv.GenerateID("master_id")] = cv.declare_id(TVMS1280Switch)
 
@@ -117,16 +115,6 @@ async def to_code(config):
                            unit="V", device_class="voltage",
                            state_class=STATE_CLASS_MEASUREMENT, decimals=2)
     cg.add(var.set_voltage_input2_sensor(s))
-
-    s = await _make_sensor(config["last_cmd_channel_id"], f"{p} Last Output Command Channel",
-                           state_class=STATE_CLASS_MEASUREMENT, decimals=0,
-                           entity_category=ENTITY_CATEGORY_DIAGNOSTIC)
-    cg.add(var.set_last_command_channel_sensor(s))
-
-    s = await _make_sensor(config["last_cmd_state_id"], f"{p} Last Output Command State",
-                           state_class=STATE_CLASS_MEASUREMENT, decimals=0,
-                           entity_category=ENTITY_CATEGORY_DIAGNOSTIC)
-    cg.add(var.set_last_command_state_sensor(s))
 
     for i in range(1, 7):
         s = await _make_sensor(config[f"tank_{i}_id"], f"{p} Tank {i}",

@@ -41,8 +41,6 @@ class TVMS1280Component : public Component {
   void set_voltage_input2_sensor(sensor::Sensor *s) { this->voltage_input2_sensor_ = s; }
   void set_tank_sensor(uint8_t tank, sensor::Sensor *s) { if (tank >= 1 && tank <= 6) this->tank_sensors_[tank] = s; }
   void set_digital_input_sensor(uint8_t input, binary_sensor::BinarySensor *s) { if (input >= 1 && input <= 3) this->digital_input_sensors_[input] = s; }
-  void set_last_command_channel_sensor(sensor::Sensor *s) { this->last_command_channel_sensor_ = s; }
-  void set_last_command_state_sensor(sensor::Sensor *s) { this->last_command_state_sensor_ = s; }
 
   void setup() override;
   void register_output_switch(TVMS1280Switch *sw);
@@ -75,8 +73,6 @@ class TVMS1280Component : public Component {
   sensor::Sensor *voltage_input2_sensor_{nullptr};
   std::array<sensor::Sensor *, 7> tank_sensors_{};
   std::array<binary_sensor::BinarySensor *, 4> digital_input_sensors_{};
-  sensor::Sensor *last_command_channel_sensor_{nullptr};
-  sensor::Sensor *last_command_state_sensor_{nullptr};
 };
 
 }  // namespace redarc_tvms_1280

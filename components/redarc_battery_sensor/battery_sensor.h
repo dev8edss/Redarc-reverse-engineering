@@ -50,7 +50,6 @@ class BatterySensorComponent : public Component {
   void set_source_address(uint8_t source_address) { this->source_address_ = source_address; }
   void set_filter_interval_ms(uint32_t ms) { this->filter_interval_ms_ = ms; }
   void set_current_sensor(sensor::Sensor *s) { this->current_sensor_ = s; }
-  void set_current_raw_sensor(sensor::Sensor *s) { this->current_raw_sensor_ = s; }
   void set_voltage_sensor(sensor::Sensor *s) { this->voltage_sensor_ = s; }
   void set_temperature_sensor(sensor::Sensor *s) { this->temperature_sensor_ = s; }
   void set_soc_sensor(sensor::Sensor *s) { this->soc_sensor_ = s; }
@@ -84,7 +83,6 @@ class BatterySensorComponent : public Component {
   uint32_t last_alarm_report_ms_{0};
   float current_a_{NAN};
   sensor::Sensor *current_sensor_{nullptr};
-  sensor::Sensor *current_raw_sensor_{nullptr};
   sensor::Sensor *voltage_sensor_{nullptr};
   sensor::Sensor *temperature_sensor_{nullptr};
   sensor::Sensor *soc_sensor_{nullptr};

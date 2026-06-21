@@ -5,7 +5,7 @@ from esphome.const import (
     CONF_ACCURACY_DECIMALS, CONF_DEVICE_CLASS, CONF_DISABLED_BY_DEFAULT,
     CONF_ENTITY_CATEGORY, CONF_FORCE_UPDATE, CONF_ICON, CONF_ID, CONF_NAME,
     CONF_STATE_CLASS, CONF_UNIT_OF_MEASUREMENT,
-    ENTITY_CATEGORY_DIAGNOSTIC, ENTITY_CATEGORY_NONE,
+    ENTITY_CATEGORY_NONE,
     STATE_CLASS_MEASUREMENT,
 )
 
@@ -34,10 +34,7 @@ CONFIG_SCHEMA = cv.Schema({
     cv.Optional(CONF_FILTER_INTERVAL, default="5s"): cv.positive_time_period_milliseconds,
     cv.GenerateID("batt_current_id"): cv.declare_id(_SensorClass),
     cv.GenerateID("device_current_id"): cv.declare_id(_SensorClass),
-    cv.GenerateID("batt_current_raw_id"): cv.declare_id(_SensorClass),
-    cv.GenerateID("device_current_raw_id"): cv.declare_id(_SensorClass),
     cv.GenerateID("mgr_output_current_id"): cv.declare_id(_SensorClass),
-    cv.GenerateID("mgr_output_current_raw_id"): cv.declare_id(_SensorClass),
 }).extend(cv.COMPONENT_SCHEMA)
 
 
@@ -79,29 +76,11 @@ async def to_code(config):
                                state_class=STATE_CLASS_MEASUREMENT, decimals=1)
         _shared_current_sensors["device_current"] = s
 
-        s = await _make_sensor(config["batt_current_raw_id"], "Redvision Battery Current Display Raw",
-                               state_class=STATE_CLASS_MEASUREMENT, decimals=0,
-                               entity_category=ENTITY_CATEGORY_DIAGNOSTIC)
-        _shared_current_sensors["batt_current_raw"] = s
-
-        s = await _make_sensor(config["device_current_raw_id"], "Redvision Device Current Display Raw",
-                               state_class=STATE_CLASS_MEASUREMENT, decimals=0,
-                               entity_category=ENTITY_CATEGORY_DIAGNOSTIC)
-        _shared_current_sensors["device_current_raw"] = s
-
         s = await _make_sensor(config["mgr_output_current_id"], "Redvision Manager Output Current Display",
                                unit="A", device_class="current",
                                state_class=STATE_CLASS_MEASUREMENT, decimals=1)
         _shared_current_sensors["mgr_output_current"] = s
 
-        s = await _make_sensor(config["mgr_output_current_raw_id"], "Redvision Manager Output Current Display Raw",
-                               state_class=STATE_CLASS_MEASUREMENT, decimals=0,
-                               entity_category=ENTITY_CATEGORY_DIAGNOSTIC)
-        _shared_current_sensors["mgr_output_current_raw"] = s
-
     cg.add(var.set_battery_current_display_sensor(_shared_current_sensors["batt_current"]))
     cg.add(var.set_device_current_display_sensor(_shared_current_sensors["device_current"]))
-    cg.add(var.set_battery_current_display_raw_sensor(_shared_current_sensors["batt_current_raw"]))
-    cg.add(var.set_device_current_display_raw_sensor(_shared_current_sensors["device_current_raw"]))
     cg.add(var.set_manager_output_current_display_sensor(_shared_current_sensors["mgr_output_current"]))
-    cg.add(var.set_manager_output_current_display_raw_sensor(_shared_current_sensors["mgr_output_current_raw"]))
