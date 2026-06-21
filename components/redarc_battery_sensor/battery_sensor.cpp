@@ -108,7 +108,7 @@ void BatterySensorComponent::send_soc_calibration_command(uint8_t target_percent
       target_percent, 0x00,
       0x00, 0x00};
   const uint32_t can_id =
-      0x0F000000UL | ((uint32_t) this->source_address_ << 8) | this->diagnostic_send_address_;
+      0x0F000000UL | ((uint32_t) this->source_address_ << 8) | this->host_address_;
   bus->send_data(can_id, true, data);
   ESP_LOGD(TAG, "Sent SOC calibration command target %u%% to SA 0x%02X", target_percent, this->source_address_);
 }
@@ -117,7 +117,7 @@ void BatterySensorComponent::handle_can_frame(uint32_t can_id, const std::vector
   can_id = redarc_common::rvc_id(can_id);
   if (data.size() < 8) return;
 
-  if ((can_id == (0x0F000000UL | ((uint32_t) this->source_address_ << 8) | this->diagnostic_receive_address_) &&
+  if ((can_id == (0x0F000000UL | ((uint32_t) this->source_address_ << 8) | this->host_address_) &&
        data[2] == 0x03) ||
       (can_id == redarc_common::with_sa(0x0F00FF00UL, this->host_address_) &&
        data[2] == 0xFF && data[3] == 0xFF)) {

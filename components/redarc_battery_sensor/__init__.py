@@ -15,8 +15,6 @@ MULTI_CONF = False
 
 CONF_SOURCE_ADDRESS = "source_address"
 CONF_HOST_ADDRESS = "host_address"
-CONF_DIAGNOSTIC_SEND_ADDRESS = "diagnostic_send_address"
-CONF_DIAGNOSTIC_RECEIVE_ADDRESS = "diagnostic_receive_address"
 CONF_FILTER_INTERVAL = "filter_interval"
 CONF_SOC_HISTORY_POLL_INTERVAL = "soc_history_poll_interval"
 
@@ -46,8 +44,6 @@ CONFIG_SCHEMA = cv.Schema({
     cv.GenerateID(): cv.declare_id(BatterySensorComponent),
     cv.Optional(CONF_SOURCE_ADDRESS, default=0x08): cv.hex_uint8_t,
     cv.Optional(CONF_HOST_ADDRESS, default=0x20): cv.hex_uint8_t,
-    cv.Optional(CONF_DIAGNOSTIC_SEND_ADDRESS, default=0xFA): cv.hex_uint8_t,
-    cv.Optional(CONF_DIAGNOSTIC_RECEIVE_ADDRESS, default=0xFA): cv.hex_uint8_t,
     cv.Optional(CONF_FILTER_INTERVAL, default="5s"): cv.positive_time_period_milliseconds,
     cv.Optional(CONF_SOC_HISTORY_POLL_INTERVAL, default="60s"): zero_or_positive_time_period_milliseconds,
     cv.GenerateID("current_id"): cv.declare_id(_SensorClass),
@@ -151,8 +147,6 @@ async def to_code(config):
     await cg.register_component(var, config)
     cg.add(var.set_source_address(config[CONF_SOURCE_ADDRESS]))
     cg.add(var.set_host_address(config[CONF_HOST_ADDRESS]))
-    cg.add(var.set_diagnostic_send_address(config[CONF_DIAGNOSTIC_SEND_ADDRESS]))
-    cg.add(var.set_diagnostic_receive_address(config[CONF_DIAGNOSTIC_RECEIVE_ADDRESS]))
     cg.add(var.set_filter_interval_ms(config[CONF_FILTER_INTERVAL]))
     cg.add(var.set_soc_history_poll_interval_ms(config[CONF_SOC_HISTORY_POLL_INTERVAL]))
 

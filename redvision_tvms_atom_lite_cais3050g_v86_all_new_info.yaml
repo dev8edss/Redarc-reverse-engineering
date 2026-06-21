@@ -25,8 +25,6 @@ substitutions:
 
   # ESP32 source address on the REDARC network (2 hex digits, no 0x prefix). Usually matches a redvision display address.
   host_address: "0x20"
-  diagnostic_send_address: "0xFA"
-  diagnostic_receive_address: "0xFA"
 
 packages:
   # Core infrastructure — ESPHome, ESP32, Wi-Fi, CAN hardware, external components.
@@ -44,8 +42,6 @@ redarc_battery_sensor:
   id: Battery
   source_address: 0x08
   host_address: ${host_address}
-  diagnostic_send_address: ${diagnostic_send_address}
-  diagnostic_receive_address: ${diagnostic_receive_address}
   filter_interval: ${sensor_average_interval}
   soc_history_poll_interval: ${history_poll_interval}
 
@@ -53,8 +49,6 @@ redarc_manager:
   id: Manager30
   source_address: 0x01
   host_address: ${host_address}
-  diagnostic_send_address: ${diagnostic_send_address}
-  diagnostic_receive_address: ${diagnostic_receive_address}
   filter_interval: ${sensor_average_interval}
   solar_history_poll_interval: ${history_poll_interval}
   battery_sensor_id: Battery

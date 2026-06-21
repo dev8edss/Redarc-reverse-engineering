@@ -37,12 +37,6 @@ class Manager30Component : public Component {
  public:
   void set_source_address(uint8_t source_address) { this->source_address_ = source_address; }
   void set_host_address(uint8_t host_address) { this->host_address_ = host_address; }
-  void set_diagnostic_send_address(uint8_t diagnostic_send_address) {
-    this->diagnostic_send_address_ = diagnostic_send_address;
-  }
-  void set_diagnostic_receive_address(uint8_t diagnostic_receive_address) {
-    this->diagnostic_receive_address_ = diagnostic_receive_address;
-  }
   void set_filter_interval_ms(uint32_t ms) { this->filter_interval_ms_ = ms; }
   void set_solar_history_poll_interval_ms(uint32_t ms) { this->solar_history_poll_interval_ms_ = ms; }
   void set_battery_sensor(redarc_battery_sensor::BatterySensorComponent *b) { this->battery_sensor_ = b; }
@@ -88,8 +82,6 @@ class Manager30Component : public Component {
 
   uint8_t source_address_{0x01};
   uint8_t host_address_{0x20};
-  uint8_t diagnostic_send_address_{0xFA};
-  uint8_t diagnostic_receive_address_{0xFA};
   uint32_t filter_interval_ms_{5000};
   uint32_t last_current_ms_{0};
   uint32_t last_solar_ms_{0};

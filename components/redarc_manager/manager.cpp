@@ -101,7 +101,7 @@ void Manager30Component::handle_can_frame(uint32_t can_id, const std::vector<uin
   const uint32_t now = millis();
   this->inspect_status_heartbeat_(can_id, data);
 
-  if (can_id == (0x0F000000UL | ((uint32_t) this->source_address_ << 8) | this->diagnostic_receive_address_) &&
+  if (can_id == (0x0F000000UL | ((uint32_t) this->source_address_ << 8) | this->host_address_) &&
       data[0] == 0x68 && data[2] == 0x03) {
     const uint16_t raw = redarc_common::u16_le(data, 4);
     if (this->vehicle_input_trigger_sensor_ != nullptr) this->vehicle_input_trigger_sensor_->publish_state((float) raw);
