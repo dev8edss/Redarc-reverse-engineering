@@ -45,20 +45,13 @@ void BatterySensorComponent::setup() {
 }
 
 void BatterySensorComponent::loop() {
-  const uint32_t now = millis();
-  if (this->send_pending_soc_history_request_(now)) return;
-
-  if (this->soc_history_poll_interval_ms_ == 0) return;
-  if (this->last_soc_history_poll_ms_ != 0 &&
-      now - this->last_soc_history_poll_ms_ < this->soc_history_poll_interval_ms_)
-    return;
-  this->last_soc_history_poll_ms_ = now;
-  this->request_soc_history_();
+  // Active SOC history polling is disabled while Manager30 reset behavior is under investigation.
 }
 
 void BatterySensorComponent::dump_config() {
   ESP_LOGCONFIG(TAG, "Battery Sensor SA 0x%02X", this->source_address_);
   ESP_LOGCONFIG(TAG, "  SOC history poll interval: %u ms", (unsigned) this->soc_history_poll_interval_ms_);
+  ESP_LOGCONFIG(TAG, "  SOC history active requests: disabled");
   LOG_SENSOR("  ", "Battery Type", this->battery_type_sensor_);
   LOG_SENSOR("  ", "Configured Capacity", this->configured_capacity_sensor_);
   LOG_SENSOR("  ", "Max Charge Current", this->max_charge_current_sensor_);
