@@ -37,7 +37,7 @@ CONFIG_SCHEMA = cv.Schema({
     cv.GenerateID(): cv.declare_id(BatterySensorComponent),
     cv.Optional(CONF_SOURCE_ADDRESS, default=0x08): cv.hex_uint8_t,
     cv.Optional(CONF_FILTER_INTERVAL, default="5s"): cv.positive_time_period_milliseconds,
-    cv.Optional(CONF_SOC_HISTORY_POLL_INTERVAL, default="60s"): cv.positive_time_period_milliseconds,
+    cv.Optional(CONF_SOC_HISTORY_POLL_INTERVAL, default="60s"): cv.time_period_milliseconds,
     cv.GenerateID("current_id"): cv.declare_id(_SensorClass),
     cv.GenerateID("voltage_id"): cv.declare_id(_SensorClass),
     cv.GenerateID("temperature_id"): cv.declare_id(_SensorClass),
