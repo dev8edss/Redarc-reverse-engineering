@@ -76,7 +76,7 @@ void Manager30Component::send_vehicle_input_trigger(uint16_t raw_value) {
       0x68, 0x00, 0xFF, 0xFF,
       (uint8_t) (raw_value & 0xFF), (uint8_t) (raw_value >> 8),
       0x00, 0x00};
-  bus->send_data(0x0F00FF20UL, true, data);
+  bus->send_data(redarc_common::with_sa(0x0F00FF00UL, this->host_address_), true, data);
   ESP_LOGD(TAG, "Sent vehicle input trigger %u", raw_value);
 }
 
@@ -85,7 +85,7 @@ void Manager30Component::send_charging_mode(uint8_t mode) {
   auto *bus = redarc_common::RedarcCanDispatcher::instance().canbus();
   if (bus == nullptr) return;
   const std::vector<uint8_t> data = {0x43, 0x00, 0xFF, 0xFF, mode, 0x00, 0x00, 0x00};
-  bus->send_data(0x0F00FF20UL, true, data);
+  bus->send_data(redarc_common::with_sa(0x0F00FF00UL, this->host_address_), true, data);
   ESP_LOGD(TAG, "Sent charging mode %s", mode == 0 ? "Touring" : "Storage");
 }
 
@@ -101,7 +101,8 @@ void Manager30Component::handle_can_frame(uint32_t can_id, const std::vector<uin
   const uint32_t now = millis();
   this->inspect_status_heartbeat_(can_id, data);
 
-  if (can_id == 0x0F0001FAUL && data[0] == 0x68 && data[2] == 0x03) {
+  if (can_id == (0x0F000000UL | ((uint32_t) this->source_address_ << 8) | this->diagnostic_receive_address_) &&
+      data[0] == 0x68 && data[2] == 0x03) {
     const uint16_t raw = redarc_common::u16_le(data, 4);
     if (this->vehicle_input_trigger_sensor_ != nullptr) this->vehicle_input_trigger_sensor_->publish_state((float) raw);
     if (this->vehicle_input_trigger_select_ != nullptr) {
@@ -111,7 +112,8 @@ void Manager30Component::handle_can_frame(uint32_t can_id, const std::vector<uin
     return;
   }
 
-  if (can_id == 0x0F00FF20UL && data[0] == 0x68 && data[2] == 0xFF && data[3] == 0xFF) {
+  if (can_id == redarc_common::with_sa(0x0F00FF00UL, this->host_address_) &&
+      data[0] == 0x68 && data[2] == 0xFF && data[3] == 0xFF) {
     const uint16_t raw = redarc_common::u16_le(data, 4);
     if (this->vehicle_input_trigger_sensor_ != nullptr) this->vehicle_input_trigger_sensor_->publish_state((float) raw);
     if (this->vehicle_input_trigger_select_ != nullptr) {
@@ -121,7 +123,8 @@ void Manager30Component::handle_can_frame(uint32_t can_id, const std::vector<uin
     return;
   }
 
-  if (can_id == 0x0F00FF20UL && data[0] == 0x43 && data[1] == 0x00 && data[2] == 0xFF && data[3] == 0xFF) {
+  if (can_id == redarc_common::with_sa(0x0F00FF00UL, this->host_address_) &&
+      data[0] == 0x43 && data[1] == 0x00 && data[2] == 0xFF && data[3] == 0xFF) {
     this->publish_charging_mode_(data[4] & 0x01U);
     return;
   }
@@ -212,7 +215,7 @@ void Manager30Component::handle_can_frame(uint32_t can_id, const std::vector<uin
     return;
   }
 
-  // Manager30 solar generation history. A request on 0x1BFCD620 is followed by
+  // Manager30 solar generation history. A request on DGN 0x1FCD6 from the host is followed by
   // pages on 0x03FCD601. D1 is the page index; D2-D3, D4-D5 and D6-D7 are
   // little-endian Wh buckets. Page 0 starts with today, then previous days.
   if (redarc_common::rvc_matches(can_id, 0x1FCD6UL, this->source_address_)) {
@@ -339,14 +342,16 @@ void Manager30Component::publish_can_status_(bool abnormal, const char *message)
 void Manager30Component::request_solar_history_() {
   auto *bus = redarc_common::RedarcCanDispatcher::instance().canbus();
   if (bus == nullptr) return;
-  bus->send_data(0x1BFCD620UL, true, {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00});
+  bus->send_data(redarc_common::with_sa(0x1BFCD600UL, this->host_address_), true,
+                 {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00});
   ESP_LOGD(TAG, "Requested Manager30 solar generation history");
 }
 
 void Manager30Component::send_history_preamble_() {
   auto *bus = redarc_common::RedarcCanDispatcher::instance().canbus();
   if (bus == nullptr) return;
-  bus->send_data(0x0FE6FF20UL, true, {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF});
+  bus->send_data(redarc_common::with_sa(0x0FE6FF00UL, this->host_address_), true,
+                 {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF});
   ESP_LOGD(TAG, "Sent history polling preamble before solar history request");
 }
 

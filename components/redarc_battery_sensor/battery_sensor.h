@@ -50,6 +50,13 @@ class BatteryTypeSelect : public select::Select {
 class BatterySensorComponent : public Component {
  public:
   void set_source_address(uint8_t source_address) { this->source_address_ = source_address; }
+  void set_host_address(uint8_t host_address) { this->host_address_ = host_address; }
+  void set_diagnostic_send_address(uint8_t diagnostic_send_address) {
+    this->diagnostic_send_address_ = diagnostic_send_address;
+  }
+  void set_diagnostic_receive_address(uint8_t diagnostic_receive_address) {
+    this->diagnostic_receive_address_ = diagnostic_receive_address;
+  }
   void set_filter_interval_ms(uint32_t ms) { this->filter_interval_ms_ = ms; }
   void set_soc_history_poll_interval_ms(uint32_t ms) { this->soc_history_poll_interval_ms_ = ms; }
   void set_current_sensor(sensor::Sensor *s) { this->current_sensor_ = s; }
@@ -93,6 +100,9 @@ class BatterySensorComponent : public Component {
   void append_csv_range_(char *buffer, size_t buffer_size, size_t &used, uint8_t low, uint8_t high, bool &first);
 
   uint8_t source_address_{0x08};
+  uint8_t host_address_{0x20};
+  uint8_t diagnostic_send_address_{0xFA};
+  uint8_t diagnostic_receive_address_{0xFA};
   uint32_t filter_interval_ms_{5000};
   uint32_t soc_history_poll_interval_ms_{60000};
   uint32_t last_soc_history_poll_ms_{0};

@@ -7,13 +7,14 @@ namespace esphome {
 namespace redarc_battery_sensor {
 
 static const char *const TAG = "redarc_battery_sensor";
-static const uint32_t SOC_HISTORY_REQUEST_IDS[] = {
-    0x1BFCD020UL, 0x1BFCD220UL, 0x1BFCD420UL};
+static const uint32_t SOC_HISTORY_REQUEST_BASE_IDS[] = {
+    0x1BFCD000UL, 0x1BFCD200UL, 0x1BFCD400UL};
 static const uint8_t SOC_HISTORY_REQUEST_DATA[][8] = {
     {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
     {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
     {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}};
-static const uint8_t SOC_HISTORY_REQUEST_COUNT = sizeof(SOC_HISTORY_REQUEST_IDS) / sizeof(SOC_HISTORY_REQUEST_IDS[0]);
+static const uint8_t SOC_HISTORY_REQUEST_COUNT =
+    sizeof(SOC_HISTORY_REQUEST_BASE_IDS) / sizeof(SOC_HISTORY_REQUEST_BASE_IDS[0]);
 static const uint32_t SOC_HISTORY_REQUEST_SPACING_MS = 100;
 static const uint32_t HISTORY_PREAMBLE_DELAY_MS = 15;
 
@@ -95,7 +96,7 @@ void BatterySensorComponent::send_config_setting(uint8_t command, uint16_t raw_v
       command, 0x00, 0xFF, 0xFF,
       (uint8_t) (raw_value & 0xFF), (uint8_t) (raw_value >> 8),
       0x00, 0x00};
-  bus->send_data(0x0F00FF20UL, true, data);
+  bus->send_data(redarc_common::with_sa(0x0F00FF00UL, this->host_address_), true, data);
   ESP_LOGD(TAG, "Sent battery config command 0x%02X value %u", command, raw_value);
 }
 
@@ -106,7 +107,8 @@ void BatterySensorComponent::send_soc_calibration_command(uint8_t target_percent
       0x15, 0x00, 0x03, 0x00,
       target_percent, 0x00,
       0x00, 0x00};
-  const uint32_t can_id = 0x0F0000FAUL | ((uint32_t) this->source_address_ << 8);
+  const uint32_t can_id =
+      0x0F000000UL | ((uint32_t) this->source_address_ << 8) | this->diagnostic_send_address_;
   bus->send_data(can_id, true, data);
   ESP_LOGD(TAG, "Sent SOC calibration command target %u%% to SA 0x%02X", target_percent, this->source_address_);
 }
@@ -115,8 +117,10 @@ void BatterySensorComponent::handle_can_frame(uint32_t can_id, const std::vector
   can_id = redarc_common::rvc_id(can_id);
   if (data.size() < 8) return;
 
-  if ((can_id == 0x0F0008FAUL && data[2] == 0x03) ||
-      (can_id == 0x0F00FF20UL && data[2] == 0xFF && data[3] == 0xFF)) {
+  if ((can_id == (0x0F000000UL | ((uint32_t) this->source_address_ << 8) | this->diagnostic_receive_address_) &&
+       data[2] == 0x03) ||
+      (can_id == redarc_common::with_sa(0x0F00FF00UL, this->host_address_) &&
+       data[2] == 0xFF && data[3] == 0xFF)) {
     const uint16_t raw = redarc_common::u16_le(data, 4);
     switch (data[0]) {
       case 0x12:
@@ -236,7 +240,8 @@ void BatterySensorComponent::request_soc_history_() {
 void BatterySensorComponent::send_history_preamble_() {
   auto *bus = redarc_common::RedarcCanDispatcher::instance().canbus();
   if (bus == nullptr) return;
-  bus->send_data(0x0FE6FF20UL, true, {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF});
+  bus->send_data(redarc_common::with_sa(0x0FE6FF00UL, this->host_address_), true,
+                 {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF});
   ESP_LOGD(TAG, "Sent history polling preamble before SOC history request");
 }
 
@@ -256,7 +261,8 @@ bool BatterySensorComponent::send_pending_soc_history_request_(uint32_t now) {
   const std::vector<uint8_t> request(
       SOC_HISTORY_REQUEST_DATA[request_index],
       SOC_HISTORY_REQUEST_DATA[request_index] + sizeof(SOC_HISTORY_REQUEST_DATA[request_index]));
-  bus->send_data(SOC_HISTORY_REQUEST_IDS[request_index], true, request);
+  bus->send_data(redarc_common::with_sa(SOC_HISTORY_REQUEST_BASE_IDS[request_index], this->host_address_), true,
+                 request);
   this->pending_soc_history_request_index_++;
   this->last_soc_history_request_ms_ = now;
   ESP_LOGD(TAG, "Sent battery SOC history request step %u", (unsigned) request_index);
