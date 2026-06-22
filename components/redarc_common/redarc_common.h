@@ -10,7 +10,7 @@
 namespace esphome {
 namespace redarc_common {
 
-static const uint32_t REDVISION_HEARTBEAT_INTERVAL_MS = 1000;
+static const uint32_t REDVISION_HEARTBEAT_INTERVAL_MS = 0;
 
 inline void log_can_frame(const char *direction, uint32_t can_id, const std::vector<uint8_t> &data) {
 #if ESPHOME_LOG_LEVEL >= ESPHOME_LOG_LEVEL_DEBUG
@@ -80,6 +80,7 @@ class RedarcCommonComponent : public Component {
   }
 
   void send_heartbeat_() {
+    if (REDVISION_HEARTBEAT_INTERVAL_MS == 0) return;
     if (!RedarcCanDispatcher::instance().address_claim_sent()) return;
     if (this->canbus_ == nullptr) return;
     const uint32_t now = millis();
