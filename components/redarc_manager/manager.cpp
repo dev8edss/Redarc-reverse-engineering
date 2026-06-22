@@ -76,7 +76,9 @@ void Manager30Component::send_vehicle_input_trigger(uint16_t raw_value) {
       0x68, 0x00, 0xFF, 0xFF,
       (uint8_t) (raw_value & 0xFF), (uint8_t) (raw_value >> 8),
       0x00, 0x00};
-  bus->send_data(redarc_common::with_sa(0x0F00FF00UL, this->host_address_), true, data);
+  const uint32_t can_id = redarc_common::with_sa(0x0F00FF00UL, this->host_address_);
+  redarc_common::log_can_frame("CAN_TX", can_id, data);
+  bus->send_data(can_id, true, data);
   ESP_LOGD(TAG, "Sent vehicle input trigger %u", raw_value);
 }
 
@@ -85,7 +87,9 @@ void Manager30Component::send_charging_mode(uint8_t mode) {
   auto *bus = redarc_common::RedarcCanDispatcher::instance().canbus();
   if (bus == nullptr) return;
   const std::vector<uint8_t> data = {0x43, 0x00, 0xFF, 0xFF, mode, 0x00, 0x00, 0x00};
-  bus->send_data(redarc_common::with_sa(0x0F00FF00UL, this->host_address_), true, data);
+  const uint32_t can_id = redarc_common::with_sa(0x0F00FF00UL, this->host_address_);
+  redarc_common::log_can_frame("CAN_TX", can_id, data);
+  bus->send_data(can_id, true, data);
   ESP_LOGD(TAG, "Sent charging mode %s", mode == 0 ? "Touring" : "Storage");
 }
 
@@ -342,16 +346,20 @@ void Manager30Component::publish_can_status_(bool abnormal, const char *message)
 void Manager30Component::request_solar_history_() {
   auto *bus = redarc_common::RedarcCanDispatcher::instance().canbus();
   if (bus == nullptr) return;
-  bus->send_data(redarc_common::with_sa(0x1BFCD600UL, this->host_address_), true,
-                 {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00});
+  const uint32_t can_id = redarc_common::with_sa(0x1BFCD600UL, this->host_address_);
+  const std::vector<uint8_t> data = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+  redarc_common::log_can_frame("CAN_TX", can_id, data);
+  bus->send_data(can_id, true, data);
   ESP_LOGD(TAG, "Requested Manager30 solar generation history");
 }
 
 void Manager30Component::send_history_preamble_() {
   auto *bus = redarc_common::RedarcCanDispatcher::instance().canbus();
   if (bus == nullptr) return;
-  bus->send_data(redarc_common::with_sa(0x0FE6FF00UL, this->host_address_), true,
-                 {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF});
+  const uint32_t can_id = redarc_common::with_sa(0x0FE6FF00UL, this->host_address_);
+  const std::vector<uint8_t> data = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+  redarc_common::log_can_frame("CAN_TX", can_id, data);
+  bus->send_data(can_id, true, data);
   ESP_LOGD(TAG, "Sent history polling preamble before solar history request");
 }
 

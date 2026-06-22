@@ -136,6 +136,7 @@ float TVMSRougeComponent::level(uint8_t output_number) const {
 void TVMSRougeComponent::send_frame_(uint32_t id, const std::vector<uint8_t> &data) {
   auto *bus = redarc_common::RedarcCanDispatcher::instance().canbus();
   if (bus == nullptr) return;
+  redarc_common::log_can_frame("CAN_TX", id, data);
   bus->send_data(id, true, data);
 }
 

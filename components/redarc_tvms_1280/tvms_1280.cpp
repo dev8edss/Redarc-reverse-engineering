@@ -47,7 +47,9 @@ void TVMS1280Component::register_output_switch(TVMS1280Switch *sw) {
 void TVMS1280Component::send_channel(uint8_t channel, bool state) {
   auto *bus = redarc_common::RedarcCanDispatcher::instance().canbus();
   if (bus == nullptr) return;
-  bus->send_data(this->command_id_, true, {0xCB, 0x00, 0xFF, channel, (uint8_t) (state ? 0x01 : 0x00), 0x00, 0x00, 0x00});
+  const std::vector<uint8_t> data = {0xCB, 0x00, 0xFF, channel, (uint8_t) (state ? 0x01 : 0x00), 0x00, 0x00, 0x00};
+  redarc_common::log_can_frame("CAN_TX", this->command_id_, data);
+  bus->send_data(this->command_id_, true, data);
 }
 
 void TVMS1280Component::publish_output_(uint8_t output_number, bool state) {

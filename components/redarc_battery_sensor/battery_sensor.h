@@ -130,6 +130,8 @@ class BatterySensorComponent : public Component {
   std::array<uint8_t, 28> soc_hourly_history_{};
   std::array<uint8_t, 35> soc_daily_low_history_{};
   std::array<uint8_t, 35> soc_daily_high_history_{};
+  std::array<bool, 35> soc_daily_low_seen_{};
+  std::array<bool, 35> soc_daily_high_seen_{};
 };
 
 }  // namespace redarc_battery_sensor

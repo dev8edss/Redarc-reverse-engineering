@@ -40,6 +40,8 @@ void BatterySensorComponent::setup() {
   this->soc_hourly_history_.fill(0xFF);
   this->soc_daily_low_history_.fill(0xFF);
   this->soc_daily_high_history_.fill(0xFF);
+  this->soc_daily_low_seen_.fill(false);
+  this->soc_daily_high_seen_.fill(false);
   redarc_common::RedarcCanDispatcher::instance().add_listener(
       [this](uint32_t id, const std::vector<uint8_t> &data) { this->handle_can_frame(id, data); });
 }
@@ -96,7 +98,9 @@ void BatterySensorComponent::send_config_setting(uint8_t command, uint16_t raw_v
       command, 0x00, 0xFF, 0xFF,
       (uint8_t) (raw_value & 0xFF), (uint8_t) (raw_value >> 8),
       0x00, 0x00};
-  bus->send_data(redarc_common::with_sa(0x0F00FF00UL, this->host_address_), true, data);
+  const uint32_t can_id = redarc_common::with_sa(0x0F00FF00UL, this->host_address_);
+  redarc_common::log_can_frame("CAN_TX", can_id, data);
+  bus->send_data(can_id, true, data);
   ESP_LOGD(TAG, "Sent battery config command 0x%02X value %u", command, raw_value);
 }
 
@@ -109,6 +113,7 @@ void BatterySensorComponent::send_soc_calibration_command(uint8_t target_percent
       0x00, 0x00};
   const uint32_t can_id =
       0x0F000000UL | ((uint32_t) this->source_address_ << 8) | this->host_address_;
+  redarc_common::log_can_frame("CAN_TX", can_id, data);
   bus->send_data(can_id, true, data);
   ESP_LOGD(TAG, "Sent SOC calibration command target %u%% to SA 0x%02X", target_percent, this->source_address_);
 }
@@ -240,8 +245,10 @@ void BatterySensorComponent::request_soc_history_() {
 void BatterySensorComponent::send_history_preamble_() {
   auto *bus = redarc_common::RedarcCanDispatcher::instance().canbus();
   if (bus == nullptr) return;
-  bus->send_data(redarc_common::with_sa(0x0FE6FF00UL, this->host_address_), true,
-                 {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF});
+  const uint32_t can_id = redarc_common::with_sa(0x0FE6FF00UL, this->host_address_);
+  const std::vector<uint8_t> data = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+  redarc_common::log_can_frame("CAN_TX", can_id, data);
+  bus->send_data(can_id, true, data);
   ESP_LOGD(TAG, "Sent history polling preamble before SOC history request");
 }
 
@@ -261,8 +268,9 @@ bool BatterySensorComponent::send_pending_soc_history_request_(uint32_t now) {
   const std::vector<uint8_t> request(
       SOC_HISTORY_REQUEST_DATA[request_index],
       SOC_HISTORY_REQUEST_DATA[request_index] + sizeof(SOC_HISTORY_REQUEST_DATA[request_index]));
-  bus->send_data(redarc_common::with_sa(SOC_HISTORY_REQUEST_BASE_IDS[request_index], this->host_address_), true,
-                 request);
+  const uint32_t can_id = redarc_common::with_sa(SOC_HISTORY_REQUEST_BASE_IDS[request_index], this->host_address_);
+  redarc_common::log_can_frame("CAN_TX", can_id, request);
+  bus->send_data(can_id, true, request);
   this->pending_soc_history_request_index_++;
   this->last_soc_history_request_ms_ = now;
   ESP_LOGD(TAG, "Sent battery SOC history request step %u", (unsigned) request_index);
@@ -279,9 +287,15 @@ void BatterySensorComponent::handle_soc_history_page_(uint32_t dgn, const std::v
     if (dgn == 0x1FCD0UL) {
       if (index < this->soc_hourly_history_.size()) this->soc_hourly_history_[index] = value;
     } else if (dgn == 0x1FCD2UL) {
-      if (index < this->soc_daily_low_history_.size()) this->soc_daily_low_history_[index] = value;
+      if (index < this->soc_daily_low_history_.size()) {
+        this->soc_daily_low_history_[index] = value;
+        this->soc_daily_low_seen_[index] = true;
+      }
     } else if (dgn == 0x1FCD4UL) {
-      if (index < this->soc_daily_high_history_.size()) this->soc_daily_high_history_[index] = value;
+      if (index < this->soc_daily_high_history_.size()) {
+        this->soc_daily_high_history_[index] = value;
+        this->soc_daily_high_seen_[index] = true;
+      }
     }
   }
   if (dgn == 0x1FCD0UL) {
@@ -324,7 +338,7 @@ void BatterySensorComponent::publish_soc_daily_history_() {
     const uint8_t high = this->soc_daily_high_history_[i];
     if (low != 0xFF) this->append_csv_value_(low_buffer, sizeof(low_buffer), low_used, low, low_first);
     if (high != 0xFF) this->append_csv_value_(high_buffer, sizeof(high_buffer), high_used, high, high_first);
-    if (low != 0xFF || high != 0xFF) {
+    if (this->soc_daily_low_seen_[i] && this->soc_daily_high_seen_[i] && low != 0xFF && high != 0xFF) {
       this->append_csv_range_(range_buffer, sizeof(range_buffer), range_used, low, high, range_first);
     }
   }
