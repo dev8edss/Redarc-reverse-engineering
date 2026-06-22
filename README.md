@@ -150,17 +150,20 @@ canbus:
     on_frame:
       - can_id: 0x00000000
         can_id_mask: 0x00000000        # match everything
+        # No remote_transmission_request filter, so RTR request frames are also
+        # captured and logged instead of being dropped.
         then:
           - lambda: esphome::redarc_common::RedarcCanDispatcher::instance()
-                      .dispatch(can_id & 0x1FFFFFFFUL, x);
+                      .dispatch(can_id & 0x1FFFFFFFUL, x, remote_transmission_request);
 ```
 
 `redarc_common` is the glue (it has **no entities of its own**):
 
 - **`RedarcCanDispatcher`** — a singleton. Each device component calls
-  `add_listener(...)` in `setup()`; `dispatch()` logs the frame (at DEBUG) and
-  hands it to every listener. So all decoding is just "did this frame match my
-  `(DGN, source address)`?".
+  `add_listener(...)` in `setup()`; `dispatch()` logs the frame (at DEBUG, with
+  an `rtr=` flag) and hands it to every listener. **RTR (remote-request) frames
+  are logged but not decoded** — they carry no payload. So all decoding is just
+  "did this data frame match my `(DGN, source address)`?".
 - **Address claim** — on boot it transmits an address-claim frame so the bus
   accepts our `host_address` (default `0x22`). Device components wait for
   `address_claim_sent()` before transmitting.
@@ -195,17 +198,20 @@ substitutions:
   can_bit_rate: 250KBPS
   can_mode: NORMAL                 # or LISTENONLY for a monitor build
   host_address: "0x22"             # this ESP32's address on the bus
+  history_poll_interval: 60s       # how often to request SOC/solar history (0 = off)
 
 redarc_battery_sensor:
   id: Battery
   source_address: 0x08
   host_address: ${host_address}
+  soc_history_poll_interval: ${history_poll_interval}
 
 redarc_manager:
   id: Manager30
   source_address: 0x01
   host_address: ${host_address}
   battery_sensor_id: Battery       # lets the Manager compute device current
+  solar_history_poll_interval: ${history_poll_interval}
 
 redarc_redvision_display:          # MULTI_CONF: list every display you have
   - { id: Redvision1, source_address: 0x20 }
@@ -235,7 +241,8 @@ Listens to the manager's status frames and publishes:
 | Battery Voltage | sensor V | `0x1F20A` | D5-D6 × 0.001 |
 | Device Current | sensor A | derived | `Output − Battery` (needs `battery_sensor_id`) |
 | Solar Current / Voltage / Power | sensors A/V/W | `0x1F208` | power = I × V (computed) |
-| **Solar Energy** | sensor Wh | `0x1FCD6` | total of the daily Wh buckets, received passively |
+| **Solar Energy** | sensor Wh | `0x1FCD6` | total of the 12 daily Wh buckets (today + −1..−11) |
+| Solar Day -1..-11 History | text *(diagnostic)* | `0x1FCD6` | CSV of the previous 11 days' Wh (255 = unknown) |
 | AC Input Voltage | sensor V | `0x1F204` | D5-D6 |
 | Vehicle Input Trigger | sensor + **select** | `0x1F206` / cmd | select writes Auto/12V/24V/Ignition/On |
 | Charging Mode | **select** | `0x1F108` / cmd | Touring / Storage (writable) |
@@ -246,9 +253,11 @@ Listens to the manager's status frames and publishes:
 Writable entities (the two **selects**) build a command frame from the
 `host_address` and send it via the shared bus.
 
-> Note: solar **history** polling and the per-day "Solar Day -N" sensors were
-> removed; only the **Solar Energy total** remains. It updates whenever a display
-> (or the replay button below) asks the Manager for its solar pages.
+> Note: the Manager polls its own solar history with an RTR request to
+> `0x0FFCD6 ··` every `solar_history_poll_interval` (default 60 s; set `0s` to
+> disable). The Manager answers on `0x03FCD601` with paged 16-bit Wh buckets —
+> 4 pages × 3 days = **12 days** (today + −1..−11) — feeding both the Solar
+> Energy total and the Solar Day -1..-11 History text sensor.
 
 ### Battery — `redarc_battery_sensor` (source `0x08`)
 
@@ -262,11 +271,15 @@ Writable entities (the two **selects**) build a command frame from the
 | Low SOC Alarm | sensor + **number** | `0x1F10A` / cmd `0x41` | %, writable |
 | Low Voltage Alarm | sensor + **number** | `0x1F10A` / cmd `0x42` | V, writable |
 | Last SOC Calibration Target | sensor *(diagnostic)* | `0x...` | last calibrate value |
+| SOC Hourly History | text *(diagnostic)* | `0x13FCD0` pages | CSV of the last 24 h of SOC % |
+| SOC Daily Range History | text *(diagnostic)* | `0x13FCD2`/`0x13FCD4` pages | CSV of daily `low-high` SOC % pairs |
 | **Calibrate SOC Full** | **button** | cmd `0x15` | press to send "SOC = 100%" |
 
 The **numbers/selects/button** are the "inputs": each writes a config command
-addressed from `host_address` to the battery. SOC-history text sensors were
-removed.
+addressed from `host_address` to the battery. The two **SOC-history text
+sensors** are populated from history pages the battery returns after the
+component's RTR poll (see below); the daily low and high are combined into the
+single `low-high` Range sensor.
 
 ### RedVision displays — `redarc_redvision_display` (sources `0x20`, `0x21`)
 
@@ -317,14 +330,24 @@ The relay / inverter module.
 TVMS1280 has **no** Rouge-style dimming; its outputs are on/off switches and its
 authoritative state comes from the `0x1BFD0024` feedback frame.
 
-### Replay Display History Poll — button in the top YAML
+### History polling (RTR requests)
 
-A `template` **button** (with a `script`) that re-emits the request frame a
-RedVision display sends to fetch solar history (`0x1BFCD621`, all-zero payload).
-The Manager answers with its solar pages, refreshing **Solar Energy** and showing
-the raw replies in the DEBUG CAN log — useful for reverse-engineering without
-opening the physical screen. SOC-history request frames are included commented
-out (not confirmed in capture, and SOC-history parsing was removed).
+Instead of a manual replay button, the Battery and Manager components poll for
+history themselves at a configurable interval (`soc_history_poll_interval` /
+`solar_history_poll_interval`, default 60 s, `0s` disables). Each poll sends an
+**RTR** (remote-request) frame — extended ID, DLC 8, **no payload** — and the
+source node answers with its paged history:
+
+| Request (RTR) | Answer | Feeds |
+|---|---|---|
+| `0x0FFCD0··` | `0x13FCD008` pages | SOC Hourly History |
+| `0x0FFCD2··` | `0x13FCD208` pages | SOC daily low → Daily Range History |
+| `0x0FFCD4··` | `0x13FCD408` pages | SOC daily high → Daily Range History |
+| `0x0FFCD6··` | `0x03FCD601` pages | Solar Energy + Solar Day -1..-11 History |
+
+The `··` low byte is our `host_address`. The raw replies (and the RTR requests,
+tagged `rtr=1`) appear in the DEBUG CAN log, so this also doubles as a way to
+re-fetch history on demand without opening the physical screen.
 
 ---
 
@@ -390,20 +413,26 @@ Rouge buttons   : 0x1BFD0030   <base> <b1..b7>     (00=inactive,01=active; D1=0x
 
 > **Solar Energy note:** the DBC also documents a single 32-bit `Solar_Energy_Wh`
 > on `D2-D5` of page `0x00`. That is a low-value special case; the firmware uses
-> the **per-day 16-bit bucket** layout (page 0 = today/−1/−2, page 1 = −3/−4/−5,
-> page 2 = −6/−7) and sums all known buckets into the total. The history pages are
-> emitted in response to request `0x0FFCD6FA` (all-zero payload); the replay
-> button currently uses the display-style request `0x1BFCD621`.
+> the **per-day 16-bit bucket** layout — `D1` is the page index and `D2-D7` are
+> three days' Wh, so 4 pages cover **12 days** (page 0 = today/−1/−2 … page 3 =
+> −9/−10/−11). It sums all known buckets into Solar Energy and publishes days
+> −1..−11 to the history text sensor. The pages are requested with an **RTR**
+> frame to `0x0FFCD6··` (`··` = our `host_address`); the Manager answers on
+> `0x03FCD601`.
 
 ---
 
 ## 7. Notes & gotchas
 
 - **Control needs `NORMAL` mode.** A `LISTENONLY` build cannot transmit
-  (switch/dim/config/replay) but is the safe way to first verify the bus.
+  (switch/dim/config) or send the history-poll RTR requests, but is the safe way
+  to first verify the bus.
 - **Stale component cache.** If ESPHome rejects new YAML keys after a component
-  change, clear `/data/external_components/*` and rebuild — the loaded schema is
-  stale.
+  change, clear `/data/external_components/*` and rebuild (or "Clean Build Files"
+  in the ESPHome dashboard) — the loaded schema is stale.
+- **Dashboard history charts need ApexCharts.** The SOC/solar history bar charts
+  in the example dashboard use the HACS **ApexCharts Card** (`custom:apexcharts-card`)
+  to plot the CSV history text sensors; install it or those cards error.
 - **Entity renames.** Home Assistant entity IDs can drift from the ESPHome names
   if you rename them in the HA UI.
 - **Don't trust the RJ45 24 V pin** until measured; power the Atom over USB.
