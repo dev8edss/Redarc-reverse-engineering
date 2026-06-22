@@ -222,8 +222,6 @@ void Manager30Component::publish_solar_daily_energy_(uint8_t day, uint16_t wh) {
   if (day >= 8) return;
   this->solar_daily_wh_[day] = wh;
   this->solar_daily_known_[day] = true;
-  if (this->solar_daily_energy_sensors_[day] != nullptr)
-    this->solar_daily_energy_sensors_[day]->publish_state((float) wh);
 }
 
 void Manager30Component::publish_solar_energy_total_() {

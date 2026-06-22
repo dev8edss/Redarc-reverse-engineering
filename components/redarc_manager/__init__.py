@@ -39,10 +39,6 @@ _TextSensorClass = _text_sensor_ns.class_("TextSensor")
 _bs_ns = cg.esphome_ns.namespace("binary_sensor")
 _BSClass = _bs_ns.class_("BinarySensor")
 
-_AUTO_IDS = {}
-for _i in range(8):
-    _AUTO_IDS[cv.GenerateID(f"solar_day_{_i}_energy_id")] = cv.declare_id(_SensorClass)
-
 CONFIG_SCHEMA = cv.Schema({
     cv.GenerateID(): cv.declare_id(Manager30Component),
     cv.Optional(CONF_SOURCE_ADDRESS, default=0x01): cv.hex_uint8_t,
@@ -66,7 +62,6 @@ CONFIG_SCHEMA = cv.Schema({
     cv.GenerateID("can_status_id"): cv.declare_id(_TextSensorClass),
     cv.GenerateID("vehicle_input_trigger_select_id"): cv.declare_id(VehicleInputTriggerSelect),
     cv.GenerateID("charging_mode_select_id"): cv.declare_id(ChargingModeSelect),
-    **_AUTO_IDS,
 }).extend(cv.COMPONENT_SCHEMA)
 
 
@@ -162,13 +157,6 @@ async def to_code(config):
                            unit="Wh", device_class="energy",
                            state_class=STATE_CLASS_MEASUREMENT, decimals=0)
     cg.add(var.set_solar_energy_sensor(s))
-
-    for i in range(8):
-        label = "Today" if i == 0 else f"Day -{i}"
-        s = await _make_sensor(config[f"solar_day_{i}_energy_id"], f"{p} Solar {label}",
-                               unit="Wh", device_class="energy",
-                               state_class=STATE_CLASS_MEASUREMENT, decimals=0)
-        cg.add(var.set_solar_daily_energy_sensor(i, s))
 
     s = await _make_sensor(config["ac_input_voltage_id"], f"{p} AC Input Voltage",
                            unit="V", device_class="voltage",

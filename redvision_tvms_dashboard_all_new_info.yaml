@@ -213,10 +213,6 @@ cards:
         entity: sensor.redvision_can_bridge_manager30_solar_energy
         icon: mdi:solar-power
       - type: entity
-        name: Solar Today
-        entity: sensor.redvision_can_bridge_manager30_solar_today
-        icon: mdi:solar-power
-      - type: entity
         name: Solar Voltage
         entity: sensor.redvision_can_bridge_manager30_solar_voltage
         icon: mdi:solar-power-variant
@@ -232,37 +228,11 @@ cards:
         name: Solar W
       - entity: sensor.redvision_can_bridge_manager30_solar_energy
         name: Solar Wh
-      - entity: sensor.redvision_can_bridge_manager30_solar_today
-        name: Today Wh
       - entity: sensor.redvision_can_bridge_manager30_solar_voltage
         name: Solar V
       - entity: sensor.redvision_can_bridge_manager30_solar_current
         name: Solar A
 
-  - type: entities
-    title: Solar Generation History
-    show_header_toggle: false
-    entities:
-      - entity: sensor.redvision_can_bridge_manager30_solar_energy
-        name: 8 Day Total
-      - entity: sensor.redvision_can_bridge_manager30_solar_today
-        name: Today
-      - entity: sensor.redvision_can_bridge_manager30_solar_day_1_5_history
-        name: Day -1..-5
-      - entity: sensor.redvision_can_bridge_manager30_solar_day_1
-        name: Day -1
-      - entity: sensor.redvision_can_bridge_manager30_solar_day_2
-        name: Day -2
-      - entity: sensor.redvision_can_bridge_manager30_solar_day_3
-        name: Day -3
-      - entity: sensor.redvision_can_bridge_manager30_solar_day_4
-        name: Day -4
-      - entity: sensor.redvision_can_bridge_manager30_solar_day_5
-        name: Day -5
-      - entity: sensor.redvision_can_bridge_manager30_solar_day_6
-        name: Day -6
-      - entity: sensor.redvision_can_bridge_manager30_solar_day_7
-        name: Day -7
   - type: grid
     title: TVMS Rouge Outputs
     columns: 2
