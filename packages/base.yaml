@@ -44,7 +44,6 @@ external_components:
 
 redarc_common:
   canbus_id: rv_can
-  host_address: ${host_address}
 
 canbus:
   - platform: esp32_can
