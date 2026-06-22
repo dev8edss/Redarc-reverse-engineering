@@ -47,6 +47,7 @@ void BatterySensorComponent::setup() {
 }
 
 void BatterySensorComponent::loop() {
+  if (!redarc_common::RedarcCanDispatcher::instance().address_claim_sent()) return;
   const uint32_t now = millis();
   if (this->send_pending_soc_history_request_(now)) return;
   if (this->soc_history_poll_interval_ms_ == 0) return;

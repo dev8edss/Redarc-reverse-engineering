@@ -7,6 +7,7 @@ CODEOWNERS = ["@dev8edss"]
 DEPENDENCIES = ["canbus"]
 
 CONF_CANBUS_ID = "canbus_id"
+CONF_HOST_ADDRESS = "host_address"
 
 ns = cg.esphome_ns.namespace("redarc_common")
 RedarcCommonComponent = ns.class_("RedarcCommonComponent", cg.Component)
@@ -14,6 +15,7 @@ RedarcCommonComponent = ns.class_("RedarcCommonComponent", cg.Component)
 CONFIG_SCHEMA = cv.Schema({
     cv.GenerateID(): cv.declare_id(RedarcCommonComponent),
     cv.Required(CONF_CANBUS_ID): cv.use_id(canbus.CanbusComponent),
+    cv.Optional(CONF_HOST_ADDRESS, default=0x22): cv.hex_uint8_t,
 }).extend(cv.COMPONENT_SCHEMA)
 
 
@@ -22,3 +24,4 @@ async def to_code(config):
     await cg.register_component(var, config)
     can = await cg.get_variable(config[CONF_CANBUS_ID])
     cg.add(var.set_canbus(can))
+    cg.add(var.set_host_address(config[CONF_HOST_ADDRESS]))

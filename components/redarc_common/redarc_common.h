@@ -38,6 +38,8 @@ class RedarcCanDispatcher {
   }
   void set_canbus(canbus::Canbus *canbus) { this->canbus_ = canbus; }
   canbus::Canbus *canbus() { return this->canbus_; }
+  void set_address_claim_sent(bool sent) { this->address_claim_sent_ = sent; }
+  bool address_claim_sent() const { return this->address_claim_sent_; }
   void add_listener(std::function<void(uint32_t, const std::vector<uint8_t> &)> cb) {
     this->listeners_.push_back(std::move(cb));
   }
@@ -47,16 +49,35 @@ class RedarcCanDispatcher {
   }
  private:
   canbus::Canbus *canbus_{nullptr};
+  bool address_claim_sent_{false};
   std::vector<std::function<void(uint32_t, const std::vector<uint8_t> &)>> listeners_;
 };
 
 class RedarcCommonComponent : public Component {
  public:
   void set_canbus(canbus::Canbus *canbus) { this->canbus_ = canbus; }
-  void setup() override { RedarcCanDispatcher::instance().set_canbus(this->canbus_); }
+  void set_host_address(uint8_t host_address) { this->host_address_ = host_address; }
+  void setup() override {
+    RedarcCanDispatcher::instance().set_canbus(this->canbus_);
+    this->send_address_claim_();
+  }
+  void loop() override {
+    if (!RedarcCanDispatcher::instance().address_claim_sent()) this->send_address_claim_();
+  }
   float get_setup_priority() const override { return setup_priority::BUS; }
  protected:
+  void send_address_claim_() {
+    if (this->canbus_ == nullptr) return;
+    const uint32_t can_id = 0x03EEFF00UL | this->host_address_;
+    const std::vector<uint8_t> data = {0x13, 0xCA, 0x23, 0x95, 0x0D, 0x00, 0x0C, 0x80};
+    log_can_frame("CAN_TX", can_id, data);
+    this->canbus_->send_data(can_id, true, data);
+    RedarcCanDispatcher::instance().set_address_claim_sent(true);
+    ESP_LOGD("redarc_common", "Sent address claim for SA 0x%02X", this->host_address_);
+  }
+
   canbus::Canbus *canbus_{nullptr};
+  uint8_t host_address_{0x22};
 };
 
 inline uint16_t u16_le(const std::vector<uint8_t> &data, uint8_t i) {

@@ -24,7 +24,7 @@ substitutions:
   logger_baud_rate: "0"
 
   # ESP32 source address on the REDARC network (2 hex digits, no 0x prefix). Usually matches a redvision display address.
-  host_address: "0x20"
+  host_address: "0x22"
 
 packages:
   # Core infrastructure — ESPHome, ESP32, Wi-Fi, CAN hardware, external components.
