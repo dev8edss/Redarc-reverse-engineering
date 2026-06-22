@@ -71,3 +71,46 @@ redarc_tvms_1280:
   source_address: 0x24
   host_address: ${host_address}
   filter_interval: ${sensor_average_interval}
+
+# ---------------------------------------------------------------------------
+# Replay the RedVision display's history-poll commands captured from the bus.
+# Pressing the button re-emits the exact request frames a display sends, in
+# order with the observed inter-frame timing, so the Manager/Battery reply with
+# their history pages. Watch the raw replies in the DEBUG CAN log; the solar
+# reply also refreshes Manager30 Solar Energy (the 0x1FCD6 receive handler is
+# still in firmware).
+#
+# Captured from the display at source address 0x21 (Redvision2). The low byte
+# of each request id is that display's address — change 21 if you impersonate
+# a different display.
+# ---------------------------------------------------------------------------
+script:
+  - id: replay_display_history_poll
+    mode: restart
+    then:
+      # Solar generation history — confirmed in capture. The Manager (sa 0x01)
+      # answers ~30 ms later on 0x03FCD601 with pages 00/01/02.
+      - canbus.send:
+          canbus_id: rv_can
+          can_id: 0x1BFCD621
+          use_extended_id: true
+          data: [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
+      # --- SOC history — NOT present in the capture above --------------------
+      # These ids are from earlier reverse-engineering (base 0x1BFCD0/2/4 | SA),
+      # unconfirmed by this log, and the firmware no longer parses the replies
+      # into entities. Uncomment to also emit them (100 ms apart, matching the
+      # old display spacing) and observe the raw responses in the DEBUG CAN log.
+      # - delay: 100ms
+      # - canbus.send: { canbus_id: rv_can, can_id: 0x1BFCD021, use_extended_id: true, data: [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00] }
+      # - delay: 100ms
+      # - canbus.send: { canbus_id: rv_can, can_id: 0x1BFCD221, use_extended_id: true, data: [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00] }
+      # - delay: 100ms
+      # - canbus.send: { canbus_id: rv_can, can_id: 0x1BFCD421, use_extended_id: true, data: [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00] }
+
+button:
+  - platform: template
+    name: "Replay Display History Poll"
+    id: replay_display_history_poll_button
+    icon: "mdi:history"
+    on_press:
+      - script.execute: replay_display_history_poll
