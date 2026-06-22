@@ -12,7 +12,7 @@ namespace redarc_common {
 
 static const uint32_t REDVISION_HEARTBEAT_INTERVAL_MS = 0;
 
-inline void log_can_frame(const char *direction, uint32_t can_id, const std::vector<uint8_t> &data) {
+inline void log_can_frame(const char *direction, uint32_t can_id, const std::vector<uint8_t> &data, bool rtr = false) {
 #if ESPHOME_LOG_LEVEL >= ESPHOME_LOG_LEVEL_DEBUG
   const uint32_t rvc_id = can_id & 0x1FFFFFFFUL;
   const uint32_t dgn = (rvc_id >> 8) & 0x1FFFFUL;
@@ -25,8 +25,8 @@ inline void log_can_frame(const char *direction, uint32_t can_id, const std::vec
   const uint8_t d6 = data.size() > 5 ? data[5] : 0xFF;
   const uint8_t d7 = data.size() > 6 ? data[6] : 0xFF;
   const uint8_t d8 = data.size() > 7 ? data[7] : 0xFF;
-  ESP_LOGD("redarc_common", "%s id=0x%08X dgn=0x%05X sa=0x%02X dlc=%u data=%02X %02X %02X %02X %02X %02X %02X %02X",
-           direction, (unsigned) rvc_id, (unsigned) dgn, (unsigned) sa, (unsigned) data.size(),
+  ESP_LOGD("redarc_common", "%s id=0x%08X dgn=0x%05X sa=0x%02X rtr=%u dlc=%u data=%02X %02X %02X %02X %02X %02X %02X %02X",
+           direction, (unsigned) rvc_id, (unsigned) dgn, (unsigned) sa, (unsigned) rtr, (unsigned) data.size(),
            (unsigned) d1, (unsigned) d2, (unsigned) d3, (unsigned) d4,
            (unsigned) d5, (unsigned) d6, (unsigned) d7, (unsigned) d8);
 #endif
@@ -45,8 +45,11 @@ class RedarcCanDispatcher {
   void add_listener(std::function<void(uint32_t, const std::vector<uint8_t> &)> cb) {
     this->listeners_.push_back(std::move(cb));
   }
-  void dispatch(uint32_t can_id, const std::vector<uint8_t> &data) {
-    log_can_frame("CAN_RX", can_id, data);
+  void dispatch(uint32_t can_id, const std::vector<uint8_t> &data, bool rtr = false) {
+    log_can_frame("CAN_RX", can_id, data, rtr);
+    // RTR request frames carry no real payload; log them but do not feed the
+    // decoders, whose data bytes would be meaningless/garbage.
+    if (rtr) return;
     for (auto &cb : this->listeners_) cb(can_id, data);
   }
  private:

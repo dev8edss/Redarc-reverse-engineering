@@ -59,6 +59,7 @@ canbus:
       - can_id: 0x00000000
         can_id_mask: 0x00000000
         use_extended_id: true
-        remote_transmission_request: false
+        # No remote_transmission_request filter, so RTR request frames are also
+        # captured and logged (with rtr=1) instead of being dropped.
         then:
-          - lambda: esphome::redarc_common::RedarcCanDispatcher::instance().dispatch(can_id & 0x1FFFFFFFUL, x);
+          - lambda: esphome::redarc_common::RedarcCanDispatcher::instance().dispatch(can_id & 0x1FFFFFFFUL, x, remote_transmission_request);

@@ -1,6 +1,6 @@
 import esphome.codegen as cg
 import esphome.config_validation as cv
-from esphome.components import button, number, select, sensor
+from esphome.components import button, number, select, sensor, text_sensor
 from esphome.const import (
     CONF_ACCURACY_DECIMALS, CONF_DEVICE_CLASS, CONF_DISABLED_BY_DEFAULT,
     CONF_ENTITY_CATEGORY, CONF_FORCE_UPDATE, CONF_ICON, CONF_ID, CONF_MODE,
@@ -10,12 +10,19 @@ from esphome.const import (
 )
 
 CODEOWNERS = ["@dev8edss"]
-AUTO_LOAD = ["button", "number", "select", "sensor", "redarc_common"]
+AUTO_LOAD = ["button", "number", "select", "sensor", "text_sensor", "redarc_common"]
 MULTI_CONF = False
 
 CONF_SOURCE_ADDRESS = "source_address"
 CONF_HOST_ADDRESS = "host_address"
 CONF_FILTER_INTERVAL = "filter_interval"
+CONF_SOC_HISTORY_POLL_INTERVAL = "soc_history_poll_interval"
+
+
+def zero_or_positive_time_period_milliseconds(value):
+    if value in (0, "0", "0s", "0ms"):
+        return 0
+    return cv.positive_time_period_milliseconds(value)
 
 battery_sensor_ns = cg.esphome_ns.namespace("redarc_battery_sensor")
 BatterySensorComponent = battery_sensor_ns.class_("BatterySensorComponent", cg.Component)
@@ -30,12 +37,15 @@ _SC_MAP = {
     "measurement": _StateClass.STATE_CLASS_MEASUREMENT,
     "total_increasing": _StateClass.STATE_CLASS_TOTAL_INCREASING,
 }
+_text_sensor_ns = cg.esphome_ns.namespace("text_sensor")
+_TextSensorClass = _text_sensor_ns.class_("TextSensor")
 
 CONFIG_SCHEMA = cv.Schema({
     cv.GenerateID(): cv.declare_id(BatterySensorComponent),
     cv.Optional(CONF_SOURCE_ADDRESS, default=0x08): cv.hex_uint8_t,
     cv.Optional(CONF_HOST_ADDRESS, default=0x20): cv.hex_uint8_t,
     cv.Optional(CONF_FILTER_INTERVAL, default="5s"): cv.positive_time_period_milliseconds,
+    cv.Optional(CONF_SOC_HISTORY_POLL_INTERVAL, default="60s"): zero_or_positive_time_period_milliseconds,
     cv.GenerateID("current_id"): cv.declare_id(_SensorClass),
     cv.GenerateID("voltage_id"): cv.declare_id(_SensorClass),
     cv.GenerateID("temperature_id"): cv.declare_id(_SensorClass),
@@ -52,6 +62,10 @@ CONFIG_SCHEMA = cv.Schema({
     cv.GenerateID("low_soc_alarm_number_id"): cv.declare_id(BatteryConfigNumber),
     cv.GenerateID("low_voltage_alarm_number_id"): cv.declare_id(BatteryConfigNumber),
     cv.GenerateID("soc_calibration_button_id"): cv.declare_id(BatterySOCCalibrateButton),
+    cv.GenerateID("soc_hourly_history_id"): cv.declare_id(_TextSensorClass),
+    cv.GenerateID("soc_daily_low_history_id"): cv.declare_id(_TextSensorClass),
+    cv.GenerateID("soc_daily_high_history_id"): cv.declare_id(_TextSensorClass),
+    cv.GenerateID("soc_daily_range_history_id"): cv.declare_id(_TextSensorClass),
 }).extend(cv.COMPONENT_SCHEMA)
 
 
@@ -117,12 +131,24 @@ async def _make_button(config_id, name):
     return await button.new_button(cfg)
 
 
+async def _make_text_sensor(config_id, name, entity_category=None):
+    cfg = {
+        CONF_ID: config_id,
+        CONF_NAME: name,
+        CONF_DISABLED_BY_DEFAULT: False,
+        CONF_ICON: "",
+        CONF_ENTITY_CATEGORY: entity_category if entity_category is not None else ENTITY_CATEGORY_NONE,
+    }
+    return await text_sensor.new_text_sensor(cfg)
+
+
 async def to_code(config):
     var = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(var, config)
     cg.add(var.set_source_address(config[CONF_SOURCE_ADDRESS]))
     cg.add(var.set_host_address(config[CONF_HOST_ADDRESS]))
     cg.add(var.set_filter_interval_ms(config[CONF_FILTER_INTERVAL]))
+    cg.add(var.set_soc_history_poll_interval_ms(config[CONF_SOC_HISTORY_POLL_INTERVAL]))
 
     p = config[CONF_ID].id.replace("_", " ")
 
@@ -214,3 +240,19 @@ async def to_code(config):
     b = await _make_button(config["soc_calibration_button_id"], f"{p} Calibrate SOC Full")
     cg.add(b.set_parent(var))
     cg.add(var.set_soc_calibration_button(b))
+
+    ts = await _make_text_sensor(config["soc_hourly_history_id"], f"{p} SOC Hourly History",
+                                 entity_category=ENTITY_CATEGORY_DIAGNOSTIC)
+    cg.add(var.set_soc_hourly_history_text_sensor(ts))
+
+    ts = await _make_text_sensor(config["soc_daily_low_history_id"], f"{p} SOC Daily Low History",
+                                 entity_category=ENTITY_CATEGORY_DIAGNOSTIC)
+    cg.add(var.set_soc_daily_low_history_text_sensor(ts))
+
+    ts = await _make_text_sensor(config["soc_daily_high_history_id"], f"{p} SOC Daily High History",
+                                 entity_category=ENTITY_CATEGORY_DIAGNOSTIC)
+    cg.add(var.set_soc_daily_high_history_text_sensor(ts))
+
+    ts = await _make_text_sensor(config["soc_daily_range_history_id"], f"{p} SOC Daily Range History",
+                                 entity_category=ENTITY_CATEGORY_DIAGNOSTIC)
+    cg.add(var.set_soc_daily_range_history_text_sensor(ts))
