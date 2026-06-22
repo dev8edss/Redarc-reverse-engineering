@@ -5,9 +5,7 @@
 #include "esphome/components/number/number.h"
 #include "esphome/components/select/select.h"
 #include "esphome/components/sensor/sensor.h"
-#include "esphome/components/text_sensor/text_sensor.h"
 #include "esphome/components/redarc_common/redarc_common.h"
-#include <array>
 #include <vector>
 #include <cmath>
 
@@ -52,7 +50,6 @@ class BatterySensorComponent : public Component {
   void set_source_address(uint8_t source_address) { this->source_address_ = source_address; }
   void set_host_address(uint8_t host_address) { this->host_address_ = host_address; }
   void set_filter_interval_ms(uint32_t ms) { this->filter_interval_ms_ = ms; }
-  void set_soc_history_poll_interval_ms(uint32_t ms) { this->soc_history_poll_interval_ms_ = ms; }
   void set_current_sensor(sensor::Sensor *s) { this->current_sensor_ = s; }
   void set_voltage_sensor(sensor::Sensor *s) { this->voltage_sensor_ = s; }
   void set_temperature_sensor(sensor::Sensor *s) { this->temperature_sensor_ = s; }
@@ -69,13 +66,8 @@ class BatterySensorComponent : public Component {
   void set_low_soc_alarm_number(number::Number *n) { this->low_soc_alarm_number_ = n; }
   void set_low_voltage_alarm_number(number::Number *n) { this->low_voltage_alarm_number_ = n; }
   void set_soc_calibration_button(BatterySOCCalibrateButton *b) { this->soc_calibration_button_ = b; }
-  void set_soc_hourly_history_text_sensor(text_sensor::TextSensor *s) { this->soc_hourly_history_text_sensor_ = s; }
-  void set_soc_daily_low_history_text_sensor(text_sensor::TextSensor *s) { this->soc_daily_low_history_text_sensor_ = s; }
-  void set_soc_daily_high_history_text_sensor(text_sensor::TextSensor *s) { this->soc_daily_high_history_text_sensor_ = s; }
-  void set_soc_daily_range_history_text_sensor(text_sensor::TextSensor *s) { this->soc_daily_range_history_text_sensor_ = s; }
 
   void setup() override;
-  void loop() override;
   void dump_config() override;
   void handle_can_frame(uint32_t can_id, const std::vector<uint8_t> &data);
   void send_config_setting(uint8_t command, uint16_t raw_value);
@@ -84,24 +76,9 @@ class BatterySensorComponent : public Component {
   bool has_current() const { return !std::isnan(this->current_a_); }
 
  protected:
-  void request_soc_history_();
-  bool send_pending_soc_history_request_(uint32_t now);
-  void send_history_preamble_();
-  void handle_soc_history_page_(uint32_t dgn, const std::vector<uint8_t> &data);
-  void publish_soc_hourly_history_();
-  void publish_soc_daily_history_();
-  void append_csv_value_(char *buffer, size_t buffer_size, size_t &used, uint8_t value, bool &first);
-  void append_csv_range_(char *buffer, size_t buffer_size, size_t &used, uint8_t low, uint8_t high, bool &first);
-
   uint8_t source_address_{0x08};
   uint8_t host_address_{0x20};
   uint32_t filter_interval_ms_{5000};
-  uint32_t soc_history_poll_interval_ms_{60000};
-  uint32_t last_soc_history_poll_ms_{0};
-  uint32_t last_soc_history_request_ms_{0};
-  uint32_t pending_soc_history_preamble_ms_{0};
-  bool pending_soc_history_poll_{false};
-  uint8_t pending_soc_history_request_index_{0xFF};
   uint32_t last_current_ms_{0};
   uint32_t last_soc_ms_{0};
   uint32_t last_capacity_ms_{0};
@@ -123,15 +100,6 @@ class BatterySensorComponent : public Component {
   number::Number *low_soc_alarm_number_{nullptr};
   number::Number *low_voltage_alarm_number_{nullptr};
   BatterySOCCalibrateButton *soc_calibration_button_{nullptr};
-  text_sensor::TextSensor *soc_hourly_history_text_sensor_{nullptr};
-  text_sensor::TextSensor *soc_daily_low_history_text_sensor_{nullptr};
-  text_sensor::TextSensor *soc_daily_high_history_text_sensor_{nullptr};
-  text_sensor::TextSensor *soc_daily_range_history_text_sensor_{nullptr};
-  std::array<uint8_t, 28> soc_hourly_history_{};
-  std::array<uint8_t, 35> soc_daily_low_history_{};
-  std::array<uint8_t, 35> soc_daily_high_history_{};
-  std::array<bool, 35> soc_daily_low_seen_{};
-  std::array<bool, 35> soc_daily_high_seen_{};
 };
 
 }  // namespace redarc_battery_sensor

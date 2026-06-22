@@ -17,13 +17,6 @@ CONF_SOURCE_ADDRESS = "source_address"
 CONF_HOST_ADDRESS = "host_address"
 CONF_FILTER_INTERVAL = "filter_interval"
 CONF_BATTERY_SENSOR = "battery_sensor_id"
-CONF_SOLAR_HISTORY_POLL_INTERVAL = "solar_history_poll_interval"
-
-
-def zero_or_positive_time_period_milliseconds(value):
-    if value in (0, "0", "0s", "0ms"):
-        return 0
-    return cv.positive_time_period_milliseconds(value)
 
 manager30_ns = cg.esphome_ns.namespace("redarc_manager")
 Manager30Component = manager30_ns.class_("Manager30Component", cg.Component)
@@ -55,7 +48,6 @@ CONFIG_SCHEMA = cv.Schema({
     cv.Optional(CONF_SOURCE_ADDRESS, default=0x01): cv.hex_uint8_t,
     cv.Optional(CONF_HOST_ADDRESS, default=0x20): cv.hex_uint8_t,
     cv.Optional(CONF_FILTER_INTERVAL, default="5s"): cv.positive_time_period_milliseconds,
-    cv.Optional(CONF_SOLAR_HISTORY_POLL_INTERVAL, default="60s"): zero_or_positive_time_period_milliseconds,
     cv.Optional(CONF_BATTERY_SENSOR): cv.use_id(_BatterySensorComponent),
     cv.GenerateID("output_current_id"): cv.declare_id(_SensorClass),
     cv.GenerateID("battery_voltage_id"): cv.declare_id(_SensorClass),
@@ -64,7 +56,6 @@ CONFIG_SCHEMA = cv.Schema({
     cv.GenerateID("solar_voltage_id"): cv.declare_id(_SensorClass),
     cv.GenerateID("solar_power_id"): cv.declare_id(_SensorClass),
     cv.GenerateID("solar_energy_id"): cv.declare_id(_SensorClass),
-    cv.GenerateID("solar_day_1_5_history_id"): cv.declare_id(_TextSensorClass),
     cv.GenerateID("ac_input_voltage_id"): cv.declare_id(_SensorClass),
     cv.GenerateID("vehicle_input_trigger_id"): cv.declare_id(_SensorClass),
     cv.GenerateID("clock_date_id"): cv.declare_id(_TextSensorClass),
@@ -128,7 +119,6 @@ async def to_code(config):
     cg.add(var.set_source_address(config[CONF_SOURCE_ADDRESS]))
     cg.add(var.set_host_address(config[CONF_HOST_ADDRESS]))
     cg.add(var.set_filter_interval_ms(config[CONF_FILTER_INTERVAL]))
-    cg.add(var.set_solar_history_poll_interval_ms(config[CONF_SOLAR_HISTORY_POLL_INTERVAL]))
 
     if CONF_BATTERY_SENSOR in config:
         battery = await cg.get_variable(config[CONF_BATTERY_SENSOR])
@@ -179,10 +169,6 @@ async def to_code(config):
                                unit="Wh", device_class="energy",
                                state_class=STATE_CLASS_MEASUREMENT, decimals=0)
         cg.add(var.set_solar_daily_energy_sensor(i, s))
-
-    ts = await _make_text_sensor(config["solar_day_1_5_history_id"], f"{p} Solar Day -1..-5 History",
-                                 entity_category=ENTITY_CATEGORY_DIAGNOSTIC)
-    cg.add(var.set_solar_day_1_5_history_text_sensor(ts))
 
     s = await _make_sensor(config["ac_input_voltage_id"], f"{p} AC Input Voltage",
                            unit="V", device_class="voltage",

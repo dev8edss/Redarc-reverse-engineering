@@ -1,22 +1,9 @@
 #include "battery_sensor.h"
 
-#include <algorithm>
-#include <cstdio>
-
 namespace esphome {
 namespace redarc_battery_sensor {
 
 static const char *const TAG = "redarc_battery_sensor";
-static const uint32_t SOC_HISTORY_REQUEST_BASE_IDS[] = {
-    0x1BFCD000UL, 0x1BFCD200UL, 0x1BFCD400UL};
-static const uint8_t SOC_HISTORY_REQUEST_DATA[][8] = {
-    {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
-    {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
-    {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}};
-static const uint8_t SOC_HISTORY_REQUEST_COUNT =
-    sizeof(SOC_HISTORY_REQUEST_BASE_IDS) / sizeof(SOC_HISTORY_REQUEST_BASE_IDS[0]);
-static const uint32_t SOC_HISTORY_REQUEST_SPACING_MS = 100;
-static const uint32_t HISTORY_PREAMBLE_DELAY_MS = 15;
 
 void BatterySOCCalibrateButton::press_action() {
   if (this->parent_ == nullptr) return;
@@ -37,43 +24,12 @@ void BatteryTypeSelect::control(size_t index) {
 }
 
 void BatterySensorComponent::setup() {
-  this->soc_hourly_history_.fill(0xFF);
-  this->soc_daily_low_history_.fill(0xFF);
-  this->soc_daily_high_history_.fill(0xFF);
-  this->soc_daily_low_seen_.fill(false);
-  this->soc_daily_high_seen_.fill(false);
   redarc_common::RedarcCanDispatcher::instance().add_listener(
       [this](uint32_t id, const std::vector<uint8_t> &data) { this->handle_can_frame(id, data); });
 }
 
-void BatterySensorComponent::loop() {
-  if (!redarc_common::RedarcCanDispatcher::instance().address_claim_sent()) return;
-  const uint32_t now = millis();
-  if (this->send_pending_soc_history_request_(now)) return;
-  if (this->soc_history_poll_interval_ms_ == 0) return;
-
-  if (this->pending_soc_history_poll_) {
-    if (now - this->pending_soc_history_preamble_ms_ < HISTORY_PREAMBLE_DELAY_MS) return;
-    this->pending_soc_history_poll_ = false;
-    this->last_soc_history_poll_ms_ = now;
-    this->request_soc_history_();
-    return;
-  }
-
-  const uint32_t lead_ms =
-      this->soc_history_poll_interval_ms_ > HISTORY_PREAMBLE_DELAY_MS ? HISTORY_PREAMBLE_DELAY_MS : 0;
-  if (this->last_soc_history_poll_ms_ == 0 ||
-      now - this->last_soc_history_poll_ms_ >= this->soc_history_poll_interval_ms_ - lead_ms) {
-    this->send_history_preamble_();
-    this->pending_soc_history_preamble_ms_ = now;
-    this->pending_soc_history_poll_ = true;
-  }
-}
-
 void BatterySensorComponent::dump_config() {
   ESP_LOGCONFIG(TAG, "Battery Sensor SA 0x%02X", this->source_address_);
-  ESP_LOGCONFIG(TAG, "  SOC history poll interval: %u ms", (unsigned) this->soc_history_poll_interval_ms_);
-  ESP_LOGCONFIG(TAG, "  SOC history active requests: %s", this->soc_history_poll_interval_ms_ == 0 ? "disabled" : "display DGNs");
   LOG_SENSOR("  ", "Battery Type", this->battery_type_sensor_);
   LOG_SENSOR("  ", "Configured Capacity", this->configured_capacity_sensor_);
   LOG_SENSOR("  ", "Max Charge Current", this->max_charge_current_sensor_);
@@ -86,10 +42,6 @@ void BatterySensorComponent::dump_config() {
   LOG_NUMBER("  ", "Low SOC Alarm", this->low_soc_alarm_number_);
   LOG_NUMBER("  ", "Low Voltage Alarm", this->low_voltage_alarm_number_);
   LOG_BUTTON("  ", "SOC Calibration", this->soc_calibration_button_);
-  LOG_TEXT_SENSOR("  ", "SOC Hourly History", this->soc_hourly_history_text_sensor_);
-  LOG_TEXT_SENSOR("  ", "SOC Daily Low History", this->soc_daily_low_history_text_sensor_);
-  LOG_TEXT_SENSOR("  ", "SOC Daily High History", this->soc_daily_high_history_text_sensor_);
-  LOG_TEXT_SENSOR("  ", "SOC Daily Range History", this->soc_daily_range_history_text_sensor_);
 }
 
 void BatterySensorComponent::send_config_setting(uint8_t command, uint16_t raw_value) {
@@ -156,13 +108,6 @@ void BatterySensorComponent::handle_can_frame(uint32_t can_id, const std::vector
       default:
         break;
     }
-    return;
-  }
-
-  if (redarc_common::rvc_matches(can_id, 0x1FCD0UL, this->source_address_) ||
-      redarc_common::rvc_matches(can_id, 0x1FCD2UL, this->source_address_) ||
-      redarc_common::rvc_matches(can_id, 0x1FCD4UL, this->source_address_)) {
-    this->handle_soc_history_page_(redarc_common::rvc_dgn(can_id), data);
     return;
   }
 
@@ -235,147 +180,6 @@ void BatterySensorComponent::handle_can_frame(uint32_t can_id, const std::vector
     }
     return;
   }
-}
-
-void BatterySensorComponent::request_soc_history_() {
-  this->pending_soc_history_request_index_ = 0;
-  this->last_soc_history_request_ms_ = 0;
-  ESP_LOGD(TAG, "Scheduled battery SOC history requests");
-}
-
-void BatterySensorComponent::send_history_preamble_() {
-  auto *bus = redarc_common::RedarcCanDispatcher::instance().canbus();
-  if (bus == nullptr) return;
-  const uint32_t can_id = redarc_common::with_sa(0x0FE6FF00UL, this->host_address_);
-  const std::vector<uint8_t> data = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
-  redarc_common::log_can_frame("CAN_TX", can_id, data);
-  bus->send_data(can_id, true, data);
-  ESP_LOGD(TAG, "Sent history polling preamble before SOC history request");
-}
-
-bool BatterySensorComponent::send_pending_soc_history_request_(uint32_t now) {
-  if (this->pending_soc_history_request_index_ >= SOC_HISTORY_REQUEST_COUNT) return false;
-  if (this->last_soc_history_request_ms_ != 0 &&
-      now - this->last_soc_history_request_ms_ < SOC_HISTORY_REQUEST_SPACING_MS)
-    return true;
-
-  auto *bus = redarc_common::RedarcCanDispatcher::instance().canbus();
-  if (bus == nullptr) {
-    this->pending_soc_history_request_index_ = 0xFF;
-    return false;
-  }
-
-  const uint8_t request_index = this->pending_soc_history_request_index_;
-  const std::vector<uint8_t> request(
-      SOC_HISTORY_REQUEST_DATA[request_index],
-      SOC_HISTORY_REQUEST_DATA[request_index] + sizeof(SOC_HISTORY_REQUEST_DATA[request_index]));
-  const uint32_t can_id = redarc_common::with_sa(SOC_HISTORY_REQUEST_BASE_IDS[request_index], this->host_address_);
-  redarc_common::log_can_frame("CAN_TX", can_id, request);
-  bus->send_data(can_id, true, request);
-  this->pending_soc_history_request_index_++;
-  this->last_soc_history_request_ms_ = now;
-  ESP_LOGD(TAG, "Sent battery SOC history request step %u", (unsigned) request_index);
-  return this->pending_soc_history_request_index_ < SOC_HISTORY_REQUEST_COUNT;
-}
-
-void BatterySensorComponent::handle_soc_history_page_(uint32_t dgn, const std::vector<uint8_t> &data) {
-  const uint8_t page = data[0];
-  if (page > 4) return;
-  const uint8_t base = page * 7U;
-  for (uint8_t i = 1; i < 8; i++) {
-    const uint8_t index = base + i - 1U;
-    const uint8_t value = data[i];
-    if (dgn == 0x1FCD0UL) {
-      if (index < this->soc_hourly_history_.size()) this->soc_hourly_history_[index] = value;
-    } else if (dgn == 0x1FCD2UL) {
-      if (index < this->soc_daily_low_history_.size()) {
-        this->soc_daily_low_history_[index] = value;
-        this->soc_daily_low_seen_[index] = true;
-      }
-    } else if (dgn == 0x1FCD4UL) {
-      if (index < this->soc_daily_high_history_.size()) {
-        this->soc_daily_high_history_[index] = value;
-        this->soc_daily_high_seen_[index] = true;
-      }
-    }
-  }
-  if (dgn == 0x1FCD0UL) {
-    this->publish_soc_hourly_history_();
-  } else {
-    this->publish_soc_daily_history_();
-  }
-}
-
-void BatterySensorComponent::publish_soc_hourly_history_() {
-  if (this->soc_hourly_history_text_sensor_ == nullptr) return;
-  char buffer[128];
-  size_t used = 0;
-  bool first = true;
-  buffer[0] = '\0';
-  for (uint8_t value : this->soc_hourly_history_) {
-    if (value == 0xFF) continue;
-    this->append_csv_value_(buffer, sizeof(buffer), used, value, first);
-  }
-  this->soc_hourly_history_text_sensor_->publish_state(buffer);
-}
-
-void BatterySensorComponent::publish_soc_daily_history_() {
-  char low_buffer[160];
-  char high_buffer[160];
-  char range_buffer[240];
-  size_t low_used = 0;
-  size_t high_used = 0;
-  size_t range_used = 0;
-  bool low_first = true;
-  bool high_first = true;
-  bool range_first = true;
-  low_buffer[0] = '\0';
-  high_buffer[0] = '\0';
-  range_buffer[0] = '\0';
-
-  const size_t day_count = std::min<size_t>(30, this->soc_daily_low_history_.size());
-  for (size_t i = 0; i < day_count; i++) {
-    const uint8_t low = this->soc_daily_low_history_[i];
-    const uint8_t high = this->soc_daily_high_history_[i];
-    if (low != 0xFF) this->append_csv_value_(low_buffer, sizeof(low_buffer), low_used, low, low_first);
-    if (high != 0xFF) this->append_csv_value_(high_buffer, sizeof(high_buffer), high_used, high, high_first);
-    if (this->soc_daily_low_seen_[i] && this->soc_daily_high_seen_[i] && low != 0xFF && high != 0xFF) {
-      this->append_csv_range_(range_buffer, sizeof(range_buffer), range_used, low, high, range_first);
-    }
-  }
-
-  if (this->soc_daily_low_history_text_sensor_ != nullptr)
-    this->soc_daily_low_history_text_sensor_->publish_state(low_buffer);
-  if (this->soc_daily_high_history_text_sensor_ != nullptr)
-    this->soc_daily_high_history_text_sensor_->publish_state(high_buffer);
-  if (this->soc_daily_range_history_text_sensor_ != nullptr)
-    this->soc_daily_range_history_text_sensor_->publish_state(range_buffer);
-}
-
-void BatterySensorComponent::append_csv_value_(char *buffer, size_t buffer_size, size_t &used, uint8_t value, bool &first) {
-  if (used >= buffer_size) return;
-  const int written = std::snprintf(buffer + used, buffer_size - used, first ? "%u" : ",%u", (unsigned) value);
-  if (written <= 0) return;
-  used += (size_t) written;
-  if (used >= buffer_size) used = buffer_size - 1;
-  first = false;
-}
-
-void BatterySensorComponent::append_csv_range_(char *buffer, size_t buffer_size, size_t &used, uint8_t low, uint8_t high, bool &first) {
-  if (used >= buffer_size) return;
-  const char *separator = first ? "" : ",";
-  int written;
-  if (low == 0xFF) {
-    written = std::snprintf(buffer + used, buffer_size - used, "%s255-%u", separator, (unsigned) high);
-  } else if (high == 0xFF) {
-    written = std::snprintf(buffer + used, buffer_size - used, "%s%u-255", separator, (unsigned) low);
-  } else {
-    written = std::snprintf(buffer + used, buffer_size - used, "%s%u-%u", separator, (unsigned) low, (unsigned) high);
-  }
-  if (written <= 0) return;
-  used += (size_t) written;
-  if (used >= buffer_size) used = buffer_size - 1;
-  first = false;
 }
 
 }  // namespace redarc_battery_sensor
