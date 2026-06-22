@@ -145,10 +145,6 @@ cards:
         name: Hourly SOC
       - entity: sensor.redvision_can_bridge_battery_soc_daily_range_history
         name: Daily Low-High SOC
-      - entity: sensor.redvision_can_bridge_battery_soc_daily_low_history
-        name: Daily Low SOC
-      - entity: sensor.redvision_can_bridge_battery_soc_daily_high_history
-        name: Daily High SOC
   - type: entities
     title: TVMS Voltage and Current Inputs
     show_header_toggle: false
@@ -232,6 +228,12 @@ cards:
         name: Solar V
       - entity: sensor.redvision_can_bridge_manager30_solar_current
         name: Solar A
+  - type: entities
+    title: Solar Generation History
+    show_header_toggle: false
+    entities:
+      - entity: sensor.redvision_can_bridge_manager30_solar_day_1_5_history
+        name: Day -1..-5 Wh
 
   - type: grid
     title: TVMS Rouge Outputs

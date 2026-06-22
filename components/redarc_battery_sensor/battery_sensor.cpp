@@ -71,8 +71,6 @@ void BatterySensorComponent::dump_config() {
   LOG_BUTTON("  ", "SOC Calibration", this->soc_calibration_button_);
   ESP_LOGCONFIG(TAG, "  SOC history poll interval: %u ms", (unsigned) this->soc_history_poll_interval_ms_);
   LOG_TEXT_SENSOR("  ", "SOC Hourly History", this->soc_hourly_history_text_sensor_);
-  LOG_TEXT_SENSOR("  ", "SOC Daily Low History", this->soc_daily_low_history_text_sensor_);
-  LOG_TEXT_SENSOR("  ", "SOC Daily High History", this->soc_daily_high_history_text_sensor_);
   LOG_TEXT_SENSOR("  ", "SOC Daily Range History", this->soc_daily_range_history_text_sensor_);
 }
 
@@ -286,36 +284,23 @@ void BatterySensorComponent::publish_soc_hourly_history_() {
 }
 
 void BatterySensorComponent::publish_soc_daily_history_() {
-  char low_buffer[160];
-  char high_buffer[160];
+  if (this->soc_daily_range_history_text_sensor_ == nullptr) return;
   char range_buffer[240];
-  size_t low_used = 0;
-  size_t high_used = 0;
   size_t range_used = 0;
-  bool low_first = true;
-  bool high_first = true;
   bool range_first = true;
-  low_buffer[0] = '\0';
-  high_buffer[0] = '\0';
   range_buffer[0] = '\0';
 
+  // The range sensor carries both the daily low and high as "low-high" pairs.
   const size_t day_count = std::min<size_t>(30, this->soc_daily_low_history_.size());
   for (size_t i = 0; i < day_count; i++) {
     const uint8_t low = this->soc_daily_low_history_[i];
     const uint8_t high = this->soc_daily_high_history_[i];
-    if (low != 0xFF) this->append_csv_value_(low_buffer, sizeof(low_buffer), low_used, low, low_first);
-    if (high != 0xFF) this->append_csv_value_(high_buffer, sizeof(high_buffer), high_used, high, high_first);
     if (this->soc_daily_low_seen_[i] && this->soc_daily_high_seen_[i] && low != 0xFF && high != 0xFF) {
       this->append_csv_range_(range_buffer, sizeof(range_buffer), range_used, low, high, range_first);
     }
   }
 
-  if (this->soc_daily_low_history_text_sensor_ != nullptr)
-    this->soc_daily_low_history_text_sensor_->publish_state(low_buffer);
-  if (this->soc_daily_high_history_text_sensor_ != nullptr)
-    this->soc_daily_high_history_text_sensor_->publish_state(high_buffer);
-  if (this->soc_daily_range_history_text_sensor_ != nullptr)
-    this->soc_daily_range_history_text_sensor_->publish_state(range_buffer);
+  this->soc_daily_range_history_text_sensor_->publish_state(range_buffer);
 }
 
 void BatterySensorComponent::append_csv_value_(char *buffer, size_t buffer_size, size_t &used, uint8_t value, bool &first) {

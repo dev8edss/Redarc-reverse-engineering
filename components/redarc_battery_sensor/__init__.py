@@ -63,8 +63,6 @@ CONFIG_SCHEMA = cv.Schema({
     cv.GenerateID("low_voltage_alarm_number_id"): cv.declare_id(BatteryConfigNumber),
     cv.GenerateID("soc_calibration_button_id"): cv.declare_id(BatterySOCCalibrateButton),
     cv.GenerateID("soc_hourly_history_id"): cv.declare_id(_TextSensorClass),
-    cv.GenerateID("soc_daily_low_history_id"): cv.declare_id(_TextSensorClass),
-    cv.GenerateID("soc_daily_high_history_id"): cv.declare_id(_TextSensorClass),
     cv.GenerateID("soc_daily_range_history_id"): cv.declare_id(_TextSensorClass),
 }).extend(cv.COMPONENT_SCHEMA)
 
@@ -244,14 +242,6 @@ async def to_code(config):
     ts = await _make_text_sensor(config["soc_hourly_history_id"], f"{p} SOC Hourly History",
                                  entity_category=ENTITY_CATEGORY_DIAGNOSTIC)
     cg.add(var.set_soc_hourly_history_text_sensor(ts))
-
-    ts = await _make_text_sensor(config["soc_daily_low_history_id"], f"{p} SOC Daily Low History",
-                                 entity_category=ENTITY_CATEGORY_DIAGNOSTIC)
-    cg.add(var.set_soc_daily_low_history_text_sensor(ts))
-
-    ts = await _make_text_sensor(config["soc_daily_high_history_id"], f"{p} SOC Daily High History",
-                                 entity_category=ENTITY_CATEGORY_DIAGNOSTIC)
-    cg.add(var.set_soc_daily_high_history_text_sensor(ts))
 
     ts = await _make_text_sensor(config["soc_daily_range_history_id"], f"{p} SOC Daily Range History",
                                  entity_category=ENTITY_CATEGORY_DIAGNOSTIC)

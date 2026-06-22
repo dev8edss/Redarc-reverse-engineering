@@ -70,8 +70,6 @@ class BatterySensorComponent : public Component {
   void set_soc_calibration_button(BatterySOCCalibrateButton *b) { this->soc_calibration_button_ = b; }
   void set_soc_history_poll_interval_ms(uint32_t ms) { this->soc_history_poll_interval_ms_ = ms; }
   void set_soc_hourly_history_text_sensor(text_sensor::TextSensor *s) { this->soc_hourly_history_text_sensor_ = s; }
-  void set_soc_daily_low_history_text_sensor(text_sensor::TextSensor *s) { this->soc_daily_low_history_text_sensor_ = s; }
-  void set_soc_daily_high_history_text_sensor(text_sensor::TextSensor *s) { this->soc_daily_high_history_text_sensor_ = s; }
   void set_soc_daily_range_history_text_sensor(text_sensor::TextSensor *s) { this->soc_daily_range_history_text_sensor_ = s; }
 
   void setup() override;
@@ -116,8 +114,6 @@ class BatterySensorComponent : public Component {
   number::Number *low_voltage_alarm_number_{nullptr};
   BatterySOCCalibrateButton *soc_calibration_button_{nullptr};
   text_sensor::TextSensor *soc_hourly_history_text_sensor_{nullptr};
-  text_sensor::TextSensor *soc_daily_low_history_text_sensor_{nullptr};
-  text_sensor::TextSensor *soc_daily_high_history_text_sensor_{nullptr};
   text_sensor::TextSensor *soc_daily_range_history_text_sensor_{nullptr};
   std::array<uint8_t, 28> soc_hourly_history_{};
   std::array<uint8_t, 35> soc_daily_low_history_{};
