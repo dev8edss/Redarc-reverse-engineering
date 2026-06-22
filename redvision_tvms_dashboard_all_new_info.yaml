@@ -137,14 +137,67 @@ cards:
       - entity: button.redvision_can_bridge_battery_calibrate_soc_full
         name: Calibrate SOC Full
         icon: mdi:battery-sync
-  - type: entities
-    title: Battery SOC History
-    show_header_toggle: false
-    entities:
+  - type: custom:apexcharts-card
+    header:
+      show: true
+      title: Battery SOC — Hourly History (%)
+    chart_type: bar
+    graph_span: 24h
+    yaxis:
+      - min: 0
+        max: 100
+    series:
       - entity: sensor.redvision_can_bridge_battery_soc_hourly_history
-        name: Hourly SOC
+        name: SOC %
+        type: column
+        data_generator: |
+          const vals = (entity.state || "").split(",").filter((s) => s.length);
+          const hr = 3600000;
+          const now = Date.now();
+          return vals
+            .map((v, i) => {
+              const n = parseInt(v, 10);
+              return [now - i * hr, isNaN(n) ? null : n];
+            })
+            .sort((a, b) => a[0] - b[0]);
+  - type: custom:apexcharts-card
+    header:
+      show: true
+      title: Battery SOC — Daily Low / High (%)
+    chart_type: bar
+    graph_span: 30d
+    yaxis:
+      - min: 0
+        max: 100
+    series:
       - entity: sensor.redvision_can_bridge_battery_soc_daily_range_history
-        name: Daily Low-High SOC
+        name: Low %
+        type: column
+        data_generator: |
+          const vals = (entity.state || "").split(",").filter((s) => s.length);
+          const day = 86400000;
+          const base = new Date();
+          base.setHours(0, 0, 0, 0);
+          return vals
+            .map((p, i) => {
+              const lo = parseInt(p.split("-")[0], 10);
+              return [base.getTime() - (i + 1) * day, isNaN(lo) ? null : lo];
+            })
+            .sort((a, b) => a[0] - b[0]);
+      - entity: sensor.redvision_can_bridge_battery_soc_daily_range_history
+        name: High %
+        type: column
+        data_generator: |
+          const vals = (entity.state || "").split(",").filter((s) => s.length);
+          const day = 86400000;
+          const base = new Date();
+          base.setHours(0, 0, 0, 0);
+          return vals
+            .map((p, i) => {
+              const hi = parseInt(p.split("-")[1], 10);
+              return [base.getTime() - (i + 1) * day, isNaN(hi) ? null : hi];
+            })
+            .sort((a, b) => a[0] - b[0]);
   - type: entities
     title: TVMS Voltage and Current Inputs
     show_header_toggle: false
@@ -228,12 +281,27 @@ cards:
         name: Solar V
       - entity: sensor.redvision_can_bridge_manager30_solar_current
         name: Solar A
-  - type: entities
-    title: Solar Generation History
-    show_header_toggle: false
-    entities:
-      - entity: sensor.redvision_can_bridge_manager30_solar_day_1_5_history
-        name: Day -1..-5 Wh
+  - type: custom:apexcharts-card
+    header:
+      show: true
+      title: Solar — Daily Generation (Wh)
+    chart_type: bar
+    graph_span: 12d
+    series:
+      - entity: sensor.redvision_can_bridge_manager30_solar_day_1_11_history
+        name: Wh
+        type: column
+        data_generator: |
+          const vals = (entity.state || "").split(",").filter((s) => s.length);
+          const day = 86400000;
+          const base = new Date();
+          base.setHours(0, 0, 0, 0);
+          return vals
+            .map((v, i) => {
+              const n = parseInt(v, 10);
+              return [base.getTime() - (i + 1) * day, (isNaN(n) || n === 255) ? null : n];
+            })
+            .sort((a, b) => a[0] - b[0]);
 
   - type: grid
     title: TVMS Rouge Outputs

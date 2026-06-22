@@ -46,7 +46,7 @@ class Manager30Component : public Component {
   void set_solar_voltage_sensor(sensor::Sensor *s) { this->solar_voltage_sensor_ = s; }
   void set_solar_power_sensor(sensor::Sensor *s) { this->solar_power_sensor_ = s; }
   void set_solar_energy_sensor(sensor::Sensor *s) { this->solar_energy_sensor_ = s; }
-  void set_solar_day_1_5_history_text_sensor(text_sensor::TextSensor *s) { this->solar_day_1_5_history_text_sensor_ = s; }
+  void set_solar_day_history_text_sensor(text_sensor::TextSensor *s) { this->solar_day_history_text_sensor_ = s; }
   void set_solar_history_poll_interval_ms(uint32_t ms) { this->solar_history_poll_interval_ms_ = ms; }
   void set_ac_input_voltage_sensor(sensor::Sensor *s) { this->ac_input_voltage_sensor_ = s; }
   void set_vehicle_input_trigger_sensor(sensor::Sensor *s) { this->vehicle_input_trigger_sensor_ = s; }
@@ -71,7 +71,7 @@ class Manager30Component : public Component {
   void publish_charging_stage_(uint8_t stage);
   void publish_solar_daily_energy_(uint8_t day, uint16_t wh);
   void publish_solar_energy_total_();
-  void publish_solar_day_1_5_history_();
+  void publish_solar_day_history_();
   void send_solar_history_request_();
   void inspect_status_heartbeat_(uint32_t can_id, const std::vector<uint8_t> &data);
   void publish_can_status_(bool abnormal, const char *message);
@@ -98,9 +98,9 @@ class Manager30Component : public Component {
   sensor::Sensor *solar_voltage_sensor_{nullptr};
   sensor::Sensor *solar_power_sensor_{nullptr};
   sensor::Sensor *solar_energy_sensor_{nullptr};
-  std::array<uint16_t, 8> solar_daily_wh_{};
-  std::array<bool, 8> solar_daily_known_{};
-  text_sensor::TextSensor *solar_day_1_5_history_text_sensor_{nullptr};
+  std::array<uint16_t, 12> solar_daily_wh_{};
+  std::array<bool, 12> solar_daily_known_{};
+  text_sensor::TextSensor *solar_day_history_text_sensor_{nullptr};
   uint32_t solar_history_poll_interval_ms_{60000};
   uint32_t last_solar_history_poll_ms_{0};
   sensor::Sensor *ac_input_voltage_sensor_{nullptr};

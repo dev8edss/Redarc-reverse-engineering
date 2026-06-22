@@ -48,7 +48,7 @@ void Manager30Component::dump_config() {
   LOG_SELECT("  ", "Vehicle Input Trigger", this->vehicle_input_trigger_select_);
   LOG_SELECT("  ", "Charging Mode", this->charging_mode_select_);
   ESP_LOGCONFIG(TAG, "  Solar history poll interval: %u ms", (unsigned) this->solar_history_poll_interval_ms_);
-  LOG_TEXT_SENSOR("  ", "Solar Day -1..-5 History", this->solar_day_1_5_history_text_sensor_);
+  LOG_TEXT_SENSOR("  ", "Solar Day -1..-11 History", this->solar_day_history_text_sensor_);
 }
 
 void Manager30Component::send_vehicle_input_trigger(uint16_t raw_value) {
@@ -203,14 +203,15 @@ void Manager30Component::handle_can_frame(uint32_t can_id, const std::vector<uin
 
   // Manager30 solar generation pages on DGN 0x1FCD6, received passively from the
   // bus. D1 is the page index; D2-D3, D4-D5 and D6-D7 are little-endian Wh buckets.
-  // Page 0 starts with today, then previous days. Feeds the Solar Energy total.
+  // Page 0 starts with today, then previous days. 4 pages x 3 days = 12 days total
+  // (today + day -1..-11). Feeds the Solar Energy total.
   if (redarc_common::rvc_matches(can_id, 0x1FCD6UL, this->source_address_)) {
     const uint8_t page = data[0];
-    if (page > 2) return;
+    if (page > 3) return;
     const uint8_t base_day = page * 3U;
     for (uint8_t slot = 0; slot < 3; slot++) {
       const uint8_t day = base_day + slot;
-      if (day >= 8) break;
+      if (day >= 12) break;
       const uint8_t offset = 1U + slot * 2U;
       this->publish_solar_daily_energy_(day, redarc_common::u16_le(data, offset));
     }
@@ -232,7 +233,7 @@ void Manager30Component::handle_can_frame(uint32_t can_id, const std::vector<uin
 }
 
 void Manager30Component::publish_solar_daily_energy_(uint8_t day, uint16_t wh) {
-  if (day >= 8) return;
+  if (day >= 12) return;
   this->solar_daily_wh_[day] = wh;
   this->solar_daily_known_[day] = true;
 }
@@ -241,22 +242,23 @@ void Manager30Component::publish_solar_energy_total_() {
   if (this->solar_energy_sensor_ == nullptr) return;
   uint32_t total = 0;
   bool any = false;
-  for (uint8_t i = 0; i < 8; i++) {
+  for (uint8_t i = 0; i < 12; i++) {
     if (!this->solar_daily_known_[i]) continue;
     total += this->solar_daily_wh_[i];
     any = true;
   }
   if (any) this->solar_energy_sensor_->publish_state((float) total);
-  if (any) this->publish_solar_day_1_5_history_();
+  if (any) this->publish_solar_day_history_();
 }
 
-void Manager30Component::publish_solar_day_1_5_history_() {
-  if (this->solar_day_1_5_history_text_sensor_ == nullptr) return;
+void Manager30Component::publish_solar_day_history_() {
+  if (this->solar_day_history_text_sensor_ == nullptr) return;
 
-  char buffer[48];
+  // Previous 11 days (day -1..-11), CSV in Wh; 255 marks an unknown slot.
+  char buffer[96];
   size_t used = 0;
   buffer[0] = '\0';
-  for (uint8_t day = 1; day <= 5; day++) {
+  for (uint8_t day = 1; day <= 11; day++) {
     const unsigned value = this->solar_daily_known_[day] ? (unsigned) this->solar_daily_wh_[day] : 255U;
     const int written = std::snprintf(buffer + used, sizeof(buffer) - used, day == 1 ? "%u" : ",%u", value);
     if (written <= 0) break;
@@ -266,7 +268,7 @@ void Manager30Component::publish_solar_day_1_5_history_() {
       break;
     }
   }
-  this->solar_day_1_5_history_text_sensor_->publish_state(buffer);
+  this->solar_day_history_text_sensor_->publish_state(buffer);
 }
 
 void Manager30Component::send_solar_history_request_() {
