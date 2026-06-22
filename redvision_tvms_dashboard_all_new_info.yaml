@@ -141,7 +141,6 @@ cards:
     header:
       show: true
       title: Battery SOC — Hourly History (%)
-    chart_type: bar
     graph_span: 24h
     yaxis:
       - min: 0
@@ -164,7 +163,6 @@ cards:
     header:
       show: true
       title: Battery SOC — Daily Low / High (%)
-    chart_type: bar
     graph_span: 30d
     yaxis:
       - min: 0
@@ -285,7 +283,6 @@ cards:
     header:
       show: true
       title: Solar — Daily Generation (Wh)
-    chart_type: bar
     graph_span: 12d
     series:
       - entity: sensor.redvision_can_bridge_manager30_solar_day_1_11_history
