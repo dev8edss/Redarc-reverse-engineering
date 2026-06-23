@@ -91,6 +91,12 @@ cards:
       - entity: sensor.redvision_can_bridge_manager30_ac_input_voltage
         name: AC Input Voltage
         icon: mdi:power-plug
+      - entity: sensor.redvision_can_bridge_manager30_vehicle_input_voltage
+        name: Vehicle Input Voltage
+        icon: mdi:car-electric
+      - entity: sensor.redvision_can_bridge_manager30_vehicle_input_current
+        name: Vehicle Input Current
+        icon: mdi:current-dc
       - entity: sensor.redvision_can_bridge_manager30_charging_stage
         name: Charging Stage
         icon: mdi:battery-clock
@@ -219,6 +225,8 @@ cards:
         name: Battery
       - entity: sensor.redvision_can_bridge_manager30_device_current
         name: Devices
+      - entity: sensor.redvision_can_bridge_manager30_vehicle_input_current
+        name: Vehicle Input
   - type: history-graph
     title: Voltage History
     hours_to_show: 6
@@ -235,6 +243,8 @@ cards:
         name: TVMS1280 V In 2
       - entity: sensor.redvision_can_bridge_manager30_ac_input_voltage
         name: AC Input
+      - entity: sensor.redvision_can_bridge_manager30_vehicle_input_voltage
+        name: Vehicle Input
   - type: grid
     title: Solar
     columns: 4

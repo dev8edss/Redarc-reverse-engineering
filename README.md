@@ -245,6 +245,7 @@ Listens to the manager's status frames and publishes:
 | **Solar Energy** | sensor Wh | `0x1FCD6` | total of the 12 daily Wh buckets (today + −1..−11) |
 | Solar Day -1..-11 History | text *(diagnostic)* | `0x1FCD6` | CSV of the previous 11 days' Wh (255 = unknown) |
 | AC Input Voltage | sensor V | `0x1F204` | D5-D6 |
+| Vehicle Input Current / Voltage | sensors A/V | `0x1F206` | D1-D4 current (centred), D5-D6 voltage × 0.001 |
 | Vehicle Input Trigger | **select** | `0x1F206` / cmd | Auto/12V/24V/Ignition/On (writable) |
 | Charging Mode | **select** | `0x1F108` / cmd | Touring / Storage (writable) |
 | Charging Stage | text | `0x1F200` | Not Charging / Soft-start / Boost / Absorption / Float / Maintenance |

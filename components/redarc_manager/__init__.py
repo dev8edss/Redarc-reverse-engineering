@@ -60,6 +60,8 @@ CONFIG_SCHEMA = cv.Schema({
     cv.GenerateID("solar_energy_id"): cv.declare_id(_SensorClass),
     cv.GenerateID("solar_day_history_id"): cv.declare_id(_TextSensorClass),
     cv.GenerateID("ac_input_voltage_id"): cv.declare_id(_SensorClass),
+    cv.GenerateID("vehicle_input_current_id"): cv.declare_id(_SensorClass),
+    cv.GenerateID("vehicle_input_voltage_id"): cv.declare_id(_SensorClass),
     cv.GenerateID("clock_date_id"): cv.declare_id(_TextSensorClass),
     cv.GenerateID("clock_time_id"): cv.declare_id(_TextSensorClass),
     cv.GenerateID("clock_datetime_id"): cv.declare_id(_TextSensorClass),
@@ -171,6 +173,16 @@ async def to_code(config):
                            unit="V", device_class="voltage",
                            state_class=STATE_CLASS_MEASUREMENT, decimals=0)
     cg.add(var.set_ac_input_voltage_sensor(s))
+
+    s = await _make_sensor(config["vehicle_input_current_id"], f"{p} Vehicle Input Current",
+                           unit="A", device_class="current",
+                           state_class=STATE_CLASS_MEASUREMENT, decimals=3)
+    cg.add(var.set_vehicle_input_current_sensor(s))
+
+    s = await _make_sensor(config["vehicle_input_voltage_id"], f"{p} Vehicle Input Voltage",
+                           unit="V", device_class="voltage",
+                           state_class=STATE_CLASS_MEASUREMENT, decimals=3)
+    cg.add(var.set_vehicle_input_voltage_sensor(s))
 
     ts = await _make_text_sensor(config["clock_date_id"], f"{p} CAN Date")
     cg.add(var.set_clock_date_text_sensor(ts))

@@ -40,6 +40,8 @@ void Manager30Component::dump_config() {
   LOG_TEXT_SENSOR("  ", "CAN Time", this->clock_time_text_sensor_);
   LOG_TEXT_SENSOR("  ", "CAN Date Time", this->clock_datetime_text_sensor_);
   LOG_TEXT_SENSOR("  ", "Charging Stage", this->charging_stage_text_sensor_);
+  LOG_SENSOR("  ", "Vehicle Input Current", this->vehicle_input_current_sensor_);
+  LOG_SENSOR("  ", "Vehicle Input Voltage", this->vehicle_input_voltage_sensor_);
   LOG_SELECT("  ", "Vehicle Input Trigger", this->vehicle_input_trigger_select_);
   LOG_SELECT("  ", "Charging Mode", this->charging_mode_select_);
   ESP_LOGCONFIG(TAG, "  Solar history poll interval: %u ms", (unsigned) this->solar_history_poll_interval_ms_);
@@ -121,6 +123,11 @@ void Manager30Component::handle_can_frame(uint32_t can_id, const std::vector<uin
   if (redarc_common::rvc_matches(can_id, 0x1F206UL, this->source_address_)) {
     if (now - this->last_charger_status_ms_ < this->filter_interval_ms_) return;
     this->last_charger_status_ms_ = now;
+    // Confirmed: D1-D4 vehicle input current (raw/1000-1000 A), D5-D6 voltage (raw*0.001 V).
+    if (this->vehicle_input_current_sensor_ != nullptr)
+      this->vehicle_input_current_sensor_->publish_state(redarc_common::current_32_centered(redarc_common::u32_le(data, 0)));
+    if (this->vehicle_input_voltage_sensor_ != nullptr)
+      this->vehicle_input_voltage_sensor_->publish_state((float) redarc_common::u16_le(data, 4) * 0.001f);
     if (this->vehicle_input_trigger_select_ != nullptr && data[7] != 0xFF) {
       if (data[7] <= 3) this->vehicle_input_trigger_select_->publish_state((size_t) data[7]);
       else if (data[7] == 5) this->vehicle_input_trigger_select_->publish_state((size_t) 4);
