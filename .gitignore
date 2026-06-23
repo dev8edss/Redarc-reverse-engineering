@@ -7,3 +7,7 @@
 # Python bytecode cache
 __pycache__/
 *.pyc
+
+# Editor / tooling settings
+/.claude/
+/.vscode/
