@@ -1,0 +1,240 @@
+VERSION "1.0 redarc-components"
+
+
+NS_ :
+	NS_DESC_
+	CM_
+	BA_DEF_
+	BA_
+	VAL_
+	CAT_DEF_
+	CAT_
+	FILTER
+	BA_DEF_DEF_
+	EV_DATA_
+	ENVVAR_DATA_
+	SGTYPE_
+	SGTYPE_VAL_
+	BA_DEF_SGTYPE_
+	BA_SGTYPE_
+	SIG_TYPE_REF_
+	VAL_TABLE_
+	SIG_GROUP_
+	SIG_VALTYPE_
+	SIGTYPE_VALTYPE_
+	BO_TX_BU_
+	BA_DEF_REL_
+	BA_REL_
+	BA_DEF_DEF_REL_
+	BU_SG_REL_
+	BU_EV_REL_
+	BU_BO_REL_
+	SG_MUL_VAL_
+
+BS_:
+
+BU_: Manager30 BatterySensor RedVisionDisplay TVMS1280 TVMSRouge Bridge
+
+
+BO_ 2482045440 BATT_1F102_CurrentVoltageTemp: 8 BatterySensor
+ SG_ BatteryCurrent : 0|32@1+ (0.001,-1000) [-1000|1000] "A" Bridge
+ SG_ BatteryVoltage : 32|16@1+ (0.001,0) [0|65.535] "V" Bridge
+ SG_ BatteryTemperature : 48|8@1+ (1,-60) [-60|195] "degC" Bridge
+
+BO_ 2482045952 BATT_1F104_SOC: 8 BatterySensor
+ SG_ BatterySOC : 0|8@1+ (1,0) [0|100] "%" Bridge
+
+BO_ 2482044928 BATT_1F100_Config: 8 BatterySensor
+ SG_ BatteryType : 0|8@1+ (1,0) [0|4] "" Bridge
+ SG_ ConfiguredCapacity : 8|16@1+ (1,0) [0|65535] "Ah" Bridge
+ SG_ MaxChargeCurrent : 32|8@1+ (1,0) [0|254] "A" Bridge
+
+BO_ 2482047488 BATT_1F10A_Alarms: 8 BatterySensor
+ SG_ LowSOCAlarm : 8|8@1+ (1,0) [0|100] "%" Bridge
+ SG_ LowVoltageAlarm : 16|16@1+ (0.001,0) [0|65.535] "V" Bridge
+
+BO_ 2482819072 BATT_1FCD0_SOCHourlyHistory: 8 BatterySensor
+ SG_ PageIndex : 0|8@1+ (1,0) [0|4] "" Bridge
+ SG_ HourlySOC_Slot0 : 8|8@1+ (1,0) [0|255] "%" Bridge
+ SG_ HourlySOC_Slot1 : 16|8@1+ (1,0) [0|255] "%" Bridge
+ SG_ HourlySOC_Slot2 : 24|8@1+ (1,0) [0|255] "%" Bridge
+ SG_ HourlySOC_Slot3 : 32|8@1+ (1,0) [0|255] "%" Bridge
+ SG_ HourlySOC_Slot4 : 40|8@1+ (1,0) [0|255] "%" Bridge
+ SG_ HourlySOC_Slot5 : 48|8@1+ (1,0) [0|255] "%" Bridge
+ SG_ HourlySOC_Slot6 : 56|8@1+ (1,0) [0|255] "%" Bridge
+
+BO_ 2482819584 BATT_1FCD2_SOCDailyLowHistory: 8 BatterySensor
+ SG_ PageIndex : 0|8@1+ (1,0) [0|4] "" Bridge
+ SG_ DailyLowSOC_Slot0 : 8|8@1+ (1,0) [0|255] "%" Bridge
+ SG_ DailyLowSOC_Slot1 : 16|8@1+ (1,0) [0|255] "%" Bridge
+ SG_ DailyLowSOC_Slot2 : 24|8@1+ (1,0) [0|255] "%" Bridge
+ SG_ DailyLowSOC_Slot3 : 32|8@1+ (1,0) [0|255] "%" Bridge
+ SG_ DailyLowSOC_Slot4 : 40|8@1+ (1,0) [0|255] "%" Bridge
+ SG_ DailyLowSOC_Slot5 : 48|8@1+ (1,0) [0|255] "%" Bridge
+ SG_ DailyLowSOC_Slot6 : 56|8@1+ (1,0) [0|255] "%" Bridge
+
+BO_ 2482820096 BATT_1FCD4_SOCDailyHighHistory: 8 BatterySensor
+ SG_ PageIndex : 0|8@1+ (1,0) [0|4] "" Bridge
+ SG_ DailyHighSOC_Slot0 : 8|8@1+ (1,0) [0|255] "%" Bridge
+ SG_ DailyHighSOC_Slot1 : 16|8@1+ (1,0) [0|255] "%" Bridge
+ SG_ DailyHighSOC_Slot2 : 24|8@1+ (1,0) [0|255] "%" Bridge
+ SG_ DailyHighSOC_Slot3 : 32|8@1+ (1,0) [0|255] "%" Bridge
+ SG_ DailyHighSOC_Slot4 : 40|8@1+ (1,0) [0|255] "%" Bridge
+ SG_ DailyHighSOC_Slot5 : 48|8@1+ (1,0) [0|255] "%" Bridge
+ SG_ DailyHighSOC_Slot6 : 56|8@1+ (1,0) [0|255] "%" Bridge
+
+BO_ 2213677568 MGR_1F20A_OutputCurrentVoltage: 8 Manager30
+ SG_ OutputCurrent : 0|32@1+ (0.001,-1000) [-1000|1000] "A" Bridge
+ SG_ ManagerBatteryVoltage : 32|16@1+ (0.001,0) [0|65.535] "V" Bridge
+
+BO_ 2213677056 MGR_1F208_Solar: 8 Manager30
+ SG_ SolarCurrent : 0|32@1+ (0.001,-1000) [-1000|1000] "A" Bridge
+ SG_ SolarVoltage : 32|16@1+ (0.001,0) [0|65.535] "V" Bridge
+
+BO_ 2213676032 MGR_1F204_ACInput: 8 Manager30
+ SG_ ACInputVoltage : 32|16@1+ (1,0) [0|65535] "V" Bridge
+
+BO_ 2213611520 MGR_1F108_ChargingMode: 8 Manager30
+ SG_ ChargingMode : 0|1@1+ (1,0) [0|1] "" Bridge
+
+BO_ 2213675008 MGR_1F200_ChargingStage: 8 Manager30
+ SG_ ChargingStage : 0|8@1+ (1,0) [0|255] "" Bridge
+
+BO_ 2213676544 MGR_1F206_VehicleInputTrigger: 8 Manager30
+ SG_ VehicleInputTrigger : 56|8@1+ (1,0) [0|255] "" Bridge
+
+BO_ 2213741568 MGR_1F304_Clock: 8 Manager30
+ SG_ ClockFlags : 0|3@1+ (1,0) [0|7] "" Bridge
+ SG_ ClockDay : 3|5@1+ (1,1) [1|31] "" Bridge
+ SG_ ClockMonth : 8|8@1+ (1,0) [1|12] "" Bridge
+ SG_ ClockYear : 16|16@1+ (1,0) [2000|2100] "" Bridge
+ SG_ ClockHour : 32|8@1+ (1,0) [0|23] "" Bridge
+ SG_ ClockMinute : 40|8@1+ (1,0) [0|59] "" Bridge
+ SG_ ClockSecond : 48|8@1+ (1,0) [0|59] "" Bridge
+
+BO_ 2214385152 MGR_1FCD6_SolarEnergyHistory: 8 Manager30
+ SG_ SolarPageIndex M : 0|8@1+ (1,0) [0|3] "" Bridge
+ SG_ SolarDay0Wh m0 : 8|16@1+ (1,0) [0|65535] "Wh" Bridge
+ SG_ SolarDay1Wh m0 : 24|16@1+ (1,0) [0|65535] "Wh" Bridge
+ SG_ SolarDay2Wh m0 : 40|16@1+ (1,0) [0|65535] "Wh" Bridge
+ SG_ SolarDay3Wh m1 : 8|16@1+ (1,0) [0|65535] "Wh" Bridge
+ SG_ SolarDay4Wh m1 : 24|16@1+ (1,0) [0|65535] "Wh" Bridge
+ SG_ SolarDay5Wh m1 : 40|16@1+ (1,0) [0|65535] "Wh" Bridge
+ SG_ SolarDay6Wh m2 : 8|16@1+ (1,0) [0|65535] "Wh" Bridge
+ SG_ SolarDay7Wh m2 : 24|16@1+ (1,0) [0|65535] "Wh" Bridge
+ SG_ SolarDay8Wh m2 : 40|16@1+ (1,0) [0|65535] "Wh" Bridge
+ SG_ SolarDay9Wh m3 : 8|16@1+ (1,0) [0|65535] "Wh" Bridge
+ SG_ SolarDay10Wh m3 : 24|16@1+ (1,0) [0|65535] "Wh" Bridge
+ SG_ SolarDay11Wh m3 : 40|16@1+ (1,0) [0|65535] "Wh" Bridge
+
+BO_ 2482143232 DISP_1F280_DisplayCurrents: 8 RedVisionDisplay
+ SG_ BatteryCurrentDisplay : 0|16@1+ (0.1,-1000) [-1000|5553.5] "A" Bridge
+ SG_ DeviceCurrentDisplay : 32|16@1+ (0.1,-1000) [-1000|5553.5] "A" Bridge
+
+BO_ 2482143744 DISP_1F282_ManagerOutputDisplay: 8 RedVisionDisplay
+ SG_ ManagerOutputCurrentDisplay : 48|16@1+ (0.1,-1000) [-1000|5553.5] "A" Bridge
+
+BO_ 2617049088 TVMS_1FD00_ChannelStateArray: 8 Vector__XXX
+ SG_ BaseItem : 0|8@1+ (1,0) [0|255] "" Bridge
+ SG_ State_Plus0 : 8|8@1+ (1,0) [0|255] "" Bridge
+ SG_ State_Plus1 : 16|8@1+ (1,0) [0|255] "" Bridge
+ SG_ State_Plus2 : 24|8@1+ (1,0) [0|255] "" Bridge
+ SG_ State_Plus3 : 32|8@1+ (1,0) [0|255] "" Bridge
+ SG_ State_Plus4 : 40|8@1+ (1,0) [0|255] "" Bridge
+ SG_ State_Plus5 : 48|8@1+ (1,0) [0|255] "" Bridge
+ SG_ State_Plus6 : 56|8@1+ (1,0) [0|255] "" Bridge
+
+BO_ 2617049600 TVMS_1FD02_MuxSensors: 8 Vector__XXX
+ SG_ ItemId M : 0|8@1+ (1,0) [0|255] "" Bridge
+ SG_ RougeTank1 m9 : 8|8@1+ (1,0) [0|100] "%" Bridge
+ SG_ RougeTank2 m9 : 16|8@1+ (1,0) [0|100] "%" Bridge
+ SG_ RougeInputVoltage m22 : 8|16@1+ (0.001,0) [0|65.535] "V" Bridge
+ SG_ TVMS1280VoltageInput1 m17 : 8|16@1+ (0.001,0) [0|65.535] "V" Bridge
+ SG_ TVMS1280VoltageInput2 m17 : 24|16@1+ (0.001,0) [0|65.535] "V" Bridge
+ SG_ TVMS1280Temp2 m17 : 40|8@1+ (1,-100) [-100|155] "degC" Bridge
+ SG_ TVMS1280Temp1 m20 : 8|8@1+ (1,-100) [-100|155] "degC" Bridge
+ SG_ TVMS1280Tank1 m20 : 24|8@1+ (1,0) [0|100] "%" Bridge
+ SG_ TVMS1280Tank2 m20 : 40|8@1+ (1,0) [0|100] "%" Bridge
+ SG_ TVMS1280Tank3 m23 : 8|8@1+ (1,0) [0|100] "%" Bridge
+ SG_ TVMS1280Tank4 m23 : 24|8@1+ (1,0) [0|100] "%" Bridge
+ SG_ TVMS1280Tank5 m23 : 40|8@1+ (1,0) [0|100] "%" Bridge
+ SG_ TVMS1280Tank6 m26 : 8|8@1+ (1,0) [0|100] "%" Bridge
+
+BO_ 2617053696 ROUGE_1FD12_OutputLevels: 8 TVMSRouge
+ SG_ LevelPageId M : 0|8@1+ (1,0) [0|255] "" Bridge
+ SG_ RougeOutput1Level m12 : 8|8@1+ (1,0) [0|100] "%" Bridge
+ SG_ RougeOutput2Level m12 : 16|8@1+ (1,0) [0|100] "%" Bridge
+ SG_ RougeOutput3Level m12 : 24|8@1+ (1,0) [0|100] "%" Bridge
+ SG_ RougeOutput4Level m12 : 32|8@1+ (1,0) [0|100] "%" Bridge
+ SG_ RougeOutput5Level m12 : 40|8@1+ (1,0) [0|100] "%" Bridge
+ SG_ RougeOutput6Level m12 : 48|8@1+ (1,0) [0|100] "%" Bridge
+ SG_ RougeOutput7Level m12 : 56|8@1+ (1,0) [0|100] "%" Bridge
+ SG_ RougeOutput8Level m19 : 8|8@1+ (1,0) [0|100] "%" Bridge
+ SG_ RougeOutput9Level m19 : 16|8@1+ (1,0) [0|100] "%" Bridge
+ SG_ RougeOutput10Level m19 : 24|8@1+ (1,0) [0|100] "%" Bridge
+
+BO_ 2617044992 TVMS1280_1FCF0_InverterStatus: 8 TVMS1280
+ SG_ InverterState : 0|8@1+ (1,0) [0|1] "" Bridge
+ SG_ InverterItemId : 8|8@1+ (1,0) [0|255] "" Bridge
+
+BO_ 2399207168 CMD_0F00FF_ConfigSetting: 8 Bridge
+ SG_ CommandId : 0|8@1+ (1,0) [0|255] "" Manager30,BatterySensor
+ SG_ ConfigValue : 32|16@1+ (1,0) [0|65535] "" Manager30,BatterySensor
+
+BO_ 2399143936 CMD_0F0008_BatterySOCCalib: 8 Bridge
+ SG_ CommandId : 0|8@1+ (1,0) [0|255] "" BatterySensor
+ SG_ SubCommand : 16|8@1+ (1,0) [0|255] "" BatterySensor
+ SG_ SOCCalibrationTarget : 32|8@1+ (1,0) [0|100] "%" BatterySensor
+
+BO_ 2399154176 CMD_0F0030_RougeChannel: 8 Bridge
+ SG_ CommandId : 0|8@1+ (1,0) [0|255] "" TVMSRouge
+ SG_ Channel : 24|8@1+ (1,0) [0|255] "" TVMSRouge
+ SG_ ChannelValue : 32|8@1+ (1,0) [0|100] "" TVMSRouge
+
+BO_ 2399151104 CMD_0F0024_TVMS1280Channel: 8 Bridge
+ SG_ CommandId : 0|8@1+ (1,0) [0|255] "" TVMS1280
+ SG_ Channel : 24|8@1+ (1,0) [0|255] "" TVMS1280
+ SG_ ChannelState : 32|8@1+ (1,0) [0|1] "" TVMS1280
+
+BO_ 2415710208 REQ_0FFCD0_SOCHourlyPoll: 8 Bridge
+
+BO_ 2415710720 REQ_0FFCD2_SOCDailyLowPoll: 8 Bridge
+
+BO_ 2415711232 REQ_0FFCD4_SOCDailyHighPoll: 8 Bridge
+
+BO_ 2415711744 REQ_0FFCD6_SolarHistoryPoll: 8 Bridge
+
+
+
+CM_ "RedVision / TVMS CAN bridge - signals reflect ONLY what the ESPHome components decode and transmit.";
+CM_ BU_ Bridge "This ESP32 / ESPHome CAN bridge. Source address is configurable (host_address, default 0x22).";
+CM_ BO_ 2482045440 "29-bit extended IDs. Receivers key on DGN=(ID>>8)&0x1FFFF and source address=ID&0xFF. Message IDs here have the source-address byte (low 8 bits) set to 0x00 so one definition matches a DGN from ANY source address; OR the real source byte in when transmitting/filtering. Observed source addresses: Manager30 0x01, BatterySensor 0x08, RedVision displays 0x20/0x21, TVMS1280 0x24, TVMSRouge 0x30, Bridge 0x22.";
+CM_ BO_ 2482819072 "Paginated history array. PageIndex (D1) selects the block; absolute hour index = PageIndex*7 + SlotN. Value 255 (0xFF) means no data.";
+CM_ BO_ 2482819584 "Paginated history array. Absolute day index = PageIndex*7 + SlotN. 255 = no data. Combined with the daily-high page into the SOC Daily Range entity.";
+CM_ BO_ 2482820096 "Paginated history array. Absolute day index = PageIndex*7 + SlotN. 255 = no data.";
+CM_ BO_ 2213675008 "ChargingStage is also used to derive ChargingMode (bit0) when 0x1F108 has not been seen.";
+CM_ BO_ 2213741568 "Bus clock. ClockDay = (D1>>3)+1, ClockFlags = D1 & 0x07. Only published when all fields are in valid calendar ranges.";
+CM_ BO_ 2214385152 "Solar generation history, 4 pages x 3 days = 12 days. Day 0 = today, Day 1..11 = previous days, in Wh. Requested via REQ_0FFCD6 (RTR).";
+CM_ BO_ 2617049088 "DGN 0x1FD00 shared by TVMS1280 (SA 0x24) and TVMSRouge (SA 0x30). Byte array: BaseItem (D1) then State_Plus0..6 for channels BaseItem..BaseItem+6. Valid states 0x00=off, 0x01=on; 0xF8/0xFF are no-data markers. TVMS1280 channel map: 0x01-0x03 Digital Inputs 1-3, 0x04-0x0D Outputs 0-9, 0x0E Inverter, 0x0F Master. TVMSRouge channel map: 0x01-0x08 Input Buttons 1-8, 0x0B Master, 0x0C-0x15 Outputs 1-10.";
+CM_ BO_ 2617049600 "DGN 0x1FD02 shared by TVMS1280 (SA 0x24) and TVMSRouge (SA 0x30), multiplexed by ItemId (D1). Item codes do not collide between the two devices, so one definition serves both.";
+CM_ BO_ 2617053696 "TVMSRouge dimmable-output levels, multiplexed by LevelPageId (D1): page 0x0C carries outputs 1-7, page 0x13 carries outputs 8-10.";
+CM_ BO_ 2617044992 "TVMS1280 inverter status. InverterState (D1) is on/off when InverterItemId (D2) == 0x0E.";
+CM_ BO_ 2399207168 "Config command from the bridge. ID = 0x0F00FF<host_address>. CommandId (D1) selects the setting; ConfigValue (D5-D6, little-endian) is the new value. Targets Manager30 and BatterySensor settings (D3=D4=0xFF).";
+CM_ BO_ 2399143936 "Battery SOC full calibration. ID = 0x0F00<battery_SA><host_address>, e.g. 0x0F000822. D1=0x15, D3=0x03, D5=target percent.";
+CM_ BO_ 2399154176 "TVMSRouge output command. ID = 0x0F00<rouge_SA><host_address>. CommandId 0xCB = on/off (ChannelValue 0/1), 0x5A = absolute level (ChannelValue 0-100%). Channel 0x0B Master, 0x0C-0x15 Outputs 1-10.";
+CM_ BO_ 2399151104 "TVMS1280 output command. ID = 0x0F00<1280_SA><host_address>. CommandId 0xCB, Channel 0x04-0x0D Outputs 0-9, 0x0E Inverter, 0x0F Master, ChannelState 0/1.";
+CM_ BO_ 2415710208 "RTR remote-request frame (no payload, DLC 8). Polls the battery for SOC hourly history; reply is BATT_1FCD0.";
+CM_ BO_ 2415710720 "RTR remote-request frame (no payload). Polls SOC daily-low history; reply is BATT_1FCD2.";
+CM_ BO_ 2415711232 "RTR remote-request frame (no payload). Polls SOC daily-high history; reply is BATT_1FCD4.";
+CM_ BO_ 2415711744 "RTR remote-request frame (no payload). Polls the manager for solar history; reply is MGR_1FCD6.";
+CM_ SG_ 2482045440 BatteryCurrent "Signed via offset: A = raw/1000 - 1000. Positive = charging, negative = discharging.";
+CM_ SG_ 2213677568 OutputCurrent "A = raw/1000 - 1000.";
+CM_ SG_ 2482143232 BatteryCurrentDisplay "Display rebroadcast value: A = raw/10 - 1000.";
+
+VAL_ 2482044928 BatteryType 0 "Gel" 1 "AGM" 2 "LeadAcid" 3 "Calcium" 4 "Lithium" ;
+VAL_ 2213611520 ChargingMode 0 "Touring" 1 "Storage" ;
+VAL_ 2213675008 ChargingStage 0 "NotCharging" 1 "NotCharging" 33 "SoftStart" 48 "Boost" 49 "Boost" 64 "Absorption" 65 "Absorption" 112 "Float" 113 "Float" 128 "Maintenance" 129 "Maintenance" ;
+VAL_ 2213676544 VehicleInputTrigger 0 "Auto" 1 "12V" 2 "24V" 3 "Ignition" 5 "On" ;
+VAL_ 2399207168 CommandId 17 "SetBatteryType" 18 "SetConfiguredCapacity" 20 "SetMaxChargeCurrent" 65 "SetLowSOCAlarm" 66 "SetLowVoltageAlarm" 67 "SetChargingMode" 104 "SetVehicleInputTrigger" ;
+VAL_ 2399154176 CommandId 203 "SetOnOff" 90 "SetLevel" ;
+VAL_ 2399151104 CommandId 203 "SetOnOff" ;
