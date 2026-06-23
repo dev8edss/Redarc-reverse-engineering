@@ -249,7 +249,7 @@ Listens to the manager's status frames and publishes:
 | Vehicle Input Current / Voltage | sensors A/V | `0x1F206` | D1-D4 current (centred), D5-D6 voltage × 0.001 |
 | Vehicle Input Trigger | **select** | `0x1F206` / cmd | Auto/12V/24V/Ignition/On (writable) |
 | Charging Mode | **select** | `0x1F108` / cmd | Touring / Storage (writable) |
-| Charging Stage | text | `0x1F200` | Not Charging / Soft-start / Boost / Absorption / Float / Maintenance |
+| Charging Stage | text | `0x1F200` | Not Charging / Desulphation / Soft-start / Boost / Absorption / Battery Test / Equalize / Float / Maintenance |
 | CAN Date / Time / Date Time | text | `0x1F304` | bus clock |
 
 Writable entities (the two **selects**) build a command frame from the
@@ -394,7 +394,7 @@ Rogue buttons   : 0x1BFD0030   <base> <b1..b7>     (00=inactive,01=active; D1=0x
 | Manager30 `0x01` | `0x03F20801` | `0x1F208` | — | Solar Power W | derived | I × V | DERIVED |
 | Manager30 `0x01` | `0x03FCD601` | `0x1FCD6` | D1 page | Solar Energy Wh (per-day buckets) | D2-D7 | 16-bit LE Wh per day slot | CONFIRMED |
 | Manager30 `0x01` | `0x03F10801` | `0x1F108` | — | Charging Mode | D1 bit0 | 0=Touring,1=Storage | CONFIRMED |
-| Manager30 `0x01` | `0x03F20001` | `0x1F200` | — | Charging Stage | D1 | 0x21 Soft-start, 0x30/31 Boost, 0x40/41 Absorption, 0x70/71 Float, 0x80/81 Maintenance | CONFIRMED |
+| Manager30 `0x01` | `0x03F20001` | `0x1F200` | — | Charging Stage | D1 | base = D1 & 0xFE: 0x00 Not Charging, 0x10 Desulphation, 0x20 Soft-start, 0x30 Boost, 0x40 Absorption, 0x50 Battery Test, 0x60 Equalize, 0x70 Float, 0x80 Maintenance (bit 0 independent) | CONFIRMED |
 | Manager30 `0x01` | `0x03F20601` | `0x1F206` | — | Vehicle Input Current A | D1-D4 | raw/1000−1000 | CONFIRMED |
 | Manager30 `0x01` | `0x03F20601` | `0x1F206` | — | Vehicle Input Voltage | D5-D6 | raw×0.001 V | CONFIRMED |
 | Manager30 `0x01` | `0x03F20601` | `0x1F206` | — | Vehicle Input Trigger | D8 | 0 Auto, 1 12V, 2 24V, 3 Ignition, 5 On | CONFIRMED |

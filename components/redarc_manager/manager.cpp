@@ -304,29 +304,35 @@ void Manager30Component::publish_charging_mode_(uint8_t mode) {
 void Manager30Component::publish_charging_stage_(uint8_t stage) {
   if (this->charging_stage_text_sensor_ == nullptr) return;
 
+  // Bit 0 is independent; the stage is encoded in the upper bits, so each stage
+  // has an even and odd raw value with the same meaning. Mask it off (& 0xFE).
   const char *name = nullptr;
-  switch (stage) {
+  switch (stage & 0xFE) {
     case 0x00:
-    case 0x01:
       name = "Not Charging";
       break;
-    case 0x21:
+    case 0x10:
+      name = "Desulphation";
+      break;
+    case 0x20:
       name = "Soft-start";
       break;
     case 0x30:
-    case 0x31:
       name = "Boost";
       break;
     case 0x40:
-    case 0x41:
       name = "Absorption";
       break;
+    case 0x50:
+      name = "Battery Test";
+      break;
+    case 0x60:
+      name = "Equalize";
+      break;
     case 0x70:
-    case 0x71:
       name = "Float";
       break;
     case 0x80:
-    case 0x81:
       name = "Maintenance";
       break;
     default:
