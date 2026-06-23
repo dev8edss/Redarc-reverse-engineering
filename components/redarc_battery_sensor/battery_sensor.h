@@ -25,6 +25,17 @@ class BatterySOCCalibrateButton : public button::Button {
   BatterySensorComponent *parent_{nullptr};
 };
 
+class BatteryHistoryClearButton : public button::Button {
+ public:
+  void set_parent(BatterySensorComponent *parent) { this->parent_ = parent; }
+  void set_daily(bool daily) { this->daily_ = daily; }
+
+ protected:
+  void press_action() override;
+  BatterySensorComponent *parent_{nullptr};
+  bool daily_{false};
+};
+
 class BatteryConfigNumber : public number::Number {
  public:
   void set_parent(BatterySensorComponent *parent) { this->parent_ = parent; }
@@ -63,6 +74,8 @@ class BatterySensorComponent : public Component {
   void set_low_soc_alarm_number(number::Number *n) { this->low_soc_alarm_number_ = n; }
   void set_low_voltage_alarm_number(number::Number *n) { this->low_voltage_alarm_number_ = n; }
   void set_soc_calibration_button(BatterySOCCalibrateButton *b) { this->soc_calibration_button_ = b; }
+  void set_clear_hourly_soc_button(BatteryHistoryClearButton *b) { this->clear_hourly_soc_button_ = b; }
+  void set_clear_daily_soc_button(BatteryHistoryClearButton *b) { this->clear_daily_soc_button_ = b; }
   void set_soc_history_poll_interval_ms(uint32_t ms) { this->soc_history_poll_interval_ms_ = ms; }
   void set_soc_hourly_history_text_sensor(text_sensor::TextSensor *s) { this->soc_hourly_history_text_sensor_ = s; }
   void set_soc_daily_range_history_text_sensor(text_sensor::TextSensor *s) { this->soc_daily_range_history_text_sensor_ = s; }
@@ -73,6 +86,8 @@ class BatterySensorComponent : public Component {
   void handle_can_frame(uint32_t can_id, const std::vector<uint8_t> &data);
   void send_config_setting(uint8_t command, uint16_t raw_value);
   void send_soc_calibration_command(uint8_t target_percent);
+  void clear_hourly_soc_history();
+  void clear_daily_soc_history();
   float current_a() const { return this->current_a_; }
   bool has_current() const { return !std::isnan(this->current_a_); }
 
@@ -103,6 +118,8 @@ class BatterySensorComponent : public Component {
   number::Number *low_soc_alarm_number_{nullptr};
   number::Number *low_voltage_alarm_number_{nullptr};
   BatterySOCCalibrateButton *soc_calibration_button_{nullptr};
+  BatteryHistoryClearButton *clear_hourly_soc_button_{nullptr};
+  BatteryHistoryClearButton *clear_daily_soc_button_{nullptr};
   text_sensor::TextSensor *soc_hourly_history_text_sensor_{nullptr};
   text_sensor::TextSensor *soc_daily_range_history_text_sensor_{nullptr};
   std::array<uint8_t, 28> soc_hourly_history_{};

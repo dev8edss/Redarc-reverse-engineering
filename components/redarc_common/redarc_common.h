@@ -118,5 +118,16 @@ inline const char *output_status_name(uint8_t status) {
   }
 }
 
+// History-clear command (DGN 0x1FCCE; actual ID 0x1BFCCE | host). D1 selects the
+// dataset: 0xD0 hourly SOC, 0xD2 daily-low SOC, 0xD4 daily-high SOC, 0xD6 solar.
+// D2 = 0xFC marker, D3-D8 = 0xFF.
+inline void send_clear_history(canbus::Canbus *bus, uint8_t host_address, uint8_t dataset) {
+  if (bus == nullptr) return;
+  const std::vector<uint8_t> data = {dataset, 0xFC, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+  const uint32_t can_id = 0x1BFCCE00UL | host_address;
+  log_can_frame("CAN_TX", can_id, data);
+  bus->send_data(can_id, true, data);
+}
+
 }  // namespace redarc_common
 }  // namespace esphome

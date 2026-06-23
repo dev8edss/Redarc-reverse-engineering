@@ -31,6 +31,7 @@ Manager30Component = manager30_ns.class_("Manager30Component", cg.Component)
 VehicleInputTriggerSelect = manager30_ns.class_("VehicleInputTriggerSelect", select.Select)
 ChargingModeSelect = manager30_ns.class_("ChargingModeSelect", select.Select)
 Manager30SetClockButton = manager30_ns.class_("Manager30SetClockButton", button.Button)
+Manager30ClearSolarHistoryButton = manager30_ns.class_("Manager30ClearSolarHistoryButton", button.Button)
 
 _battery_sensor_ns = cg.esphome_ns.namespace("redarc_battery_sensor")
 _BatterySensorComponent = _battery_sensor_ns.class_("BatterySensorComponent", cg.Component)
@@ -55,6 +56,7 @@ CONFIG_SCHEMA = cv.Schema({
     cv.Optional(CONF_BATTERY_SENSOR): cv.use_id(_BatterySensorComponent),
     cv.Optional(CONF_TIME_ID): cv.use_id(time.RealTimeClock),
     cv.GenerateID("set_clock_button_id"): cv.declare_id(Manager30SetClockButton),
+    cv.GenerateID("clear_solar_history_button_id"): cv.declare_id(Manager30ClearSolarHistoryButton),
     cv.GenerateID("output_current_id"): cv.declare_id(_SensorClass),
     cv.GenerateID("battery_voltage_id"): cv.declare_id(_SensorClass),
     cv.GenerateID("source_device_current_id"): cv.declare_id(_SensorClass),
@@ -223,3 +225,13 @@ async def to_code(config):
     })
     cg.add(btn.set_parent(var))
     cg.add(var.set_set_clock_button(btn))
+
+    btn = await button.new_button({
+        CONF_ID: config["clear_solar_history_button_id"],
+        CONF_NAME: f"{p} Delete Solar History",
+        CONF_DISABLED_BY_DEFAULT: False,
+        CONF_ICON: "mdi:delete-clock",
+        CONF_ENTITY_CATEGORY: ENTITY_CATEGORY_DIAGNOSTIC,
+    })
+    cg.add(btn.set_parent(var))
+    cg.add(var.set_clear_solar_history_button(btn))

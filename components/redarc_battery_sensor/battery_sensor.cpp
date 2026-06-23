@@ -17,6 +17,14 @@ void BatterySOCCalibrateButton::press_action() {
   this->parent_->send_soc_calibration_command(100);
 }
 
+void BatteryHistoryClearButton::press_action() {
+  if (this->parent_ == nullptr) return;
+  if (this->daily_)
+    this->parent_->clear_daily_soc_history();
+  else
+    this->parent_->clear_hourly_soc_history();
+}
+
 void BatteryConfigNumber::control(float value) {
   if (this->parent_ == nullptr) return;
   const uint16_t raw = (uint16_t) std::lround(value * this->raw_multiplier_);
@@ -59,6 +67,8 @@ void BatterySensorComponent::dump_config() {
   LOG_NUMBER("  ", "Low SOC Alarm", this->low_soc_alarm_number_);
   LOG_NUMBER("  ", "Low Voltage Alarm", this->low_voltage_alarm_number_);
   LOG_BUTTON("  ", "SOC Calibration", this->soc_calibration_button_);
+  LOG_BUTTON("  ", "Delete Hourly SOC History", this->clear_hourly_soc_button_);
+  LOG_BUTTON("  ", "Delete Daily SOC History", this->clear_daily_soc_button_);
   ESP_LOGCONFIG(TAG, "  SOC history poll interval: %u ms", (unsigned) this->soc_history_poll_interval_ms_);
   LOG_TEXT_SENSOR("  ", "SOC Hourly History", this->soc_hourly_history_text_sensor_);
   LOG_TEXT_SENSOR("  ", "SOC Daily Range History", this->soc_daily_range_history_text_sensor_);
@@ -89,6 +99,19 @@ void BatterySensorComponent::send_soc_calibration_command(uint8_t target_percent
   redarc_common::log_can_frame("CAN_TX", can_id, data);
   bus->send_data(can_id, true, data);
   ESP_LOGD(TAG, "Sent SOC calibration command target %u%% to SA 0x%02X", target_percent, this->source_address_);
+}
+
+void BatterySensorComponent::clear_hourly_soc_history() {
+  auto *bus = redarc_common::RedarcCanDispatcher::instance().canbus();
+  redarc_common::send_clear_history(bus, this->host_address_, 0xD0);
+  ESP_LOGI(TAG, "Sent clear hourly SOC history");
+}
+
+void BatterySensorComponent::clear_daily_soc_history() {
+  auto *bus = redarc_common::RedarcCanDispatcher::instance().canbus();
+  redarc_common::send_clear_history(bus, this->host_address_, 0xD2);  // daily low
+  redarc_common::send_clear_history(bus, this->host_address_, 0xD4);  // daily high
+  ESP_LOGI(TAG, "Sent clear daily SOC history (low + high)");
 }
 
 void BatterySensorComponent::handle_can_frame(uint32_t can_id, const std::vector<uint8_t> &data) {

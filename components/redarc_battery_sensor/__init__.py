@@ -27,6 +27,7 @@ def zero_or_positive_time_period_milliseconds(value):
 battery_sensor_ns = cg.esphome_ns.namespace("redarc_battery_sensor")
 BatterySensorComponent = battery_sensor_ns.class_("BatterySensorComponent", cg.Component)
 BatterySOCCalibrateButton = battery_sensor_ns.class_("BatterySOCCalibrateButton", button.Button)
+BatteryHistoryClearButton = battery_sensor_ns.class_("BatteryHistoryClearButton", button.Button)
 BatteryConfigNumber = battery_sensor_ns.class_("BatteryConfigNumber", number.Number)
 BatteryTypeSelect = battery_sensor_ns.class_("BatteryTypeSelect", select.Select)
 
@@ -57,6 +58,8 @@ CONFIG_SCHEMA = cv.Schema({
     cv.GenerateID("low_soc_alarm_number_id"): cv.declare_id(BatteryConfigNumber),
     cv.GenerateID("low_voltage_alarm_number_id"): cv.declare_id(BatteryConfigNumber),
     cv.GenerateID("soc_calibration_button_id"): cv.declare_id(BatterySOCCalibrateButton),
+    cv.GenerateID("clear_hourly_soc_button_id"): cv.declare_id(BatteryHistoryClearButton),
+    cv.GenerateID("clear_daily_soc_button_id"): cv.declare_id(BatteryHistoryClearButton),
     cv.GenerateID("soc_hourly_history_id"): cv.declare_id(_TextSensorClass),
     cv.GenerateID("soc_daily_range_history_id"): cv.declare_id(_TextSensorClass),
 }).extend(cv.COMPONENT_SCHEMA)
@@ -113,12 +116,12 @@ async def _make_select(config_id, name, options):
     return await select.new_select(cfg, options=options)
 
 
-async def _make_button(config_id, name):
+async def _make_button(config_id, name, icon="mdi:battery-sync"):
     cfg = {
         CONF_ID: config_id,
         CONF_NAME: name,
         CONF_DISABLED_BY_DEFAULT: False,
-        CONF_ICON: "mdi:battery-sync",
+        CONF_ICON: icon,
         CONF_ENTITY_CATEGORY: ENTITY_CATEGORY_DIAGNOSTIC,
     }
     return await button.new_button(cfg)
@@ -205,6 +208,17 @@ async def to_code(config):
     b = await _make_button(config["soc_calibration_button_id"], f"{p} Calibrate SOC Full")
     cg.add(b.set_parent(var))
     cg.add(var.set_soc_calibration_button(b))
+
+    b = await _make_button(config["clear_hourly_soc_button_id"], f"{p} Delete Hourly SOC History",
+                           icon="mdi:delete-clock")
+    cg.add(b.set_parent(var))
+    cg.add(var.set_clear_hourly_soc_button(b))
+
+    b = await _make_button(config["clear_daily_soc_button_id"], f"{p} Delete Daily SOC History",
+                           icon="mdi:delete-clock")
+    cg.add(b.set_parent(var))
+    cg.add(b.set_daily(True))
+    cg.add(var.set_clear_daily_soc_button(b))
 
     ts = await _make_text_sensor(config["soc_hourly_history_id"], f"{p} SOC Hourly History",
                                  entity_category=ENTITY_CATEGORY_DIAGNOSTIC)

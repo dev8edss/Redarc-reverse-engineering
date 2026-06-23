@@ -23,6 +23,16 @@ void Manager30SetClockButton::press_action() {
   if (this->parent_ != nullptr) this->parent_->send_set_clock();
 }
 
+void Manager30ClearSolarHistoryButton::press_action() {
+  if (this->parent_ != nullptr) this->parent_->clear_solar_history();
+}
+
+void Manager30Component::clear_solar_history() {
+  auto *bus = redarc_common::RedarcCanDispatcher::instance().canbus();
+  redarc_common::send_clear_history(bus, this->host_address_, 0xD6);
+  ESP_LOGI(TAG, "Sent clear solar history");
+}
+
 void Manager30Component::send_set_clock() {
   if (this->time_source_ == nullptr) {
     ESP_LOGW(TAG, "Set Time: no time source configured (time_id)");
@@ -77,6 +87,7 @@ void Manager30Component::dump_config() {
   LOG_SELECT("  ", "Vehicle Input Trigger", this->vehicle_input_trigger_select_);
   LOG_SELECT("  ", "Charging Mode", this->charging_mode_select_);
   LOG_BUTTON("  ", "Set Time", this->set_clock_button_);
+  LOG_BUTTON("  ", "Delete Solar History", this->clear_solar_history_button_);
   ESP_LOGCONFIG(TAG, "  Solar history poll interval: %u ms", (unsigned) this->solar_history_poll_interval_ms_);
   LOG_TEXT_SENSOR("  ", "Solar Day -1..-11 History", this->solar_day_history_text_sensor_);
 }
