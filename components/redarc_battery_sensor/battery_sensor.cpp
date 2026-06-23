@@ -75,42 +75,33 @@ void BatterySensorComponent::dump_config() {
 }
 
 void BatterySensorComponent::send_config_setting(uint8_t command, uint16_t raw_value) {
-  auto *bus = redarc_common::RedarcCanDispatcher::instance().canbus();
-  if (bus == nullptr) return;
   const std::vector<uint8_t> data = {
       command, 0x00, 0xFF, 0xFF,
       (uint8_t) (raw_value & 0xFF), (uint8_t) (raw_value >> 8),
       0x00, 0x00};
-  const uint32_t can_id = redarc_common::with_sa(0x0F00FF00UL, this->host_address_);
-  redarc_common::log_can_frame("CAN_TX", can_id, data);
-  bus->send_data(can_id, true, data);
+  redarc_common::send_command(redarc_common::with_sa(0x0F00FF00UL, this->host_address_), data);
   ESP_LOGD(TAG, "Sent battery config command 0x%02X value %u", command, raw_value);
 }
 
 void BatterySensorComponent::send_soc_calibration_command(uint8_t target_percent) {
-  auto *bus = redarc_common::RedarcCanDispatcher::instance().canbus();
-  if (bus == nullptr) return;
   const std::vector<uint8_t> data = {
       0x15, 0x00, 0x03, 0x00,
       target_percent, 0x00,
       0x00, 0x00};
   const uint32_t can_id =
       0x0F000000UL | ((uint32_t) this->source_address_ << 8) | this->host_address_;
-  redarc_common::log_can_frame("CAN_TX", can_id, data);
-  bus->send_data(can_id, true, data);
+  redarc_common::send_command(can_id, data);
   ESP_LOGD(TAG, "Sent SOC calibration command target %u%% to SA 0x%02X", target_percent, this->source_address_);
 }
 
 void BatterySensorComponent::clear_hourly_soc_history() {
-  auto *bus = redarc_common::RedarcCanDispatcher::instance().canbus();
-  redarc_common::send_clear_history(bus, this->host_address_, 0xD0);
+  redarc_common::send_clear_history(this->host_address_, 0xD0);
   ESP_LOGI(TAG, "Sent clear hourly SOC history");
 }
 
 void BatterySensorComponent::clear_daily_soc_history() {
-  auto *bus = redarc_common::RedarcCanDispatcher::instance().canbus();
-  redarc_common::send_clear_history(bus, this->host_address_, 0xD2);  // daily low
-  redarc_common::send_clear_history(bus, this->host_address_, 0xD4);  // daily high
+  redarc_common::send_clear_history(this->host_address_, 0xD2);  // daily low
+  redarc_common::send_clear_history(this->host_address_, 0xD4);  // daily high
   ESP_LOGI(TAG, "Sent clear daily SOC history (low + high)");
 }
 
@@ -213,16 +204,11 @@ void BatterySensorComponent::handle_can_frame(uint32_t can_id, const std::vector
 }
 
 void BatterySensorComponent::send_soc_history_requests_() {
-  auto *bus = redarc_common::RedarcCanDispatcher::instance().canbus();
-  if (bus == nullptr) return;
-
   // RTR frames, extended ID, DLC 8, no payload (the RTR flag suppresses data on
   // the wire). All sent back-to-back with no inter-request delay.
   const std::vector<uint8_t> rtr_dlc8(8, 0x00);
   for (uint8_t idx = 0; idx < SOC_HISTORY_REQUEST_COUNT; idx++) {
-    const uint32_t can_id = SOC_HISTORY_REQUEST_BASES[idx] | this->host_address_;
-    redarc_common::log_can_frame("CAN_TX", can_id, rtr_dlc8, true);
-    bus->send_data(can_id, true, true, rtr_dlc8);
+    redarc_common::send_command(SOC_HISTORY_REQUEST_BASES[idx] | this->host_address_, rtr_dlc8, true);
   }
 }
 

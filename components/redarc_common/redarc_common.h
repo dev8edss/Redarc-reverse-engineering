@@ -118,15 +118,22 @@ inline const char *output_status_name(uint8_t status) {
   }
 }
 
+// Transmit a CAN command on the shared bus: looks up the canbus from the
+// dispatcher, null-checks it, logs at DEBUG and sends an extended-ID frame.
+// Pass rtr=true for a remote-request (no-payload) frame.
+inline void send_command(uint32_t can_id, const std::vector<uint8_t> &data, bool rtr = false) {
+  auto *bus = RedarcCanDispatcher::instance().canbus();
+  if (bus == nullptr) return;
+  log_can_frame("CAN_TX", can_id, data, rtr);
+  bus->send_data(can_id, true, rtr, data);
+}
+
 // History-clear command (DGN 0x1FCCE; actual ID 0x1BFCCE | host). D1 selects the
 // dataset: 0xD0 hourly SOC, 0xD2 daily-low SOC, 0xD4 daily-high SOC, 0xD6 solar.
 // D2 = 0xFC marker, D3-D8 = 0xFF.
-inline void send_clear_history(canbus::Canbus *bus, uint8_t host_address, uint8_t dataset) {
-  if (bus == nullptr) return;
+inline void send_clear_history(uint8_t host_address, uint8_t dataset) {
   const std::vector<uint8_t> data = {dataset, 0xFC, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
-  const uint32_t can_id = 0x1BFCCE00UL | host_address;
-  log_can_frame("CAN_TX", can_id, data);
-  bus->send_data(can_id, true, data);
+  send_command(0x1BFCCE00UL | host_address, data);
 }
 
 }  // namespace redarc_common

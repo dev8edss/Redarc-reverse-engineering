@@ -28,8 +28,7 @@ void Manager30ClearSolarHistoryButton::press_action() {
 }
 
 void Manager30Component::clear_solar_history() {
-  auto *bus = redarc_common::RedarcCanDispatcher::instance().canbus();
-  redarc_common::send_clear_history(bus, this->host_address_, 0xD6);
+  redarc_common::send_clear_history(this->host_address_, 0xD6);
   ESP_LOGI(TAG, "Sent clear solar history");
 }
 
@@ -43,8 +42,6 @@ void Manager30Component::send_set_clock() {
     ESP_LOGW(TAG, "Set Time: time not yet synced");
     return;
   }
-  auto *bus = redarc_common::RedarcCanDispatcher::instance().canbus();
-  if (bus == nullptr) return;
   // Redarc weekday is 1=Mon..7=Sun; ESPHome day_of_week is 1=Sun..7=Sat.
   const uint8_t weekday = now.day_of_week == 1 ? 7 : (uint8_t) (now.day_of_week - 1);
   // D1=((day-1)<<3)|weekday, D2=month, D3-D4=year LE, D5=hour, D6=min, D7=sec, D8=0.
@@ -54,9 +51,7 @@ void Manager30Component::send_set_clock() {
       (uint8_t) (now.year & 0xFF), (uint8_t) ((now.year >> 8) & 0xFF),
       (uint8_t) now.hour, (uint8_t) now.minute, (uint8_t) now.second,
       0x00};
-  const uint32_t can_id = 0x0FF30400UL | this->host_address_;
-  redarc_common::log_can_frame("CAN_TX", can_id, data);
-  bus->send_data(can_id, true, data);
+  redarc_common::send_command(0x0FF30400UL | this->host_address_, data);
   ESP_LOGI(TAG, "Sent set-clock %04u-%02u-%02u %02u:%02u:%02u",
            now.year, now.month, now.day_of_month, now.hour, now.minute, now.second);
 }
@@ -93,26 +88,18 @@ void Manager30Component::dump_config() {
 }
 
 void Manager30Component::send_vehicle_input_trigger(uint16_t raw_value) {
-  auto *bus = redarc_common::RedarcCanDispatcher::instance().canbus();
-  if (bus == nullptr) return;
   const std::vector<uint8_t> data = {
       0x68, 0x00, 0xFF, 0xFF,
       (uint8_t) (raw_value & 0xFF), (uint8_t) (raw_value >> 8),
       0x00, 0x00};
-  const uint32_t can_id = redarc_common::with_sa(0x0F00FF00UL, this->host_address_);
-  redarc_common::log_can_frame("CAN_TX", can_id, data);
-  bus->send_data(can_id, true, data);
+  redarc_common::send_command(redarc_common::with_sa(0x0F00FF00UL, this->host_address_), data);
   ESP_LOGD(TAG, "Sent vehicle input trigger %u", raw_value);
 }
 
 void Manager30Component::send_charging_mode(uint8_t mode) {
   if (mode > 1) return;
-  auto *bus = redarc_common::RedarcCanDispatcher::instance().canbus();
-  if (bus == nullptr) return;
   const std::vector<uint8_t> data = {0x43, 0x00, 0xFF, 0xFF, mode, 0x00, 0x00, 0x00};
-  const uint32_t can_id = redarc_common::with_sa(0x0F00FF00UL, this->host_address_);
-  redarc_common::log_can_frame("CAN_TX", can_id, data);
-  bus->send_data(can_id, true, data);
+  redarc_common::send_command(redarc_common::with_sa(0x0F00FF00UL, this->host_address_), data);
   ESP_LOGD(TAG, "Sent charging mode %s", mode == 0 ? "Touring" : "Storage");
 }
 
@@ -304,13 +291,9 @@ void Manager30Component::publish_solar_day_history_() {
 }
 
 void Manager30Component::send_solar_history_request_() {
-  auto *bus = redarc_common::RedarcCanDispatcher::instance().canbus();
-  if (bus == nullptr) return;
-  const uint32_t can_id = 0x0FFCD600UL | this->host_address_;
   // RTR frame, extended ID, DLC 8, no payload (the RTR flag suppresses data on the wire).
   const std::vector<uint8_t> rtr_dlc8(8, 0x00);
-  redarc_common::log_can_frame("CAN_TX", can_id, rtr_dlc8, true);
-  bus->send_data(can_id, true, true, rtr_dlc8);
+  redarc_common::send_command(0x0FFCD600UL | this->host_address_, rtr_dlc8, true);
 }
 
 void Manager30Component::publish_charging_mode_(uint8_t mode) {
