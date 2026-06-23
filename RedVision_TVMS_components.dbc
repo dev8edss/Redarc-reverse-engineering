@@ -92,6 +92,7 @@ BO_ 2213677056 MGR_1F208_Solar: 8 Manager30
  SG_ SolarVoltage : 32|16@1+ (0.001,0) [0|65.535] "V" Bridge
 
 BO_ 2213676032 MGR_1F204_ACInput: 8 Manager30
+ SG_ ACInputCurrent : 0|32@1+ (0.001,-1000) [-1000|1000] "A" Bridge
  SG_ ACInputVoltage : 32|16@1+ (1,0) [0|65535] "V" Bridge
 
 BO_ 2213611520 MGR_1F108_ChargingMode: 8 Manager30
@@ -270,6 +271,8 @@ CM_ SG_ 2617036288 HistoryReservedD8 "Required constant 0xFF in confirmed clear-
 CM_ SG_ 2482045440 BatteryCurrent "Signed via offset: A = raw/1000 - 1000. Positive = charging, negative = discharging.";
 CM_ SG_ 2213677568 OutputCurrent "A = raw/1000 - 1000.";
 CM_ SG_ 2482143232 BatteryCurrentDisplay "Display rebroadcast value: A = raw/10 - 1000.";
+CM_ BO_ 2213676032 "Native Manager30 AC input. ACInputCurrent D1-D4 (raw/1000 - 1000 A, 0.001 A resolution), ACInputVoltage D5-D6 (1 V/count). Example 0x03F20401 E8 42 0F 00 EF 00 FD FF -> 0.168 A, 239 V. Preferred over the display rebroadcast 0x1F282 which is rounded to 0.1 A.";
+CM_ SG_ 2213676032 ACInputCurrent "A = raw/1000 - 1000.";
 CM_ BO_ 2213676544 "Native Manager30 vehicle input, ~10 Hz. Confirmed from capture (224 frames): current D1-D4, voltage D5-D6, mode trigger D8. Example 0x03F20601 40 42 0F 00 31 31 FC 01 -> 0.000 A, 12.593 V, trigger 0x01.";
 CM_ SG_ 2213676544 VehicleInputCurrent "Confirmed: A = raw/1000 - 1000. Constant 0 A across the capture.";
 CM_ SG_ 2213676544 VehicleInputVoltage "Confirmed: V = raw/1000. Ranged 12.552-12.629 V across the capture.";

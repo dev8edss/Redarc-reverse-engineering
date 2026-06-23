@@ -240,10 +240,15 @@ void Manager30Component::handle_can_frame(uint32_t can_id, const std::vector<uin
     return;
   }
 
+  // AC input current: D1-D4 little-endian, raw/1000 - 1000 A.
   // AC input voltage: D5-D6 little-endian, 1 V/count.
   if (redarc_common::rvc_matches(can_id, 0x1F204UL, this->source_address_)) {
     if (now - this->last_ac_ms_ < this->filter_interval_ms_) return;
     this->last_ac_ms_ = now;
+    if (this->ac_input_current_sensor_ != nullptr) {
+      this->ac_input_current_sensor_->publish_state(
+          redarc_common::current_32_centered(redarc_common::u32_le(data, 0)));
+    }
     if (this->ac_input_voltage_sensor_ != nullptr) {
       this->ac_input_voltage_sensor_->publish_state((float) redarc_common::u16_le(data, 4));
     }

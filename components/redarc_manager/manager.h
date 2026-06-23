@@ -72,6 +72,7 @@ class Manager30Component : public Component {
   void set_solar_energy_sensor(sensor::Sensor *s) { this->solar_energy_sensor_ = s; }
   void set_solar_day_history_text_sensor(text_sensor::TextSensor *s) { this->solar_day_history_text_sensor_ = s; }
   void set_solar_history_poll_interval_ms(uint32_t ms) { this->solar_history_poll_interval_ms_ = ms; }
+  void set_ac_input_current_sensor(sensor::Sensor *s) { this->ac_input_current_sensor_ = s; }
   void set_ac_input_voltage_sensor(sensor::Sensor *s) { this->ac_input_voltage_sensor_ = s; }
   void set_vehicle_input_current_sensor(sensor::Sensor *s) { this->vehicle_input_current_sensor_ = s; }
   void set_vehicle_input_voltage_sensor(sensor::Sensor *s) { this->vehicle_input_voltage_sensor_ = s; }
@@ -121,6 +122,7 @@ class Manager30Component : public Component {
   text_sensor::TextSensor *solar_day_history_text_sensor_{nullptr};
   uint32_t solar_history_poll_interval_ms_{60000};
   uint32_t last_solar_history_poll_ms_{0};
+  sensor::Sensor *ac_input_current_sensor_{nullptr};
   sensor::Sensor *ac_input_voltage_sensor_{nullptr};
   sensor::Sensor *vehicle_input_current_sensor_{nullptr};
   sensor::Sensor *vehicle_input_voltage_sensor_{nullptr};

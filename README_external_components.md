@@ -9,7 +9,7 @@ This package splits the RedVision / TVMS CAN bridge into ESPHome external compon
 | `redarc_common` | Shared CAN byte helpers, source-address helpers, and current/voltage decoding helpers. |
 | `tvms_rogue` | TVMS Rogue dimmable output lights, direct set-level and OFF commands, output level feedback, physical input/button binary sensors, input voltage, candidate input current, and tank sensors. |
 | `tvms_1280` | TVMS1280 relay output switches, inverter switch, output feedback from RedVision/display changes, tank sensors, temperature sensors, supply voltage, voltage-input diagnostic candidates, and notes for the 3 unused digital inputs. |
-| `manager30` | Manager30 output current, battery voltage, source-derived device current, solar current/voltage/power, solar Wh/yield, AC input voltage, charging mode select, and charging stage text. |
+| `manager30` | Manager30 output current, battery voltage, source-derived device current, solar current/voltage/power, solar Wh/yield, AC input current/voltage, charging mode select, and charging stage text. |
 | `battery_sensor` | Battery shunt current, voltage, SOC, and temperature. |
 | `redvision_display` | RedVision display/rebroadcast current values for display/source comparison. |
 
@@ -284,6 +284,7 @@ Current voltage-input interpretation:
 |---|---:|---|
 | Output/load current and Manager battery voltage | `0x03F20A01` | Current `D1-D4 raw/1000-1000`; voltage `D5-D6 * 0.001 V` |
 | Solar current/voltage/power source | `0x03F20801` | Solar current and voltage decode; ESPHome publishes exact live power as current × voltage |
+| AC input current | `0x03F20401` | `D1-D4` little-endian, `raw/1000 - 1000 A` (0.001 A resolution); preferred over the display rebroadcast `0x1F282` which is rounded to 0.1 A |
 | AC input voltage | `0x03F20401` | `D5-D6` little-endian, `1 V/count`; confirmed mains/240 V style signal |
 | Solar energy/yield | `0x03FCD601` | Decode only when `D1 == 0x00`; `D2-D5` little-endian uint32 = Wh; capture showed `14 -> 19 Wh` |
 | Charging mode status | `0x03F10801` | `D1 bit0`: `0=Touring`, `1=Storage`; preferred status source |

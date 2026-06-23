@@ -245,6 +245,7 @@ Listens to the manager's status frames and publishes:
 | Solar Current / Voltage / Power | sensors A/V/W | `0x1F208` | power = I × V (computed) |
 | **Solar Energy** | sensor Wh | `0x1FCD6` | total of the 12 daily Wh buckets (today + −1..−11) |
 | Solar Day -1..-11 History | text *(diagnostic)* | `0x1FCD6` | CSV of the previous 11 days' Wh (255 = unknown) |
+| AC Input Current | sensor A | `0x1F204` | D1-D4 centred (raw/1000 − 1000), 0.001 A resolution |
 | AC Input Voltage | sensor V | `0x1F204` | D5-D6 |
 | Vehicle Input Current / Voltage | sensors A/V | `0x1F206` | D1-D4 current (centred), D5-D6 voltage × 0.001 |
 | Vehicle Input Trigger | **select** | `0x1F206` / cmd | Auto/12V/24V/Ignition/On (writable) |
@@ -387,6 +388,7 @@ Rogue buttons   : 0x1BFD0030   <base> <b1..b7>     (00=inactive,01=active; D1=0x
 |---|---:|---:|---:|---|---|---|---|
 | Manager30 `0x01` | `0x03F20A01` | `0x1F20A` | — | Output Current A | D1-D4 | raw/1000−1000 | CONFIRMED |
 | Manager30 `0x01` | `0x03F20A01` | `0x1F20A` | — | Battery Voltage | D5-D6 | raw×0.001 V | CONFIRMED |
+| Manager30 `0x01` | `0x03F20401` | `0x1F204` | — | AC Input Current A | D1-D4 | raw/1000−1000 (LE) | CONFIRMED |
 | Manager30 `0x01` | `0x03F20401` | `0x1F204` | — | AC Input Voltage | D5-D6 | raw V (LE) | CONFIRMED |
 | Manager30 `0x01` | `0x03F20401` | `0x1F204` | — | DC Input Voltage Raw | D7-D8 | signed raw | UNCONFIRMED |
 | Manager30 `0x01` | `0x03F20801` | `0x1F208` | — | Solar Current A | D1-D4 | raw/1000−1000 | CONFIRMED (verify DBC export) |

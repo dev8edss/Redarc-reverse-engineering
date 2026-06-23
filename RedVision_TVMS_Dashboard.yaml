@@ -91,6 +91,9 @@ cards:
       - entity: sensor.redvision_can_bridge_manager30_ac_input_voltage
         name: AC Input Voltage
         icon: mdi:power-plug
+      - entity: sensor.redvision_can_bridge_manager30_ac_input_current
+        name: AC Input Current
+        icon: mdi:current-ac
       - entity: sensor.redvision_can_bridge_manager30_vehicle_input_voltage
         name: Vehicle Input Voltage
         icon: mdi:car-electric
