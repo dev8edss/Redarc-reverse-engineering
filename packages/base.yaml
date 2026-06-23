@@ -55,7 +55,7 @@ external_components:
 redarc_common:
   canbus_id: rv_can
   host_address: ${host_address}
-  discovery_delay: 1500ms
+  discovery_delay: 60s
 
 canbus:
   - platform: esp32_can
