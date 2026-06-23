@@ -56,11 +56,6 @@ class BatterySensorComponent : public Component {
   void set_voltage_sensor(sensor::Sensor *s) { this->voltage_sensor_ = s; }
   void set_temperature_sensor(sensor::Sensor *s) { this->temperature_sensor_ = s; }
   void set_soc_sensor(sensor::Sensor *s) { this->soc_sensor_ = s; }
-  void set_battery_type_sensor(sensor::Sensor *s) { this->battery_type_sensor_ = s; }
-  void set_configured_capacity_sensor(sensor::Sensor *s) { this->configured_capacity_sensor_ = s; }
-  void set_max_charge_current_sensor(sensor::Sensor *s) { this->max_charge_current_sensor_ = s; }
-  void set_low_soc_alarm_sensor(sensor::Sensor *s) { this->low_soc_alarm_sensor_ = s; }
-  void set_low_voltage_alarm_sensor(sensor::Sensor *s) { this->low_voltage_alarm_sensor_ = s; }
   void set_last_soc_calibration_target_sensor(sensor::Sensor *s) { this->last_soc_calibration_target_sensor_ = s; }
   void set_battery_type_select(BatteryTypeSelect *s) { this->battery_type_select_ = s; }
   void set_configured_capacity_number(number::Number *n) { this->configured_capacity_number_ = n; }
@@ -101,11 +96,6 @@ class BatterySensorComponent : public Component {
   sensor::Sensor *voltage_sensor_{nullptr};
   sensor::Sensor *temperature_sensor_{nullptr};
   sensor::Sensor *soc_sensor_{nullptr};
-  sensor::Sensor *battery_type_sensor_{nullptr};
-  sensor::Sensor *configured_capacity_sensor_{nullptr};
-  sensor::Sensor *max_charge_current_sensor_{nullptr};
-  sensor::Sensor *low_soc_alarm_sensor_{nullptr};
-  sensor::Sensor *low_voltage_alarm_sensor_{nullptr};
   sensor::Sensor *last_soc_calibration_target_sensor_{nullptr};
   BatteryTypeSelect *battery_type_select_{nullptr};
   number::Number *configured_capacity_number_{nullptr};

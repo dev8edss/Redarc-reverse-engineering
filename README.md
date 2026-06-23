@@ -245,7 +245,7 @@ Listens to the manager's status frames and publishes:
 | **Solar Energy** | sensor Wh | `0x1FCD6` | total of the 12 daily Wh buckets (today + −1..−11) |
 | Solar Day -1..-11 History | text *(diagnostic)* | `0x1FCD6` | CSV of the previous 11 days' Wh (255 = unknown) |
 | AC Input Voltage | sensor V | `0x1F204` | D5-D6 |
-| Vehicle Input Trigger | sensor + **select** | `0x1F206` / cmd | select writes Auto/12V/24V/Ignition/On |
+| Vehicle Input Trigger | **select** | `0x1F206` / cmd | Auto/12V/24V/Ignition/On (writable) |
 | Charging Mode | **select** | `0x1F108` / cmd | Touring / Storage (writable) |
 | Charging Stage | text | `0x1F200` | Not Charging / Soft-start / Boost / Absorption / Float / Maintenance |
 | CAN Date / Time / Date Time | text | `0x1F304` | bus clock |
@@ -265,11 +265,11 @@ Writable entities (the two **selects**) build a command frame from the
 |---|---|---|---|
 | Current / Voltage / Temperature | sensors | `0x1F102` | core shunt data |
 | SOC | sensor % | `0x1F104` | state of charge (force-updated) |
-| Battery Type | sensor + **select** | `0x1F100` / cmd | Gel/AGM/LeadAcid/Calcium/Lithium |
-| Configured Capacity | sensor + **number** | `0x1F100` / cmd `0x12` | Ah, writable |
-| Max Charge Current | sensor + **number** | `0x1F100` / cmd `0x14` | A, writable |
-| Low SOC Alarm | sensor + **number** | `0x1F10A` / cmd `0x41` | %, writable |
-| Low Voltage Alarm | sensor + **number** | `0x1F10A` / cmd `0x42` | V, writable |
+| Battery Type | **select** | `0x1F100` / cmd | Gel/AGM/LeadAcid/Calcium/Lithium |
+| Configured Capacity | **number** | `0x1F100` / cmd `0x12` | Ah, writable |
+| Max Charge Current | **number** | `0x1F100` / cmd `0x14` | A, writable |
+| Low SOC Alarm | **number** | `0x1F10A` / cmd `0x41` | %, writable |
+| Low Voltage Alarm | **number** | `0x1F10A` / cmd `0x42` | V, writable |
 | Last SOC Calibration Target | sensor *(diagnostic)* | `0x...` | last calibrate value |
 | SOC Hourly History | text *(diagnostic)* | `0x13FCD0` pages | CSV of the last 24 h of SOC % |
 | SOC Daily Range History | text *(diagnostic)* | `0x13FCD2`/`0x13FCD4` pages | CSV of daily `low-high` SOC % pairs |

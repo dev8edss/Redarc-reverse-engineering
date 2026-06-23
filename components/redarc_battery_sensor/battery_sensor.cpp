@@ -52,11 +52,6 @@ void BatterySensorComponent::loop() {
 
 void BatterySensorComponent::dump_config() {
   ESP_LOGCONFIG(TAG, "Battery Sensor SA 0x%02X", this->source_address_);
-  LOG_SENSOR("  ", "Battery Type", this->battery_type_sensor_);
-  LOG_SENSOR("  ", "Configured Capacity", this->configured_capacity_sensor_);
-  LOG_SENSOR("  ", "Max Charge Current", this->max_charge_current_sensor_);
-  LOG_SENSOR("  ", "Low SOC Alarm", this->low_soc_alarm_sensor_);
-  LOG_SENSOR("  ", "Low Voltage Alarm", this->low_voltage_alarm_sensor_);
   LOG_SENSOR("  ", "Last SOC Calibration Target", this->last_soc_calibration_target_sensor_);
   LOG_SELECT("  ", "Battery Type", this->battery_type_select_);
   LOG_NUMBER("  ", "Configured Capacity", this->configured_capacity_number_);
@@ -107,15 +102,12 @@ void BatterySensorComponent::handle_can_frame(uint32_t can_id, const std::vector
     const uint16_t raw = redarc_common::u16_le(data, 4);
     switch (data[0]) {
       case 0x12:
-        if (this->configured_capacity_sensor_ != nullptr) this->configured_capacity_sensor_->publish_state((float) raw);
         if (this->configured_capacity_number_ != nullptr) this->configured_capacity_number_->publish_state((float) raw);
         break;
       case 0x11:
-        if (this->battery_type_sensor_ != nullptr) this->battery_type_sensor_->publish_state((float) raw);
         if (this->battery_type_select_ != nullptr && raw <= 4) this->battery_type_select_->publish_state((size_t) raw);
         break;
       case 0x14:
-        if (this->max_charge_current_sensor_ != nullptr) this->max_charge_current_sensor_->publish_state((float) raw);
         if (this->max_charge_current_number_ != nullptr) this->max_charge_current_number_->publish_state((float) raw);
         break;
       case 0x15:
@@ -123,11 +115,9 @@ void BatterySensorComponent::handle_can_frame(uint32_t can_id, const std::vector
           this->last_soc_calibration_target_sensor_->publish_state((float) raw);
         break;
       case 0x41:
-        if (this->low_soc_alarm_sensor_ != nullptr) this->low_soc_alarm_sensor_->publish_state((float) raw);
         if (this->low_soc_alarm_number_ != nullptr) this->low_soc_alarm_number_->publish_state((float) raw);
         break;
       case 0x42:
-        if (this->low_voltage_alarm_sensor_ != nullptr) this->low_voltage_alarm_sensor_->publish_state((float) raw * 0.001f);
         if (this->low_voltage_alarm_number_ != nullptr) this->low_voltage_alarm_number_->publish_state((float) raw * 0.001f);
         break;
       default:
@@ -147,20 +137,11 @@ void BatterySensorComponent::handle_can_frame(uint32_t can_id, const std::vector
     const uint32_t now = millis();
     if (now - this->last_capacity_ms_ >= this->filter_interval_ms_) {
       this->last_capacity_ms_ = now;
-      if (this->battery_type_sensor_ != nullptr && data[0] <= 0x04) {
-        this->battery_type_sensor_->publish_state((float) data[0]);
-      }
       if (this->battery_type_select_ != nullptr && data[0] <= 0x04) {
         this->battery_type_select_->publish_state((size_t) data[0]);
       }
-      if (this->configured_capacity_sensor_ != nullptr) {
-        this->configured_capacity_sensor_->publish_state((float) redarc_common::u16_le(data, 1));
-      }
       if (this->configured_capacity_number_ != nullptr) {
         this->configured_capacity_number_->publish_state((float) redarc_common::u16_le(data, 1));
-      }
-      if (this->max_charge_current_sensor_ != nullptr && data[4] != 0xFF) {
-        this->max_charge_current_sensor_->publish_state((float) data[4]);
       }
       if (this->max_charge_current_number_ != nullptr && data[4] != 0xFF) {
         this->max_charge_current_number_->publish_state((float) data[4]);
@@ -173,16 +154,10 @@ void BatterySensorComponent::handle_can_frame(uint32_t can_id, const std::vector
     const uint32_t now = millis();
     if (now - this->last_alarm_report_ms_ >= this->filter_interval_ms_) {
       this->last_alarm_report_ms_ = now;
-      if (this->low_soc_alarm_sensor_ != nullptr && data[1] != 0xFF) {
-        this->low_soc_alarm_sensor_->publish_state((float) data[1]);
-      }
       if (this->low_soc_alarm_number_ != nullptr && data[1] != 0xFF) {
         this->low_soc_alarm_number_->publish_state((float) data[1]);
       }
       const uint16_t raw_low_voltage = redarc_common::u16_le(data, 2);
-      if (this->low_voltage_alarm_sensor_ != nullptr && raw_low_voltage != 0xFFFF) {
-        this->low_voltage_alarm_sensor_->publish_state((float) raw_low_voltage * 0.001f);
-      }
       if (this->low_voltage_alarm_number_ != nullptr && raw_low_voltage != 0xFFFF) {
         this->low_voltage_alarm_number_->publish_state((float) raw_low_voltage * 0.001f);
       }

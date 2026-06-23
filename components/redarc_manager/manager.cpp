@@ -36,7 +36,6 @@ void Manager30Component::loop() {
 
 void Manager30Component::dump_config() {
   ESP_LOGCONFIG(TAG, "Manager30 SA 0x%02X", this->source_address_);
-  LOG_SENSOR("  ", "Vehicle Input Trigger", this->vehicle_input_trigger_sensor_);
   LOG_TEXT_SENSOR("  ", "CAN Date", this->clock_date_text_sensor_);
   LOG_TEXT_SENSOR("  ", "CAN Time", this->clock_time_text_sensor_);
   LOG_TEXT_SENSOR("  ", "CAN Date Time", this->clock_datetime_text_sensor_);
@@ -80,7 +79,6 @@ void Manager30Component::handle_can_frame(uint32_t can_id, const std::vector<uin
   if (can_id == (0x0F000000UL | ((uint32_t) this->source_address_ << 8) | this->host_address_) &&
       data[0] == 0x68 && data[2] == 0x03) {
     const uint16_t raw = redarc_common::u16_le(data, 4);
-    if (this->vehicle_input_trigger_sensor_ != nullptr) this->vehicle_input_trigger_sensor_->publish_state((float) raw);
     if (this->vehicle_input_trigger_select_ != nullptr) {
       if (raw <= 3) this->vehicle_input_trigger_select_->publish_state((size_t) raw);
       else if (raw == 5) this->vehicle_input_trigger_select_->publish_state((size_t) 4);
@@ -91,7 +89,6 @@ void Manager30Component::handle_can_frame(uint32_t can_id, const std::vector<uin
   if (can_id == redarc_common::with_sa(0x0F00FF00UL, this->host_address_) &&
       data[0] == 0x68 && data[2] == 0xFF && data[3] == 0xFF) {
     const uint16_t raw = redarc_common::u16_le(data, 4);
-    if (this->vehicle_input_trigger_sensor_ != nullptr) this->vehicle_input_trigger_sensor_->publish_state((float) raw);
     if (this->vehicle_input_trigger_select_ != nullptr) {
       if (raw <= 3) this->vehicle_input_trigger_select_->publish_state((size_t) raw);
       else if (raw == 5) this->vehicle_input_trigger_select_->publish_state((size_t) 4);
@@ -124,8 +121,6 @@ void Manager30Component::handle_can_frame(uint32_t can_id, const std::vector<uin
   if (redarc_common::rvc_matches(can_id, 0x1F206UL, this->source_address_)) {
     if (now - this->last_charger_status_ms_ < this->filter_interval_ms_) return;
     this->last_charger_status_ms_ = now;
-    if (this->vehicle_input_trigger_sensor_ != nullptr && data[7] != 0xFF)
-      this->vehicle_input_trigger_sensor_->publish_state((float) data[7]);
     if (this->vehicle_input_trigger_select_ != nullptr && data[7] != 0xFF) {
       if (data[7] <= 3) this->vehicle_input_trigger_select_->publish_state((size_t) data[7]);
       else if (data[7] == 5) this->vehicle_input_trigger_select_->publish_state((size_t) 4);
