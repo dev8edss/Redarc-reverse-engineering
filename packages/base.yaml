@@ -13,6 +13,11 @@ logger:
   # Raw CAN debug logging can be very high volume; use API logging instead of
   # UART so DEBUG boots do not overflow the ESP-IDF UART ringbuffer.
   baud_rate: ${logger_baud_rate}
+  logs:
+    # Silence the built-in canbus "received can message" DEBUG line; the
+    # redarc_common dispatcher already logs every frame at DEBUG with
+    # id/dgn/sa/rtr/dlc/data, so the canbus line is redundant noise.
+    canbus: INFO
 
 api:
   encryption:
