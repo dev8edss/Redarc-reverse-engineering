@@ -53,6 +53,7 @@ redarc_manager:
   filter_interval: ${sensor_average_interval}
   solar_history_poll_interval: ${history_poll_interval}
   battery_sensor_id: Battery
+  time_id: ha_time
 
 # Multiple redvision displays are supported — add entries as needed.
 redarc_redvision_display:

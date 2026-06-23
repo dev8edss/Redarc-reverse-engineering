@@ -119,7 +119,7 @@ async def _make_button(config_id, name):
         CONF_NAME: name,
         CONF_DISABLED_BY_DEFAULT: False,
         CONF_ICON: "mdi:battery-sync",
-        CONF_ENTITY_CATEGORY: ENTITY_CATEGORY_NONE,
+        CONF_ENTITY_CATEGORY: ENTITY_CATEGORY_DIAGNOSTIC,
     }
     return await button.new_button(cfg)
 

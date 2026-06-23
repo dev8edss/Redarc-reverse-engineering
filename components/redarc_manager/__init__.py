@@ -1,6 +1,6 @@
 import esphome.codegen as cg
 import esphome.config_validation as cv
-from esphome.components import select, sensor, text_sensor
+from esphome.components import button, select, sensor, text_sensor, time
 from esphome.const import (
     CONF_ACCURACY_DECIMALS, CONF_DEVICE_CLASS, CONF_DISABLED_BY_DEFAULT,
     CONF_ENTITY_CATEGORY, CONF_FORCE_UPDATE, CONF_ICON, CONF_ID, CONF_NAME,
@@ -10,7 +10,7 @@ from esphome.const import (
 )
 
 CODEOWNERS = ["@dev8edss"]
-AUTO_LOAD = ["select", "sensor", "text_sensor", "redarc_common"]
+AUTO_LOAD = ["button", "select", "sensor", "text_sensor", "redarc_common"]
 MULTI_CONF = False
 
 CONF_SOURCE_ADDRESS = "source_address"
@@ -18,6 +18,7 @@ CONF_HOST_ADDRESS = "host_address"
 CONF_FILTER_INTERVAL = "filter_interval"
 CONF_BATTERY_SENSOR = "battery_sensor_id"
 CONF_SOLAR_HISTORY_POLL_INTERVAL = "solar_history_poll_interval"
+CONF_TIME_ID = "time_id"
 
 
 def zero_or_positive_time_period_milliseconds(value):
@@ -29,6 +30,7 @@ manager30_ns = cg.esphome_ns.namespace("redarc_manager")
 Manager30Component = manager30_ns.class_("Manager30Component", cg.Component)
 VehicleInputTriggerSelect = manager30_ns.class_("VehicleInputTriggerSelect", select.Select)
 ChargingModeSelect = manager30_ns.class_("ChargingModeSelect", select.Select)
+Manager30SetClockButton = manager30_ns.class_("Manager30SetClockButton", button.Button)
 
 _battery_sensor_ns = cg.esphome_ns.namespace("redarc_battery_sensor")
 _BatterySensorComponent = _battery_sensor_ns.class_("BatterySensorComponent", cg.Component)
@@ -51,6 +53,8 @@ CONFIG_SCHEMA = cv.Schema({
     cv.Optional(CONF_FILTER_INTERVAL, default="5s"): cv.positive_time_period_milliseconds,
     cv.Optional(CONF_SOLAR_HISTORY_POLL_INTERVAL, default="60s"): zero_or_positive_time_period_milliseconds,
     cv.Optional(CONF_BATTERY_SENSOR): cv.use_id(_BatterySensorComponent),
+    cv.Optional(CONF_TIME_ID): cv.use_id(time.RealTimeClock),
+    cv.GenerateID("set_clock_button_id"): cv.declare_id(Manager30SetClockButton),
     cv.GenerateID("output_current_id"): cv.declare_id(_SensorClass),
     cv.GenerateID("battery_voltage_id"): cv.declare_id(_SensorClass),
     cv.GenerateID("source_device_current_id"): cv.declare_id(_SensorClass),
@@ -205,3 +209,17 @@ async def to_code(config):
                              ["Touring", "Storage"])
     cg.add(sel.set_parent(var))
     cg.add(var.set_charging_mode_select(sel))
+
+    if CONF_TIME_ID in config:
+        t = await cg.get_variable(config[CONF_TIME_ID])
+        cg.add(var.set_time_source(t))
+
+    btn = await button.new_button({
+        CONF_ID: config["set_clock_button_id"],
+        CONF_NAME: f"{p} Set Time",
+        CONF_DISABLED_BY_DEFAULT: False,
+        CONF_ICON: "mdi:clock-edit",
+        CONF_ENTITY_CATEGORY: ENTITY_CATEGORY_DIAGNOSTIC,
+    })
+    cg.add(btn.set_parent(var))
+    cg.add(var.set_set_clock_button(btn))

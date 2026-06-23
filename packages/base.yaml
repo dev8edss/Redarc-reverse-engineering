@@ -33,6 +33,11 @@ wifi:
 
 captive_portal:
 
+# Time source for the Manager30 "Set Time" button (syncs the RedVision clock).
+time:
+  - platform: homeassistant
+    id: ha_time
+
 external_components:
   - source:
       type: git

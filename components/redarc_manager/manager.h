@@ -1,9 +1,11 @@
 #pragma once
 #include "esphome/core/component.h"
 #include "esphome/core/log.h"
+#include "esphome/components/button/button.h"
 #include "esphome/components/select/select.h"
 #include "esphome/components/sensor/sensor.h"
 #include "esphome/components/text_sensor/text_sensor.h"
+#include "esphome/components/time/real_time_clock.h"
 #include "esphome/components/redarc_battery_sensor/battery_sensor.h"
 #include "esphome/components/redarc_common/redarc_common.h"
 #include <array>
@@ -32,12 +34,24 @@ class ChargingModeSelect : public select::Select {
   Manager30Component *parent_{nullptr};
 };
 
+class Manager30SetClockButton : public button::Button {
+ public:
+  void set_parent(Manager30Component *parent) { this->parent_ = parent; }
+
+ protected:
+  void press_action() override;
+  Manager30Component *parent_{nullptr};
+};
+
 class Manager30Component : public Component {
  public:
   void set_source_address(uint8_t source_address) { this->source_address_ = source_address; }
   void set_host_address(uint8_t host_address) { this->host_address_ = host_address; }
   void set_filter_interval_ms(uint32_t ms) { this->filter_interval_ms_ = ms; }
   void set_battery_sensor(redarc_battery_sensor::BatterySensorComponent *b) { this->battery_sensor_ = b; }
+  void set_time_source(time::RealTimeClock *t) { this->time_source_ = t; }
+  void set_set_clock_button(Manager30SetClockButton *b) { this->set_clock_button_ = b; }
+  void send_set_clock();
   void set_output_current_sensor(sensor::Sensor *s) { this->output_current_sensor_ = s; }
   void set_battery_voltage_sensor(sensor::Sensor *s) { this->battery_voltage_sensor_ = s; }
   void set_source_device_current_sensor(sensor::Sensor *s) { this->source_device_current_sensor_ = s; }
@@ -105,6 +119,8 @@ class Manager30Component : public Component {
   text_sensor::TextSensor *charging_stage_text_sensor_{nullptr};
   VehicleInputTriggerSelect *vehicle_input_trigger_select_{nullptr};
   ChargingModeSelect *charging_mode_select_{nullptr};
+  time::RealTimeClock *time_source_{nullptr};
+  Manager30SetClockButton *set_clock_button_{nullptr};
 };
 
 }  // namespace redarc_manager

@@ -19,6 +19,38 @@ void ChargingModeSelect::control(size_t index) {
   this->publish_state(index);
 }
 
+void Manager30SetClockButton::press_action() {
+  if (this->parent_ != nullptr) this->parent_->send_set_clock();
+}
+
+void Manager30Component::send_set_clock() {
+  if (this->time_source_ == nullptr) {
+    ESP_LOGW(TAG, "Set Time: no time source configured (time_id)");
+    return;
+  }
+  auto now = this->time_source_->now();
+  if (!now.is_valid()) {
+    ESP_LOGW(TAG, "Set Time: time not yet synced");
+    return;
+  }
+  auto *bus = redarc_common::RedarcCanDispatcher::instance().canbus();
+  if (bus == nullptr) return;
+  // Redarc weekday is 1=Mon..7=Sun; ESPHome day_of_week is 1=Sun..7=Sat.
+  const uint8_t weekday = now.day_of_week == 1 ? 7 : (uint8_t) (now.day_of_week - 1);
+  // D1=((day-1)<<3)|weekday, D2=month, D3-D4=year LE, D5=hour, D6=min, D7=sec, D8=0.
+  const std::vector<uint8_t> data = {
+      (uint8_t) (((now.day_of_month - 1) << 3) | (weekday & 0x07)),
+      (uint8_t) now.month,
+      (uint8_t) (now.year & 0xFF), (uint8_t) ((now.year >> 8) & 0xFF),
+      (uint8_t) now.hour, (uint8_t) now.minute, (uint8_t) now.second,
+      0x00};
+  const uint32_t can_id = 0x0FF30400UL | this->host_address_;
+  redarc_common::log_can_frame("CAN_TX", can_id, data);
+  bus->send_data(can_id, true, data);
+  ESP_LOGI(TAG, "Sent set-clock %04u-%02u-%02u %02u:%02u:%02u",
+           now.year, now.month, now.day_of_month, now.hour, now.minute, now.second);
+}
+
 void Manager30Component::setup() {
   redarc_common::RedarcCanDispatcher::instance().add_listener(
       [this](uint32_t id, const std::vector<uint8_t> &data) { this->handle_can_frame(id, data); });
@@ -44,6 +76,7 @@ void Manager30Component::dump_config() {
   LOG_SENSOR("  ", "Vehicle Input Voltage", this->vehicle_input_voltage_sensor_);
   LOG_SELECT("  ", "Vehicle Input Trigger", this->vehicle_input_trigger_select_);
   LOG_SELECT("  ", "Charging Mode", this->charging_mode_select_);
+  LOG_BUTTON("  ", "Set Time", this->set_clock_button_);
   ESP_LOGCONFIG(TAG, "  Solar history poll interval: %u ms", (unsigned) this->solar_history_poll_interval_ms_);
   LOG_TEXT_SENSOR("  ", "Solar Day -1..-11 History", this->solar_day_history_text_sensor_);
 }
