@@ -287,7 +287,7 @@ Current voltage-input interpretation:
 | AC input voltage | `0x03F20401` | `D5-D6` little-endian, `1 V/count`; confirmed mains/240 V style signal |
 | Solar energy/yield | `0x03FCD601` | Decode only when `D1 == 0x00`; `D2-D5` little-endian uint32 = Wh; capture showed `14 -> 19 Wh` |
 | Charging mode status | `0x03F10801` | `D1 bit0`: `0=Touring`, `1=Storage`; preferred status source |
-| Charging stage/status | `0x03F20001` | `D1` base = `D1 & 0xFE`: `0x00=Not Charging`, `0x10=Desulphation`, `0x20=Soft-start`, `0x30=Boost`, `0x40=Absorption`, `0x50=Battery Test`, `0x60=Equalize`, `0x70=Float`, `0x80=Maintenance`; low bit 1 means Storage mode |
+| Charging stage/status | `0x03F20001` | Stage `= D1 & 0xFE`: `0x00=Not Charging`, `0x10=Desulphation`, `0x20=Soft-start`, `0x30=Boost`, `0x40=Absorption`, `0x50=Battery Test`, `0x60=Equalize`, `0x70=Float`, `0x80=Maintenance`. `D1 bit0` = mode (`0=Touring`, `1=Storage`), used as a fallback mode source when `0x1F108` has not been seen |
 | Charging mode command | `0x0F00FF20` | RedVision/source `0x20`, `43 00 FF FF <mode> 00 00 00`; `<mode>` is `0x00=Touring`, `0x01=Storage` |
 | Charge-cycle request candidate | `0x0F00FF20` | `4D 00 FF FF 01 00 00 00`; likely force boost / restart charge cycle, kept candidate until more tests |
 
