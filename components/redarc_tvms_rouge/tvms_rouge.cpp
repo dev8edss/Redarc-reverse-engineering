@@ -113,7 +113,7 @@ void TVMSRougeComponent::setup() {
 
 void TVMSRougeComponent::dump_config() {
   ESP_LOGCONFIG(TAG, "TVMS Rouge SA=0x%02X HA=0x%02X", this->source_address_, this->host_address_);
-  ESP_LOGCONFIG(TAG, "  Output cmd: 0x%08X  DGN: 0x1F108, 0x1FD00, 0x1FD02, 0x1FD12", this->output_command_id_);
+  ESP_LOGCONFIG(TAG, "  Output cmd: 0x%08X  DGN: 0x1FD00, 0x1FD02, 0x1FD12", this->output_command_id_);
   LOG_SENSOR("  ", "Input Voltage", this->input_voltage_sensor_);
   LOG_SWITCH("  ", "Master", this->master_switch_);
   ESP_LOGCONFIG(TAG, "  True-off threshold: %.1f%%", this->true_off_threshold_percent_);
@@ -213,11 +213,6 @@ void TVMSRougeComponent::handle_can_frame(uint32_t can_id, const std::vector<uin
     }
     return;
   }
-
-  if (redarc_common::rvc_matches(can_id, 0x1FD14UL, this->source_address_)) {
-    return;
-  }
-
 
   if (can_id == this->output_command_id_) {
     // Output command events are not throttled; they reflect requested state changes.

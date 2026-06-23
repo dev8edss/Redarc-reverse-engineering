@@ -76,10 +76,6 @@ void TVMS1280Component::handle_can_frame(uint32_t can_id, const std::vector<uint
 
   const uint32_t now = millis();
 
-  if (redarc_common::rvc_matches(can_id, 0x1F108UL, this->source_address_)) {
-    return;
-  }
-
   if (redarc_common::rvc_matches(can_id, 0x1FD02UL, this->source_address_)) {
     if (data[0] == TVMS1280_ITEM_VOLTAGE_INPUT_1) {
       if (now - this->last_mux_0x11_ms_ < this->filter_interval_ms_) return;
@@ -104,8 +100,6 @@ void TVMS1280Component::handle_can_frame(uint32_t can_id, const std::vector<uint
       this->last_mux_0x17_ms_ = now;
       if (this->tank_sensors_[3] != nullptr) this->tank_sensors_[3]->publish_state((float) data[1]);
       if (this->tank_sensors_[4] != nullptr) this->tank_sensors_[4]->publish_state((float) data[3]);
-      // DBC v50 confirmed: TVMS1280_Tank5_Percent is MUX 0x17, D6, raw percent.
-      // Earlier experimental builds used x1.25; remove that now-confirmed wrong scale.
       if (this->tank_sensors_[5] != nullptr) this->tank_sensors_[5]->publish_state((float) data[5]);
     } else if (data[0] == TVMS1280_ITEM_TANK_6) {
       if (now - this->last_mux_0x1A_ms_ < this->filter_interval_ms_) return;

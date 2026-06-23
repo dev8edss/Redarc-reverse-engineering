@@ -75,7 +75,6 @@ class Manager30Component : public Component {
   uint32_t filter_interval_ms_{5000};
   uint32_t last_current_ms_{0};
   uint32_t last_solar_ms_{0};
-  uint32_t last_solar_energy_ms_{0};
   uint32_t last_ac_ms_{0};
   uint32_t last_charger_status_ms_{0};
   uint32_t last_manager_status_ms_{0};

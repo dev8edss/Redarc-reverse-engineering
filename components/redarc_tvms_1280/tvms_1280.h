@@ -57,7 +57,6 @@ class TVMS1280Component : public Component {
   uint8_t source_address_{0x24};
   uint8_t host_address_{0x20};
   uint32_t filter_interval_ms_{5000};
-  uint32_t last_input_status_ms_{0};
   uint32_t last_mux_0x11_ms_{0};
   uint32_t last_mux_0x14_ms_{0};
   uint32_t last_mux_0x17_ms_{0};

@@ -133,13 +133,11 @@ void Manager30Component::handle_can_frame(uint32_t can_id, const std::vector<uin
     this->last_clock_ms_ = now;
     const uint8_t raw_day_flags = data[0];
     const uint8_t day = (raw_day_flags >> 3) + 1U;
-    const uint8_t flags = raw_day_flags & 0x07U;
     const uint8_t month = data[1];
     const uint16_t year = redarc_common::u16_le(data, 2);
     const uint8_t hour = data[4];
     const uint8_t minute = data[5];
     const uint8_t second = data[6];
-    (void) flags;
     if (year >= 2000 && year <= 2100 && month >= 1 && month <= 12 && day >= 1 && day <= 31 &&
         hour <= 23 && minute <= 59 && second <= 59) {
       char date[11];
@@ -200,13 +198,11 @@ void Manager30Component::handle_can_frame(uint32_t can_id, const std::vector<uin
       const uint8_t offset = 1U + slot * 2U;
       this->publish_solar_daily_energy_(day, redarc_common::u16_le(data, offset));
     }
-    this->last_solar_energy_ms_ = now;
     this->publish_solar_energy_total_();
     return;
   }
 
-  // DBC confirmed PGN_03F204_Manager30_AC_DC_Voltage_Candidates:
-  // AC_Input_Voltage is D5-D6 little-endian, scale 1 V/count.
+  // AC input voltage: D5-D6 little-endian, 1 V/count.
   if (redarc_common::rvc_matches(can_id, 0x1F204UL, this->source_address_)) {
     if (now - this->last_ac_ms_ < this->filter_interval_ms_) return;
     this->last_ac_ms_ = now;
