@@ -10,8 +10,6 @@
 namespace esphome {
 namespace redarc_common {
 
-static const uint32_t REDVISION_HEARTBEAT_INTERVAL_MS = 0;
-
 inline void log_can_frame(const char *direction, uint32_t can_id, const std::vector<uint8_t> &data, bool rtr = false) {
 #if ESPHOME_LOG_LEVEL >= ESPHOME_LOG_LEVEL_DEBUG
   const uint32_t rvc_id = can_id & 0x1FFFFFFFUL;
@@ -68,7 +66,6 @@ class RedarcCommonComponent : public Component {
   }
   void loop() override {
     if (!RedarcCanDispatcher::instance().address_claim_sent()) this->send_address_claim_();
-    this->send_heartbeat_();
   }
   float get_setup_priority() const override { return setup_priority::BUS; }
  protected:
@@ -82,23 +79,8 @@ class RedarcCommonComponent : public Component {
     ESP_LOGD("redarc_common", "Sent address claim for SA 0x%02X", this->host_address_);
   }
 
-  void send_heartbeat_() {
-    if (REDVISION_HEARTBEAT_INTERVAL_MS == 0) return;
-    if (!RedarcCanDispatcher::instance().address_claim_sent()) return;
-    if (this->canbus_ == nullptr) return;
-    const uint32_t now = millis();
-    if (this->last_heartbeat_ms_ != 0 && now - this->last_heartbeat_ms_ < REDVISION_HEARTBEAT_INTERVAL_MS) return;
-    this->last_heartbeat_ms_ = now;
-
-    const uint32_t can_id = 0x1BF40400UL | this->host_address_;
-    const std::vector<uint8_t> data = {0x13, 0xCA, 0x23, 0x95, 0x0E, 0x00, 0x0C, 0x02};
-    log_can_frame("CAN_TX", can_id, data);
-    this->canbus_->send_data(can_id, true, data);
-  }
-
   canbus::Canbus *canbus_{nullptr};
   uint8_t host_address_{0x22};
-  uint32_t last_heartbeat_ms_{0};
 };
 
 inline uint16_t u16_le(const std::vector<uint8_t> &data, uint8_t i) {
