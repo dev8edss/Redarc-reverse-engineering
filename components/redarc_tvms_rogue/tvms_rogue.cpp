@@ -104,7 +104,6 @@ void TVMSRogueLight::write_state(light::LightState *state) {
 
 void TVMSRogueComponent::setup() {
   for (auto &level : this->levels_) level = NAN;
-  this->output_state_.fill(0xFF);  // 0xFF = unseen, so the first frame publishes
   const uint8_t sa = this->source_address_;
   const uint8_t ha = this->host_address_;
   this->output_command_id_ = 0x0F000000UL | ((uint32_t) sa << 8) | ha;
@@ -274,20 +273,15 @@ void TVMSRogueComponent::handle_channel_status_frame_(const std::vector<uint8_t>
   // DGN 0x1FD00 is a paginated byte-state array. D1 is the base item ID and
   // D2-D8 are states for base..base+6. Status codes: 0x00 off, 0x01 on, 0x06
   // fuse blown, 0x0A over temp, 0x14/0x15 off/on override, 0xF8 unconfigured,
-  // 0xFF no-data. Only 0x00/0x01 drive button/master state; every output status
-  // feeds the Output Status text sensor and the per-output status sensors
-  // (0xF8 -> unavailable).
+  // 0xFF no-data. Only 0x00/0x01 drive button/master state; non-normal codes
+  // are summarised in the Output Status text sensor.
   const uint8_t base_channel = data[0];
   bool output_seen = false;
   for (uint8_t i = 1; i <= 7; i++) {
     const uint8_t value = data[i];
     const uint8_t channel = base_channel + i - 1;
     if (channel >= ROGUE_ITEM_OUTPUT_1 && channel <= ROGUE_ITEM_OUTPUT_10) {
-      const uint8_t idx = channel - ROGUE_ITEM_OUTPUT_1;
-      if (value != this->output_state_[idx]) {
-        this->output_state_[idx] = value;
-        this->publish_output_status_value_(idx, value);
-      }
+      this->output_state_[channel - ROGUE_ITEM_OUTPUT_1] = value;
       output_seen = true;
     }
     if (value != 0x00 && value != 0x01) continue;
@@ -298,19 +292,6 @@ void TVMSRogueComponent::handle_channel_status_frame_(const std::vector<uint8_t>
     }
   }
   if (output_seen) this->publish_output_status_();
-}
-
-void TVMSRogueComponent::publish_output_status_value_(uint8_t idx, uint8_t value) {
-  if (idx >= this->output_status_sensors_.size()) return;
-  sensor::Sensor *s = this->output_status_sensors_[idx];
-  if (s == nullptr) return;
-  // 0xF8 unconfigured / 0xFF no-data -> NaN (unavailable in HA). Otherwise the
-  // raw status code (0 off, 1 on, 6 fuse blown, 10 over temp, 20/21 override).
-  if (value == 0xF8 || value == 0xFF) {
-    s->publish_state(NAN);
-  } else {
-    s->publish_state((float) value);
-  }
 }
 
 void TVMSRogueComponent::publish_output_status_() {

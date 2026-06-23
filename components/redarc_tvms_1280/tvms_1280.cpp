@@ -27,7 +27,6 @@ void TVMS1280Component::setup() {
   const uint8_t sa = this->source_address_;
   const uint8_t ha = this->host_address_;
   this->command_id_       = 0x0F000000UL | ((uint32_t) sa << 8) | ha;
-  this->output_state_.fill(0xFF);  // 0xFF = unseen, so the first frame publishes
   redarc_common::RedarcCanDispatcher::instance().add_listener(
       [this](uint32_t id, const std::vector<uint8_t> &data) { this->handle_can_frame(id, data); });
 }
@@ -54,20 +53,6 @@ void TVMS1280Component::send_channel(uint8_t channel, bool state) {
 void TVMS1280Component::publish_output_(uint8_t output_number, bool state) {
   if (output_number > 9) return;
   if (this->output_switches_[output_number] != nullptr) this->output_switches_[output_number]->publish_state(state);
-}
-
-void TVMS1280Component::publish_output_status_value_(uint8_t idx, uint8_t value) {
-  if (idx >= this->output_status_sensors_.size()) return;
-  sensor::Sensor *s = this->output_status_sensors_[idx];
-  if (s == nullptr) return;
-  // 0xF8 unconfigured / 0xFF no-data -> NaN, which Home Assistant shows as
-  // unavailable. Otherwise publish the raw status code (0 off, 1 on, 6 fuse
-  // blown, 10 over temp, 20 off override, 21 on override).
-  if (value == 0xF8 || value == 0xFF) {
-    s->publish_state(NAN);
-  } else {
-    s->publish_state((float) value);
-  }
 }
 
 void TVMS1280Component::publish_output_status_() {
@@ -162,11 +147,7 @@ void TVMS1280Component::handle_can_frame(uint32_t can_id, const std::vector<uint
       const uint8_t value = data[i];
       const uint8_t channel = base_channel + i - 1;
       if (channel >= TVMS1280_ITEM_OUTPUT_1 && channel <= TVMS1280_ITEM_OUTPUT_10) {
-        const uint8_t idx = channel - TVMS1280_ITEM_OUTPUT_1;
-        if (value != this->output_state_[idx]) {
-          this->output_state_[idx] = value;
-          this->publish_output_status_value_(idx, value);
-        }
+        this->output_state_[channel - TVMS1280_ITEM_OUTPUT_1] = value;
         output_seen = true;
       }
       switch (value) {

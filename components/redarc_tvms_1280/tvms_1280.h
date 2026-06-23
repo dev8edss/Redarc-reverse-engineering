@@ -7,7 +7,6 @@
 #include "esphome/components/text_sensor/text_sensor.h"
 #include "esphome/components/redarc_common/redarc_common.h"
 #include <array>
-#include <cmath>
 #include <string>
 #include <vector>
 
@@ -45,7 +44,6 @@ class TVMS1280Component : public Component {
   void set_tank_sensor(uint8_t tank, sensor::Sensor *s) { if (tank >= 1 && tank <= 6) this->tank_sensors_[tank] = s; }
   void set_digital_input_sensor(uint8_t input, binary_sensor::BinarySensor *s) { if (input >= 1 && input <= 3) this->digital_input_sensors_[input] = s; }
   void set_output_status_text_sensor(text_sensor::TextSensor *s) { this->output_status_text_sensor_ = s; }
-  void set_output_status_sensor(uint8_t output, sensor::Sensor *s) { if (output < 10) this->output_status_sensors_[output] = s; }
 
   void setup() override;
   void register_output_switch(TVMS1280Switch *sw);
@@ -59,7 +57,6 @@ class TVMS1280Component : public Component {
   void publish_output_(uint8_t output_number, bool state);
   void publish_channel_(uint8_t channel, bool state);
   void publish_output_status_();
-  void publish_output_status_value_(uint8_t idx, uint8_t value);
 
   uint8_t source_address_{0x24};
   uint8_t host_address_{0x20};
@@ -80,7 +77,6 @@ class TVMS1280Component : public Component {
   std::array<sensor::Sensor *, 7> tank_sensors_{};
   std::array<binary_sensor::BinarySensor *, 4> digital_input_sensors_{};
   text_sensor::TextSensor *output_status_text_sensor_{nullptr};
-  std::array<sensor::Sensor *, 10> output_status_sensors_{};
   std::array<uint8_t, 10> output_state_{};
   std::string last_output_status_;
 };

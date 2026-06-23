@@ -74,8 +74,6 @@ _AUTO_IDS[cv.GenerateID("input_voltage_id")] = cv.declare_id(_SensorClass)
 _AUTO_IDS[cv.GenerateID("input_current_id")] = cv.declare_id(_SensorClass)
 _AUTO_IDS[cv.GenerateID("master_id")] = cv.declare_id(TVMSRogueSwitch)
 _AUTO_IDS[cv.GenerateID("output_status_id")] = cv.declare_id(_TSClass)
-for _i in range(10):
-    _AUTO_IDS[cv.GenerateID(f"output_status_{_i}_id")] = cv.declare_id(_SensorClass)
 
 CONFIG_SCHEMA = cv.Schema(
     {
@@ -149,15 +147,6 @@ async def to_code(config):
         CONF_ENTITY_CATEGORY: ENTITY_CATEGORY_DIAGNOSTIC,
     })
     cg.add(var.set_output_status_text_sensor(ts))
-
-    # Per-output status sensors (diagnostic). Value is the raw 0x1FD00 status
-    # code (0 off, 1 on, 6 fuse blown, 10 over temp, 20/21 off/on override); an
-    # unconfigured (0xF8) output publishes NaN -> unavailable in HA.
-    for i in range(10):
-        s = await _make_sensor(config[f"output_status_{i}_id"], f"{p} Output {i + 1} Status",
-                               state_class=STATE_CLASS_MEASUREMENT, decimals=0,
-                               entity_category=ENTITY_CATEGORY_DIAGNOSTIC)
-        cg.add(var.set_output_status_sensor(i, s))
 
     # Output level sensors
     for i in range(1, 11):
