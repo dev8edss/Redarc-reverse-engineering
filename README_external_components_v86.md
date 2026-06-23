@@ -7,7 +7,7 @@ This package splits the RedVision / TVMS CAN bridge into ESPHome external compon
 | Component | Purpose |
 |---|---|
 | `redarc_common` | Shared CAN byte helpers, source-address helpers, and current/voltage decoding helpers. |
-| `tvms_rouge` | TVMS Rouge dimmable output lights, direct set-level and OFF commands, output level feedback, physical input/button binary sensors, input voltage, candidate input current, and tank sensors. |
+| `tvms_rogue` | TVMS Rogue dimmable output lights, direct set-level and OFF commands, output level feedback, physical input/button binary sensors, input voltage, candidate input current, and tank sensors. |
 | `tvms_1280` | TVMS1280 relay output switches, inverter switch, output feedback from RedVision/display changes, tank sensors, temperature sensors, supply voltage, voltage-input diagnostic candidates, and notes for the 3 unused digital inputs. |
 | `manager30` | Manager30 output current, battery voltage, source-derived device current, solar current/voltage/power, solar Wh/yield, AC input voltage, charging mode select, and charging stage text. |
 | `battery_sensor` | Battery shunt current, voltage, SOC, and temperature. |
@@ -43,7 +43,7 @@ external_components:
       ref: main
     components:
       - redarc_common
-      - tvms_rouge
+      - tvms_rogue
       - tvms_1280
       - manager30
       - battery_sensor
@@ -61,7 +61,7 @@ external_components:
     refresh: 0s
     components:
       - redarc_common
-      - tvms_rouge
+      - tvms_rogue
       - tvms_1280
       - manager30
       - battery_sensor
@@ -78,7 +78,7 @@ rm -rf /data/external_components/*
 
 ## CAN bus setup
 
-Current control-capable YAML uses `NORMAL` mode because ESPHome transmits TVMS1280 and TVMS Rouge commands:
+Current control-capable YAML uses `NORMAL` mode because ESPHome transmits TVMS1280 and TVMS Rogue commands:
 
 ```yaml
 canbus:
@@ -99,7 +99,7 @@ canbus:
         then:
           - lambda: |-
               const uint32_t id_rx = can_id & 0x1FFFFFFFUL;
-              id(tvms_rouge_hub).handle_can_frame(id_rx, x);
+              id(tvms_rogue_hub).handle_can_frame(id_rx, x);
               id(tvms1280_hub).handle_can_frame(id_rx, x);
               id(manager30_hub).handle_can_frame(id_rx, x);
               id(battery_sensor_hub).handle_can_frame(id_rx, x);
@@ -109,7 +109,7 @@ canbus:
 
 Use `LISTENONLY` only for passive monitoring YAMLs where nothing is transmitted.
 
-## TVMS Rouge
+## TVMS Rogue
 
 ### Output channel map
 
@@ -141,7 +141,7 @@ Use `LISTENONLY` only for passive monitoring YAMLs where nothing is transmitted.
 
 ### Current dimming behavior
 
-Rouge dimming now uses the absolute set-level command observed from the RedVision display. Home Assistant sends a target brightness and the component sends one direct `0x0F003020` frame with the requested percent; full-on requests use the basic ON command.
+Rogue dimming now uses the absolute set-level command observed from the RedVision display. Home Assistant sends a target brightness and the component sends one direct `0x0F003020` frame with the requested percent; full-on requests use the basic ON command.
 
 Current UX behaviour:
 
@@ -150,11 +150,11 @@ Current UX behaviour:
 - The diagnostic `Output X Level` sensor tracks the actual hardware level from `1BFD1230`.
 - The old timed dim-hold/ramp protocol is no longer used by this component.
 
-Recommended Rouge YAML options:
+Recommended Rogue YAML options:
 
 ```yaml
-tvms_rouge:
-  id: tvms_rouge_hub
+tvms_rogue:
+  id: tvms_rogue_hub
   canbus_id: rv_can
   output_command_id: 0x0F003020
   level_feedback_id: 0x1BFD1230
@@ -165,36 +165,36 @@ tvms_rouge:
   true_off_threshold: 1.0
 
   input_voltage:
-    name: "TVMS Rouge Input Voltage"
+    name: "TVMS Rogue Input Voltage"
     unit_of_measurement: "V"
     device_class: voltage
     state_class: measurement
     accuracy_decimals: 2
 
   button_states:
-    - name: "TVMS Rouge Input Button 1"
-    - name: "TVMS Rouge Input Button 2"
-    - name: "TVMS Rouge Input Button 3"
-    - name: "TVMS Rouge Input Button 4"
-    - name: "TVMS Rouge Input Button 5"
-    - name: "TVMS Rouge Input Button 6"
-    - name: "TVMS Rouge Input Button 7"
-    - name: "TVMS Rouge Input Button 8"
+    - name: "TVMS Rogue Input Button 1"
+    - name: "TVMS Rogue Input Button 2"
+    - name: "TVMS Rogue Input Button 3"
+    - name: "TVMS Rogue Input Button 4"
+    - name: "TVMS Rogue Input Button 5"
+    - name: "TVMS Rogue Input Button 6"
+    - name: "TVMS Rogue Input Button 7"
+    - name: "TVMS Rogue Input Button 8"
 ```
 
-If `button_status_id`, `button_states`, `input_status_id`, or `input_voltage` are rejected as invalid YAML options, ESPHome is loading an older `tvms_rouge` schema. Push the latest component code and clear `/data/external_components/*`.
+If `button_status_id`, `button_states`, `input_status_id`, or `input_voltage` are rejected as invalid YAML options, ESPHome is loading an older `tvms_rogue` schema. Push the latest component code and clear `/data/external_components/*`.
 
 
-### TVMS Rouge input current candidate
+### TVMS Rogue input current candidate
 
-The Rouge label pages identify:
+The Rogue label pages identify:
 
 ```text
 0x16 = Input Voltage
 0x17 = Input Current
 ```
 
-The current candidate decode uses the grouped Rouge `0x1BFD0230` status frame:
+The current candidate decode uses the grouped Rogue `0x1BFD0230` status frame:
 
 ```text
 CAN ID: 0x1BFD0230
@@ -211,7 +211,7 @@ Observed examples include:
 1BFD0230  16 BC 2F FF FF FF FF FF
 ```
 
-`0x2F / 10 = 4.7 A`. This is exposed as a diagnostic/candidate sensor until confirmed with a controlled Rouge input-current change test.
+`0x2F / 10 = 4.7 A`. This is exposed as a diagnostic/candidate sensor until confirmed with a controlled Rogue input-current change test.
 
 ## TVMS1280
 
@@ -275,7 +275,7 @@ Current voltage-input interpretation:
 - TVMS1280 hardware has **3 digital inputs**.
 - Channel map for testing: digital inputs are `0x01`, `0x02`, and `0x03`; outputs are `0x04`-`0x0D`; inverter is `0x0E`.
 - ESPHome exposes candidate Home Assistant binary sensors for the 3 digital input states using `0x1BFD0024` channel feedback.
-- Do not treat these as Rouge-style hardware button inputs. Rouge physical input/button state is `0x1BFD0030`; `0x1BFD1430` is only output/dimming activity.
+- Do not treat these as Rogue-style hardware button inputs. Rogue physical input/button state is `0x1BFD0030`; `0x1BFD1430` is only output/dimming activity.
 - A one-at-a-time input toggle capture is still needed before marking the live-state decode confirmed.
 
 ## Manager30
@@ -345,6 +345,6 @@ After applying component patches to the GitHub repo:
 
 ## Known limitations / next targets
 
-- TVMS Rouge brightness uses the direct set-level command `5A 01 FF <channel> <percent> 00 00 00`; the older timed dim-hold/ramp command path is no longer used.
+- TVMS Rogue brightness uses the direct set-level command `5A 01 FF <channel> <percent> 00 00 00`; the older timed dim-hold/ramp command path is no longer used.
 - TVMS1280 voltage input 1/2 candidates are diagnostic until confirmed against the RedVision UI or direct wiring tests.
 - Some status/config PGNs remain observed-only and should not be used for HA entities until tested.

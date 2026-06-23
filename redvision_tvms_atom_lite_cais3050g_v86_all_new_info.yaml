@@ -9,14 +9,14 @@ substitutions:
   # RedVision/TVMS bus speed.
   can_bit_rate: 250KBPS
 
-  # NORMAL is required for transmitting TVMS1280 and TVMS Rouge commands.
+  # NORMAL is required for transmitting TVMS1280 and TVMS Rogue commands.
   # Use LISTENONLY only for passive monitoring.
   can_mode: NORMAL
 
   sensor_average_interval: 5s
   # How often to request SOC + solar history pages. Set to 0s to disable polling.
   history_poll_interval: 60s
-  rouge_transition_length: 750ms
+  rogue_transition_length: 750ms
   board: m5stack-atom
   esp32_framework_type: esp-idf
   logger_level: DEBUG
@@ -63,12 +63,12 @@ redarc_redvision_display:
     source_address: 0x21
     filter_interval: ${sensor_average_interval}
 
-redarc_tvms_rouge:
-  id: TVMS_Rouge
+redarc_tvms_rogue:
+  id: TVMS_Rogue
   source_address: 0x30
   host_address: ${host_address}
   filter_interval: ${sensor_average_interval}
-  default_transition_length: ${rouge_transition_length}
+  default_transition_length: ${rogue_transition_length}
 
 redarc_tvms_1280:
   id: TVMS1280

@@ -1,36 +1,36 @@
-#include "tvms_rouge.h"
+#include "tvms_rogue.h"
 
 namespace esphome {
-namespace redarc_tvms_rouge {
+namespace redarc_tvms_rogue {
 
-static const char *const TAG = "redarc_tvms_rouge";
+static const char *const TAG = "redarc_tvms_rogue";
 
 namespace {
-static constexpr uint8_t ROUGE_ITEM_DIGITAL_INPUT_1 = 0x01;
-static constexpr uint8_t ROUGE_ITEM_DIGITAL_INPUT_8 = 0x08;
-static constexpr uint8_t ROUGE_ITEM_TANK_1 = 0x09;
-static constexpr uint8_t ROUGE_ITEM_MASTER = 0x0B;
-static constexpr uint8_t ROUGE_ITEM_OUTPUT_1 = 0x0C;
-static constexpr uint8_t ROUGE_ITEM_OUTPUT_10 = 0x15;
-static constexpr uint8_t ROUGE_ITEM_INPUT_VOLTAGE = 0x16;
+static constexpr uint8_t ROGUE_ITEM_DIGITAL_INPUT_1 = 0x01;
+static constexpr uint8_t ROGUE_ITEM_DIGITAL_INPUT_8 = 0x08;
+static constexpr uint8_t ROGUE_ITEM_TANK_1 = 0x09;
+static constexpr uint8_t ROGUE_ITEM_MASTER = 0x0B;
+static constexpr uint8_t ROGUE_ITEM_OUTPUT_1 = 0x0C;
+static constexpr uint8_t ROGUE_ITEM_OUTPUT_10 = 0x15;
+static constexpr uint8_t ROGUE_ITEM_INPUT_VOLTAGE = 0x16;
 }  // namespace
 
-void TVMSRougeSwitch::write_state(bool state) {
+void TVMSRogueSwitch::write_state(bool state) {
   if (this->parent_ != nullptr) this->parent_->send_master(state);
   this->publish_state(state);
 }
 
-light::LightTraits TVMSRougeLight::get_traits() {
+light::LightTraits TVMSRogueLight::get_traits() {
   auto traits = light::LightTraits();
   traits.set_supported_color_modes({light::ColorMode::BRIGHTNESS});
   return traits;
 }
 
-void TVMSRougeLight::setup_state(light::LightState *state) {
+void TVMSRogueLight::setup_state(light::LightState *state) {
   this->state_ = state;
 }
 
-void TVMSRougeLight::publish_feedback_level(float level_percent) {
+void TVMSRogueLight::publish_feedback_level(float level_percent) {
   if (this->state_ == nullptr) return;
 
   if (level_percent < 0.0f) level_percent = 0.0f;
@@ -48,7 +48,7 @@ void TVMSRougeLight::publish_feedback_level(float level_percent) {
   this->state_->publish_state();
 }
 
-void TVMSRougeLight::publish_target_level(float level_percent) {
+void TVMSRogueLight::publish_target_level(float level_percent) {
   if (this->state_ == nullptr) return;
 
   if (level_percent < 0.0f) level_percent = 0.0f;
@@ -57,7 +57,7 @@ void TVMSRougeLight::publish_target_level(float level_percent) {
   const bool on = level_percent > 0.5f;
   const float brightness = on ? level_percent / 100.0f : 0.0f;
 
-  // This is the HA-requested target. The Rouge now supports an absolute level
+  // This is the HA-requested target. The Rogue now supports an absolute level
   // command, so feedback should reconcile quickly after the CAN frame is sent.
   this->state_->current_values.set_state(on);
   this->state_->current_values.set_brightness(brightness);
@@ -66,7 +66,7 @@ void TVMSRougeLight::publish_target_level(float level_percent) {
   this->state_->publish_state();
 }
 
-void TVMSRougeLight::write_state(light::LightState *state) {
+void TVMSRogueLight::write_state(light::LightState *state) {
   if (this->parent_ == nullptr) return;
 
   // Use the requested frontend target, not current_values. current_values may still
@@ -83,7 +83,7 @@ void TVMSRougeLight::write_state(light::LightState *state) {
   float target_percent = brightness * 100.0f;
 
   // A plain HA turn_on can arrive as ON with brightness still at 0 because our
-  // feedback publisher correctly reported the real Rouge output as OFF/0%. Do
+  // feedback publisher correctly reported the real Rogue output as OFF/0%. Do
   // not translate that into another OFF command; use current feedback if known,
   // otherwise request full ON.
   if (target_percent <= 0.0f) {
@@ -102,7 +102,7 @@ void TVMSRougeLight::write_state(light::LightState *state) {
   this->parent_->set_target(this->output_number_, this->channel_, target_percent);
 }
 
-void TVMSRougeComponent::setup() {
+void TVMSRogueComponent::setup() {
   for (auto &level : this->levels_) level = NAN;
   const uint8_t sa = this->source_address_;
   const uint8_t ha = this->host_address_;
@@ -111,8 +111,8 @@ void TVMSRougeComponent::setup() {
       [this](uint32_t id, const std::vector<uint8_t> &data) { this->handle_can_frame(id, data); });
 }
 
-void TVMSRougeComponent::dump_config() {
-  ESP_LOGCONFIG(TAG, "TVMS Rouge SA=0x%02X HA=0x%02X", this->source_address_, this->host_address_);
+void TVMSRogueComponent::dump_config() {
+  ESP_LOGCONFIG(TAG, "TVMS Rogue SA=0x%02X HA=0x%02X", this->source_address_, this->host_address_);
   ESP_LOGCONFIG(TAG, "  Output cmd: 0x%08X  DGN: 0x1FD00, 0x1FD02, 0x1FD12", this->output_command_id_);
   LOG_SENSOR("  ", "Input Voltage", this->input_voltage_sensor_);
   LOG_SENSOR("  ", "Input Current", this->input_current_sensor_);
@@ -120,55 +120,55 @@ void TVMSRougeComponent::dump_config() {
   ESP_LOGCONFIG(TAG, "  True-off threshold: %.1f%%", this->true_off_threshold_percent_);
 }
 
-void TVMSRougeComponent::register_light(TVMSRougeLight *light) {
+void TVMSRogueComponent::register_light(TVMSRogueLight *light) {
   if (light == nullptr) return;
   uint8_t out = light->output_number();
   if (out < 1 || out > 10) return;
   this->lights_[out] = light;
 }
 
-float TVMSRougeComponent::level(uint8_t output_number) const {
+float TVMSRogueComponent::level(uint8_t output_number) const {
   if (output_number < 1 || output_number > 10) return NAN;
   return this->levels_[output_number];
 }
 
-void TVMSRougeComponent::send_frame_(uint32_t id, const std::vector<uint8_t> &data) {
+void TVMSRogueComponent::send_frame_(uint32_t id, const std::vector<uint8_t> &data) {
   auto *bus = redarc_common::RedarcCanDispatcher::instance().canbus();
   if (bus == nullptr) return;
   redarc_common::log_can_frame("CAN_TX", id, data);
   bus->send_data(id, true, data);
 }
 
-void TVMSRougeComponent::send_on_(uint8_t channel) {
+void TVMSRogueComponent::send_on_(uint8_t channel) {
   this->send_frame_(this->output_command_id_, {0xCB, 0x00, 0xFF, channel, 0x01, 0x00, 0x00, 0x00});
 }
 
-void TVMSRougeComponent::send_off_(uint8_t channel) {
+void TVMSRogueComponent::send_off_(uint8_t channel) {
   this->send_frame_(this->output_command_id_, {0xCB, 0x00, 0xFF, channel, 0x00, 0x00, 0x00, 0x00});
 }
 
-void TVMSRougeComponent::send_level_(uint8_t channel, uint8_t percent) {
+void TVMSRogueComponent::send_level_(uint8_t channel, uint8_t percent) {
   if (percent > 100) percent = 100;
   this->send_frame_(this->output_command_id_, {0x5A, 0x01, 0xFF, channel, percent, 0x00, 0x00, 0x00});
 }
 
-void TVMSRougeComponent::send_master(bool state) {
+void TVMSRogueComponent::send_master(bool state) {
   if (state) {
-    this->send_on_(ROUGE_ITEM_MASTER);
+    this->send_on_(ROGUE_ITEM_MASTER);
   } else {
-    this->send_off_(ROUGE_ITEM_MASTER);
+    this->send_off_(ROGUE_ITEM_MASTER);
   }
   ESP_LOGI(TAG, "Master channel 0x0B %s", state ? "ON" : "OFF");
 }
 
-void TVMSRougeComponent::turn_off(uint8_t output_number, uint8_t channel) {
+void TVMSRogueComponent::turn_off(uint8_t output_number, uint8_t channel) {
   if (output_number < 1 || output_number > 10) return;
 
   this->send_off_(channel);
   ESP_LOGI(TAG, "Output %u channel 0x%02X OFF", output_number, channel);
 }
 
-void TVMSRougeComponent::set_target(uint8_t output_number, uint8_t channel, float target_percent) {
+void TVMSRogueComponent::set_target(uint8_t output_number, uint8_t channel, float target_percent) {
   if (output_number < 1 || output_number > 10) return;
   if (target_percent <= this->true_off_threshold_percent_) {
     this->turn_off(output_number, channel);
@@ -186,20 +186,20 @@ void TVMSRougeComponent::set_target(uint8_t output_number, uint8_t channel, floa
   }
 }
 
-void TVMSRougeComponent::handle_can_frame(uint32_t can_id, const std::vector<uint8_t> &data) {
+void TVMSRogueComponent::handle_can_frame(uint32_t can_id, const std::vector<uint8_t> &data) {
   can_id = redarc_common::rvc_id(can_id);
   if (data.size() < 8) return;
 
   const uint32_t now = millis();
 
   if (redarc_common::rvc_matches(can_id, 0x1FD02UL, this->source_address_)) {
-    if (data[0] == ROUGE_ITEM_TANK_1) {
+    if (data[0] == ROGUE_ITEM_TANK_1) {
       if (now - this->last_tank_ms_ >= this->filter_interval_ms_) {
         this->last_tank_ms_ = now;
         if (this->tank1_sensor_ != nullptr) this->tank1_sensor_->publish_state((float) data[1]);
         if (this->tank2_sensor_ != nullptr) this->tank2_sensor_->publish_state((float) data[2]);
       }
-    } else if (data[0] == ROUGE_ITEM_INPUT_VOLTAGE) {
+    } else if (data[0] == ROGUE_ITEM_INPUT_VOLTAGE) {
       // Input page: D2-D3 voltage, D4-D5 current, both little-endian, raw / 1000.
       if (now - this->last_input_voltage_ms_ >= this->filter_interval_ms_) {
         this->last_input_voltage_ms_ = now;
@@ -214,7 +214,7 @@ void TVMSRougeComponent::handle_can_frame(uint32_t can_id, const std::vector<uin
       }
     } else if (now - this->last_unknown_1fd02_ms_ >= this->filter_interval_ms_) {
       this->last_unknown_1fd02_ms_ = now;
-      ESP_LOGV(TAG, "Rouge unknown 0x1FD02 item page 0x%02X: %02X %02X %02X %02X %02X %02X %02X %02X",
+      ESP_LOGV(TAG, "Rogue unknown 0x1FD02 item page 0x%02X: %02X %02X %02X %02X %02X %02X %02X %02X",
                data[0], data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7]);
     }
     return;
@@ -251,14 +251,14 @@ void TVMSRougeComponent::handle_can_frame(uint32_t can_id, const std::vector<uin
   }
 }
 
-void TVMSRougeComponent::publish_channel_(uint8_t channel, bool state) {
-  if (channel == ROUGE_ITEM_MASTER) {
+void TVMSRogueComponent::publish_channel_(uint8_t channel, bool state) {
+  if (channel == ROGUE_ITEM_MASTER) {
     if (this->master_switch_ != nullptr) this->master_switch_->publish_state(state);
     return;
   }
-  if (channel < ROUGE_ITEM_OUTPUT_1 || channel > ROUGE_ITEM_OUTPUT_10) return;
+  if (channel < ROGUE_ITEM_OUTPUT_1 || channel > ROGUE_ITEM_OUTPUT_10) return;
 
-  const uint8_t output_number = channel - ROUGE_ITEM_MASTER;
+  const uint8_t output_number = channel - ROGUE_ITEM_MASTER;
   if (!state) {
     this->set_feedback_level_(output_number, 0.0f);
     return;
@@ -269,7 +269,7 @@ void TVMSRougeComponent::publish_channel_(uint8_t channel, bool state) {
   this->set_feedback_level_(output_number, current);
 }
 
-void TVMSRougeComponent::handle_channel_status_frame_(const std::vector<uint8_t> &data) {
+void TVMSRogueComponent::handle_channel_status_frame_(const std::vector<uint8_t> &data) {
   if (data.size() < 8) return;
 
   // DGN 0x1FD00 is a paginated byte-state array. D1 is the base item ID and
@@ -281,15 +281,15 @@ void TVMSRougeComponent::handle_channel_status_frame_(const std::vector<uint8_t>
     if (value != 0x00 && value != 0x01) continue;
 
     const uint8_t channel = base_channel + i - 1;
-    if (channel >= ROUGE_ITEM_DIGITAL_INPUT_1 && channel <= ROUGE_ITEM_DIGITAL_INPUT_8) {
+    if (channel >= ROGUE_ITEM_DIGITAL_INPUT_1 && channel <= ROGUE_ITEM_DIGITAL_INPUT_8) {
       this->set_button_state_(channel, value == 0x01);
-    } else if (channel == ROUGE_ITEM_MASTER && this->master_switch_ != nullptr) {
+    } else if (channel == ROGUE_ITEM_MASTER && this->master_switch_ != nullptr) {
       this->master_switch_->publish_state(value == 0x01);
     }
   }
 }
 
-void TVMSRougeComponent::set_button_state_(uint8_t output_number, bool active) {
+void TVMSRogueComponent::set_button_state_(uint8_t output_number, bool active) {
   if (output_number < 1 || output_number > 8) return;
   if (this->button_state_known_[output_number] && this->button_states_[output_number] == active) return;
 
@@ -300,7 +300,7 @@ void TVMSRougeComponent::set_button_state_(uint8_t output_number, bool active) {
   }
 }
 
-void TVMSRougeComponent::set_feedback_level_(uint8_t output_number, float level) {
+void TVMSRogueComponent::set_feedback_level_(uint8_t output_number, float level) {
   if (output_number < 1 || output_number > 10) return;
   if (level < 0.0f) level = 0.0f;
   if (level > 100.0f) level = 100.0f;
@@ -311,7 +311,7 @@ void TVMSRougeComponent::set_feedback_level_(uint8_t output_number, float level)
   this->publish_actual_light_level_(output_number);
 }
 
-void TVMSRougeComponent::publish_actual_light_level_(uint8_t output_number) {
+void TVMSRogueComponent::publish_actual_light_level_(uint8_t output_number) {
   if (output_number < 1 || output_number > 10) return;
   if (this->lights_[output_number] == nullptr) return;
 
@@ -320,5 +320,5 @@ void TVMSRougeComponent::publish_actual_light_level_(uint8_t output_number) {
   this->lights_[output_number]->publish_feedback_level(level);
 }
 
-}  // namespace redarc_tvms_rouge
+}  // namespace redarc_tvms_rogue
 }  // namespace esphome

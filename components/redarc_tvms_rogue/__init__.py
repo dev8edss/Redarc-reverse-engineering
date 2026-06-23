@@ -43,10 +43,10 @@ CONF_HOST_ADDRESS = "host_address"
 CONF_FILTER_INTERVAL = "filter_interval"
 CONF_TRUE_OFF_THRESHOLD = "true_off_threshold"
 
-tvms_rouge_ns = cg.esphome_ns.namespace("redarc_tvms_rouge")
-TVMSRougeComponent = tvms_rouge_ns.class_("TVMSRougeComponent", cg.Component)
-TVMSRougeLight = tvms_rouge_ns.class_("TVMSRougeLight", light.LightOutput)
-TVMSRougeSwitch = tvms_rouge_ns.class_("TVMSRougeSwitch", switch.Switch)
+tvms_rogue_ns = cg.esphome_ns.namespace("redarc_tvms_rogue")
+TVMSRogueComponent = tvms_rogue_ns.class_("TVMSRogueComponent", cg.Component)
+TVMSRogueLight = tvms_rogue_ns.class_("TVMSRogueLight", light.LightOutput)
+TVMSRogueSwitch = tvms_rogue_ns.class_("TVMSRogueSwitch", switch.Switch)
 
 _sensor_ns = cg.esphome_ns.namespace("sensor")
 _SensorClass = _sensor_ns.class_("Sensor")
@@ -61,7 +61,7 @@ _BSClass = _bs_ns.class_("BinarySensor")
 # Auto-generated IDs for sensors and lights.
 _AUTO_IDS = {}
 for _i in range(1, 11):
-    _AUTO_IDS[cv.GenerateID(f"light_out_{_i}")] = cv.declare_id(TVMSRougeLight)
+    _AUTO_IDS[cv.GenerateID(f"light_out_{_i}")] = cv.declare_id(TVMSRogueLight)
     _AUTO_IDS[cv.GenerateID(f"light_state_{_i}")] = cv.declare_id(light.LightState)
     _AUTO_IDS[cv.GenerateID(f"level_sensor_{_i}")] = cv.declare_id(_SensorClass)
 for _i in range(1, 9):
@@ -70,11 +70,11 @@ _AUTO_IDS[cv.GenerateID("tank1_id")] = cv.declare_id(_SensorClass)
 _AUTO_IDS[cv.GenerateID("tank2_id")] = cv.declare_id(_SensorClass)
 _AUTO_IDS[cv.GenerateID("input_voltage_id")] = cv.declare_id(_SensorClass)
 _AUTO_IDS[cv.GenerateID("input_current_id")] = cv.declare_id(_SensorClass)
-_AUTO_IDS[cv.GenerateID("master_id")] = cv.declare_id(TVMSRougeSwitch)
+_AUTO_IDS[cv.GenerateID("master_id")] = cv.declare_id(TVMSRogueSwitch)
 
 CONFIG_SCHEMA = cv.Schema(
     {
-        cv.GenerateID(): cv.declare_id(TVMSRougeComponent),
+        cv.GenerateID(): cv.declare_id(TVMSRogueComponent),
         cv.Optional(CONF_SOURCE_ADDRESS, default=0x30): cv.hex_uint8_t,
         cv.Optional(CONF_HOST_ADDRESS, default=0x20): cv.hex_uint8_t,
         cv.Optional(CONF_FILTER_INTERVAL, default="5s"): cv.positive_time_period_milliseconds,

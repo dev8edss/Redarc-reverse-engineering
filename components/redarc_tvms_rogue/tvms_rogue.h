@@ -13,22 +13,22 @@
 #include <vector>
 
 namespace esphome {
-namespace redarc_tvms_rouge {
+namespace redarc_tvms_rogue {
 
-class TVMSRougeComponent;
+class TVMSRogueComponent;
 
-class TVMSRougeSwitch : public switch_::Switch {
+class TVMSRogueSwitch : public switch_::Switch {
  public:
-  void set_parent(TVMSRougeComponent *parent) { this->parent_ = parent; }
+  void set_parent(TVMSRogueComponent *parent) { this->parent_ = parent; }
   void write_state(bool state) override;
 
  protected:
-  TVMSRougeComponent *parent_{nullptr};
+  TVMSRogueComponent *parent_{nullptr};
 };
 
-class TVMSRougeLight : public light::LightOutput {
+class TVMSRogueLight : public light::LightOutput {
  public:
-  void set_parent(TVMSRougeComponent *parent) { this->parent_ = parent; }
+  void set_parent(TVMSRogueComponent *parent) { this->parent_ = parent; }
   void set_output_number(uint8_t output_number) { this->output_number_ = output_number; }
   void set_channel(uint8_t channel) { this->channel_ = channel; }
 
@@ -42,13 +42,13 @@ class TVMSRougeLight : public light::LightOutput {
   uint8_t channel() const { return this->channel_; }
 
  protected:
-  TVMSRougeComponent *parent_{nullptr};
+  TVMSRogueComponent *parent_{nullptr};
   light::LightState *state_{nullptr};
   uint8_t output_number_{1};
   uint8_t channel_{0x0C};
 };
 
-class TVMSRougeComponent : public Component {
+class TVMSRogueComponent : public Component {
  public:
   void setup() override;
   void dump_config() override;
@@ -65,8 +65,8 @@ class TVMSRougeComponent : public Component {
 
   void set_true_off_threshold(float v) { this->true_off_threshold_percent_ = v; }
 
-  void register_light(TVMSRougeLight *light);
-  void register_master_switch(TVMSRougeSwitch *sw) { this->master_switch_ = sw; }
+  void register_light(TVMSRogueLight *light);
+  void register_master_switch(TVMSRogueSwitch *sw) { this->master_switch_ = sw; }
 
   void handle_can_frame(uint32_t can_id, const std::vector<uint8_t> &data);
   void set_target(uint8_t output_number, uint8_t channel, float target_percent);
@@ -97,8 +97,8 @@ class TVMSRougeComponent : public Component {
   uint32_t output_command_id_{0};
 
   std::array<float, 11> levels_{};
-  std::array<TVMSRougeLight *, 11> lights_{};
-  TVMSRougeSwitch *master_switch_{nullptr};
+  std::array<TVMSRogueLight *, 11> lights_{};
+  TVMSRogueSwitch *master_switch_{nullptr};
   std::array<sensor::Sensor *, 11> level_sensors_{};
   std::array<binary_sensor::BinarySensor *, 11> button_sensors_{};
   std::array<bool, 11> button_states_{};
@@ -111,5 +111,5 @@ class TVMSRougeComponent : public Component {
   float true_off_threshold_percent_{1.5f};
 };
 
-}  // namespace redarc_tvms_rouge
+}  // namespace redarc_tvms_rogue
 }  // namespace esphome

@@ -8,7 +8,7 @@ exposed as native Home Assistant entities.
 
 The decode is reverse-engineered from captured bus traffic. The byte-level
 findings live in the companion DBC file
-[`Current_SOC_v53_rouge_input_current.dbc`](Current_SOC_v53_rouge_input_current.dbc);
+[`Current_SOC_v53_rogue_input_current.dbc`](Current_SOC_v53_rogue_input_current.dbc);
 this README is the human-readable summary plus a build/wiring guide.
 
 > **Status legend** (used throughout): `CONFIRMED` = validated against capture,
@@ -47,7 +47,7 @@ display's rebroadcast of the same numbers.
 | `0x20` | RedVision display 1 | Screen; also the source of most button commands |
 | `0x21` | RedVision display 2 | Second screen / status |
 | `0x24` | TVMS1280 | 10 relay outputs + inverter, tanks, temps, voltage inputs |
-| `0x30` | TVMS Rouge | 10 dimmable outputs, hardware buttons, tanks, input V/A |
+| `0x30` | TVMS Rogue | 10 dimmable outputs, hardware buttons, tanks, input V/A |
 | `0x22` | **This ESP32 bridge** | Our own address, used as the source of command/poll frames (configurable) |
 | `0xFA` | Diagnostic / request tool | Readout & history-request traffic |
 
@@ -128,10 +128,10 @@ components/
   redarc_manager/           <- Manager30  (0x01)
   redarc_battery_sensor/    <- Battery     (0x08)
   redarc_redvision_display/ <- Display(s)  (0x20 / 0x21)
-  redarc_tvms_rouge/        <- TVMS Rouge  (0x30)
+  redarc_tvms_rogue/        <- TVMS Rogue  (0x30)
   redarc_tvms_1280/         <- TVMS1280    (0x24)
 redvision_tvms_dashboard_all_new_info.yaml                 <- example Home Assistant Lovelace dashboard
-Current_SOC_v53_rouge_input_current.dbc                    <- byte-level decode reference
+Current_SOC_v53_rogue_input_current.dbc                    <- byte-level decode reference
 ```
 
 The top-level YAML is intentionally thin: a `substitutions:` block (pins, bus
@@ -172,7 +172,7 @@ canbus:
   `rvc_matches`, and the `current_32_centered` / `current_display_16_centered`
   scalers described above.
 
-Each **device component** (`redarc_manager`, `redarc_tvms_rouge`, …) is a normal
+Each **device component** (`redarc_manager`, `redarc_tvms_rogue`, …) is a normal
 ESPHome external component. Its Python `__init__.py` declares a config schema and
 **auto-generates the entity IDs/names** (you don't list every sensor in YAML — you
 just give the block an `id:` prefix and a `source_address:`). Its C++ registers a
@@ -218,7 +218,7 @@ redarc_redvision_display:          # MULTI_CONF: list every display you have
   - { id: Redvision1, source_address: 0x20 }
   - { id: Redvision2, source_address: 0x21 }
 
-redarc_tvms_rouge: { id: TVMS_Rouge, source_address: 0x30, host_address: ${host_address} }
+redarc_tvms_rogue: { id: TVMS_Rogue, source_address: 0x30, host_address: ${host_address} }
 redarc_tvms_1280:  { id: TVMS1280,   source_address: 0x24, host_address: ${host_address} }
 ```
 
@@ -294,7 +294,7 @@ single `low-high` Range sensor.
 These are the display's own 16-bit rebroadcast values — handy as a cross-check
 against the Manager/Battery source readings.
 
-### TVMS Rouge — `redarc_tvms_rouge` (source `0x30`)
+### TVMS Rogue — `redarc_tvms_rogue` (source `0x30`)
 
 The dimmable-lighting module.
 
@@ -327,7 +327,7 @@ The relay / inverter module.
 | Voltage Input 1 / 2 | sensors V | `0x1FD02` (D1=`0x11`) | items `0x11`/`0x12`, mV/1000 |
 | Tank 1–6 | sensors % | `0x1FD02` (D1=`0x14`/`0x17`/`0x1A`) | multiplexed by page |
 
-TVMS1280 has **no** Rouge-style dimming; its outputs are on/off switches and its
+TVMS1280 has **no** Rogue-style dimming; its outputs are on/off switches and its
 authoritative state comes from the `0x1BFD0024` feedback frame.
 
 ### History polling (RTR requests)
@@ -357,8 +357,8 @@ re-fetch history on demand without opening the physical screen.
 
 ```text
 TVMS1280 output : 0x0F002420   CB 00 FF <ch> <00|01> 00 00 00     (ch 0x04..0x0E)
-Rouge on/off    : 0x0F003020   CB 00 FF <ch> <00|01> 00 00 00     (ch 0x0C..0x15)
-Rouge dim       : 0x0F053020   <ch> 01 <dir> 05 00 FF FF FF        (dir 01=down,64=up,FF=release)
+Rogue on/off    : 0x0F003020   CB 00 FF <ch> <00|01> 00 00 00     (ch 0x0C..0x15)
+Rogue dim       : 0x0F053020   <ch> 01 <dir> 05 00 FF FF FF        (dir 01=down,64=up,FF=release)
 Charging mode   : 0x0F00FF20   43 00 FF FF <00|01> 00 00 00        (00=Touring,01=Storage)
 ```
 
@@ -366,8 +366,8 @@ Charging mode   : 0x0F00FF20   43 00 FF FF <00|01> 00 00 00        (00=Touring,0
 
 ```text
 TVMS1280 out fb : 0x1BFD0024   <base> <s0..s6>     (00=off,01=on,F8/FF=ignore)
-Rouge level fb  : 0x1BFD1230   <base> <l0..l6>     (% per channel)
-Rouge buttons   : 0x1BFD0030   <base> <b1..b7>     (00=inactive,01=active; D1=0x08 D2 = button 8)
+Rogue level fb  : 0x1BFD1230   <base> <l0..l6>     (% per channel)
+Rogue buttons   : 0x1BFD0030   <base> <b1..b7>     (00=inactive,01=active; D1=0x08 D2 = button 8)
 ```
 
 ### Signal table (full)
@@ -396,13 +396,13 @@ Rouge buttons   : 0x1BFD0030   <base> <b1..b7>     (00=inactive,01=active; D1=0x
 | RedVision `0x21` | `0x13F28221` | `0x1F282` | — | Manager Output Current Display A | D7-D8 | raw/10−1000 | CONFIRMED |
 | RedVision disp | `0x13F28220` | `0x1F282` | — | Vehicle Current Display A | D3-D4 | raw/10−1000 | CONFIRMED |
 | RedVision disp | `0x13F28420` | `0x1F284` | — | Vehicle Voltage Display | D3-D4 | raw×0.1 V | CONFIRMED |
-| TVMS Rouge `0x30` | `0x1BFD0230` | `0x1FD02` | D1=`0x09` | Water Tank 1 % | D2 | raw % | CONFIRMED |
-| TVMS Rouge `0x30` | `0x1BFD0230` | `0x1FD02` | D1=`0x09` | Water Tank 2 % | D3 | raw % | CONFIRMED |
-| TVMS Rouge `0x30` | `0x1BFD1230` | `0x1FD12` | D1 base | Output Level +0..6 | D2-D8 | raw % | CONFIRMED |
-| TVMS Rouge `0x30` | `0x1BFD0030` | `0x1FD00` | D1 base | Input Button 1..8 | D2-D8 | 0=inactive,1=active | CONFIRMED |
-| TVMS Rouge `0x30` | `0x1BFD1430` | `0x1FD14` | D1 base | Output Dim Activity +0..6 | D2-D8 | activity only, not input state | CONFIRMED |
-| TVMS Rouge `0x30` | `0x1BFD0230` | `0x1FD02` | D1=`0x16` | Input Voltage | D2-D3 | uint16 LE × 0.001 V | CONFIRMED |
-| TVMS Rouge `0x30` | `0x1BFD0230` | `0x1FD02` | D1=`0x16` | Input Current | D4-D5 | uint16 LE × 0.001 A | CONFIRMED |
+| TVMS Rogue `0x30` | `0x1BFD0230` | `0x1FD02` | D1=`0x09` | Water Tank 1 % | D2 | raw % | CONFIRMED |
+| TVMS Rogue `0x30` | `0x1BFD0230` | `0x1FD02` | D1=`0x09` | Water Tank 2 % | D3 | raw % | CONFIRMED |
+| TVMS Rogue `0x30` | `0x1BFD1230` | `0x1FD12` | D1 base | Output Level +0..6 | D2-D8 | raw % | CONFIRMED |
+| TVMS Rogue `0x30` | `0x1BFD0030` | `0x1FD00` | D1 base | Input Button 1..8 | D2-D8 | 0=inactive,1=active | CONFIRMED |
+| TVMS Rogue `0x30` | `0x1BFD1430` | `0x1FD14` | D1 base | Output Dim Activity +0..6 | D2-D8 | activity only, not input state | CONFIRMED |
+| TVMS Rogue `0x30` | `0x1BFD0230` | `0x1FD02` | D1=`0x16` | Input Voltage | D2-D3 | uint16 LE × 0.001 V | CONFIRMED |
+| TVMS Rogue `0x30` | `0x1BFD0230` | `0x1FD02` | D1=`0x16` | Input Current | D4-D5 | uint16 LE × 0.001 A | CONFIRMED |
 | TVMS1280 `0x24` | `0x1BFD0024` | `0x1FD00` | D1 base | Output Feedback +0..6 | D2-D8 | 0=off,1=on,F8/FF=ignore | CONFIRMED |
 | TVMS1280 `0x24` | `0x1BFD0224` | `0x1FD02` | D1=`0x14` | Temperature 1 °C | D2 | raw−100 | CONFIRMED |
 | TVMS1280 `0x24` | `0x1BFD0224` | `0x1FD02` | D1=`0x11` | Temperature 2 °C | D6 | raw−100 | CONFIRMED |

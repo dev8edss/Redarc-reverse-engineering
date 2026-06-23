@@ -2,7 +2,7 @@ VERSION ""
 
 NS_ :
 BS_:
-BU_: Manager30 Battery_Sensor Redvision_1 Redvision_2 TVMS_Rouge TVMS_1280 Config_Tool
+BU_: Manager30 Battery_Sensor Redvision_1 Redvision_2 TVMS_Rogue TVMS_1280 Config_Tool
 
 CM_ "Current/SOC decode v27. Long-log cleanup: source Manager30 and Battery Sensor currents are 32-bit little-endian values centred at exactly 1,000,000. Formula is raw/1000 - 1000. Redvision display copies are 16-bit values centred at exactly 10,000. Formula is raw/10 - 1000.";
 
@@ -129,19 +129,19 @@ CM_ "Long-log validation: Manager30 0x03F20A01 D1-D4 raw 0x000F4240 decodes 0 A;
 CM_ "Long-log validation: Battery Sensor 0x13F10208 D1-D4 decodes from about -212 A to +30 A and tracks Redvision_1 battery display.";
 CM_ "Redvision validation: display currents remain centred on 10000 with 0.1 A/count.";
 
-BO_ 2617049648 PGN_1BFD02_TVMSRouge_WaterTankLevels: 8 TVMS_Rouge
+BO_ 2617049648 PGN_1BFD02_TVMSRogue_WaterTankLevels: 8 TVMS_Rogue
  SG_ WaterTank_MUX M : 0|8@1+ (1,0) [0|255] "" Vector__XXX
  SG_ WaterTank1_Percent m9 : 8|8@1+ (1,0) [0|100] "%" Vector__XXX
  SG_ WaterTank2_Percent m9 : 16|8@1+ (1,0) [0|100] "%" Vector__XXX
- SG_ TVMSRouge_Input_Voltage m22 : 8|16@1+ (0.001,0) [0|65.535] "V" Vector__XXX
- SG_ TVMSRouge_Input_Current_A_Candidate m22 : 16|8@1+ (0.1,0) [0|25.5] "A" Vector__XXX
+ SG_ TVMSRogue_Input_Voltage m22 : 8|16@1+ (0.001,0) [0|65.535] "V" Vector__XXX
+ SG_ TVMSRogue_Input_Current_A_Candidate m22 : 16|8@1+ (0.1,0) [0|25.5] "A" Vector__XXX
 
-CM_ BO_ 2617049648 "Confirmed TVMS_Rouge water tank levels. Raw CAN ID 0x1BFD0230, PGN 0xFD02, source address 0x30.";
+CM_ BO_ 2617049648 "Confirmed TVMS_Rogue water tank levels. Raw CAN ID 0x1BFD0230, PGN 0xFD02, source address 0x30.";
 CM_ SG_ 2617049648 WaterTank_MUX "D1 message type/mux. 0x09 = water tank levels. 0x16 = live input voltage and current.";
 CM_ SG_ 2617049648 WaterTank1_Percent "D2 = Tank 1 level percent. 0x00 = 0%, 0x64 = 100%. Scale: raw percent.";
 CM_ SG_ 2617049648 WaterTank2_Percent "D3 = Tank 2 level percent. 0x00 = 0%, 0x64 = 100%. Scale: raw percent.";
-CM_ SG_ 2617049648 TVMSRouge_Input_Voltage "CONFIRMED_CORRECT_DO_NOT_EDIT: MUX 0x16, D2-D3 little-endian uint16 millivolts. Live input voltage. ESPHome: data[1]|(data[2]<<8) / 1000.0.";
-CM_ SG_ 2617049648 TVMSRouge_Input_Current_A_Candidate "DECODE_WRONG_PENDING_RETEST: Label pages identify item 0x17 as Input Current, but 0x1BFD0230 D1=0x16 D3 is the high byte of the confirmed D2-D3 input-voltage millivolt field. Do not publish D3/10 A as current. Find the real current page, likely item/mux 0x17 or another frame, with controlled load-current testing.";
+CM_ SG_ 2617049648 TVMSRogue_Input_Voltage "CONFIRMED_CORRECT_DO_NOT_EDIT: MUX 0x16, D2-D3 little-endian uint16 millivolts. Live input voltage. ESPHome: data[1]|(data[2]<<8) / 1000.0.";
+CM_ SG_ 2617049648 TVMSRogue_Input_Current_A_Candidate "DECODE_WRONG_PENDING_RETEST: Label pages identify item 0x17 as Input Current, but 0x1BFD0230 D1=0x16 D3 is the high byte of the confirmed D2-D3 input-voltage millivolt field. Do not publish D3/10 A as current. Find the real current page, likely item/mux 0x17 or another frame, with controlled load-current testing.";
 VAL_ 2617049648 WaterTank_MUX 9 "WaterTankLevels" 22 "InputVoltageCurrentCandidates";
 
 
@@ -176,7 +176,7 @@ BA_ "Decode_Status"
 
 
 CM_ "v35 update: mux 0x1A D2 renamed from TVMS1280_Tank5_Percent to TVMS1280_Tank6_Percent per confirmed physical mapping.";
-CM_ "v53 update: Added TVMS Rouge Input Current candidate. Superseded by later review: D3 in 0x1BFD0230 D1=0x16 belongs to the confirmed D2-D3 voltage field, so D3/10 A must not be used as current.";
+CM_ "v53 update: Added TVMS Rogue Input Current candidate. Superseded by later review: D3 in 0x1BFD0230 D1=0x16 belongs to the confirmed D2-D3 voltage field, so D3/10 A must not be used as current.";
 
 BO_ 2617049636 PGN_1BFD02_TVMS1280_TempTankStatus: 8 TVMS_1280
  SG_ TVMS1280_Status_MUX M : 0|8@1+ (1,0) [0|255] "" Vector__XXX
@@ -263,8 +263,8 @@ BA_ "Decode_Status" BO_ 2617049648 "CONFIRMED_CORRECT_DO_NOT_EDIT";
 BA_ "Decode_Status" SG_ 2617049648 WaterTank_MUX "CONFIRMED_CORRECT_DO_NOT_EDIT";
 BA_ "Decode_Status" SG_ 2617049648 WaterTank1_Percent "CONFIRMED_CORRECT_DO_NOT_EDIT";
 BA_ "Decode_Status" SG_ 2617049648 WaterTank2_Percent "CONFIRMED_CORRECT_DO_NOT_EDIT";
-BA_ "Decode_Status" SG_ 2617049648 TVMSRouge_Input_Voltage "CONFIRMED_CORRECT_DO_NOT_EDIT";
-BA_ "Decode_Status" SG_ 2617049648 TVMSRouge_Input_Current_A_Candidate "UNCONFIRMED_PENDING_TEST";
+BA_ "Decode_Status" SG_ 2617049648 TVMSRogue_Input_Voltage "CONFIRMED_CORRECT_DO_NOT_EDIT";
+BA_ "Decode_Status" SG_ 2617049648 TVMSRogue_Input_Current_A_Candidate "UNCONFIRMED_PENDING_TEST";
 BA_ "Decode_Status" BO_ 2617049636 "CONFIRMED_CORRECT_DO_NOT_EDIT";
 BA_ "Decode_Status" SG_ 2617049636 TVMS1280_Status_MUX "CONFIRMED_CORRECT_DO_NOT_EDIT";
 BA_ "Decode_Status" SG_ 2617049636 TVMS1280_Temp1_C "CONFIRMED_CORRECT_DO_NOT_EDIT";
@@ -449,194 +449,194 @@ BA_ "Decode_Status" SG_ 2399151136 TVMS1280_Inverter_Command "UNCONFIRMED_PENDIN
 BA_ "Decode_Status" SG_ 2399151136 TVMS1280_Master_Command "UNCONFIRMED_PENDING_TEST";
 BA_ "Decode_Status" SG_ 2399151136 TVMS1280_Command_State_Raw "UNCONFIRMED_PENDING_TEST";
 
-BO_ 2617049136 TVMSRouge_Output_Coarse_Status: 8 TVMS_Rouge
- SG_ TVMSRouge_Coarse_BaseChannel : 0|8@1+ (1,0) [0|255] "channel" Vector__XXX
- SG_ TVMSRouge_Coarse_BasePlus0 : 8|8@1+ (1,0) [0|255] "state" Vector__XXX
- SG_ TVMSRouge_Coarse_BasePlus1 : 16|8@1+ (1,0) [0|255] "state" Vector__XXX
- SG_ TVMSRouge_Coarse_BasePlus2 : 24|8@1+ (1,0) [0|255] "state" Vector__XXX
- SG_ TVMSRouge_Coarse_BasePlus3 : 32|8@1+ (1,0) [0|255] "state" Vector__XXX
- SG_ TVMSRouge_Coarse_BasePlus4 : 40|8@1+ (1,0) [0|255] "state" Vector__XXX
- SG_ TVMSRouge_Coarse_BasePlus5 : 48|8@1+ (1,0) [0|255] "state" Vector__XXX
- SG_ TVMSRouge_Coarse_BasePlus6 : 56|8@1+ (1,0) [0|255] "state" Vector__XXX
-CM_ BO_ 2617049136 "CONFIRMED_CORRECT_DO_NOT_EDIT: TVMS Rouge physical input/button state. Raw CAN ID 0x1BFD0030, PGN 0x1FD00, SA 0x30. D1 is base input; D2-D8 are states for base+0..base+6. D1=0x01 covers inputs 1-7; D1=0x08 D2 covers input 8. 0x00=inactive, 0x01=active.";
-CM_ SG_ 2617049136 TVMSRouge_Coarse_BaseChannel "D1 base input/channel. D1=0x01 maps D2-D8 to Rouge inputs/buttons 1-7. D1=0x08 maps D2 to Rouge input/button 8; later bytes in that frame are not physical button states.";
-CM_ SG_ 2617049136 TVMSRouge_Coarse_BasePlus0 "Input/button state for base+0. 0x00=inactive, 0x01=active.";
-CM_ SG_ 2617049136 TVMSRouge_Coarse_BasePlus1 "Input/button state for base+1. 0x00=inactive, 0x01=active.";
-CM_ SG_ 2617049136 TVMSRouge_Coarse_BasePlus2 "Input/button state for base+2. 0x00=inactive, 0x01=active.";
-CM_ SG_ 2617049136 TVMSRouge_Coarse_BasePlus3 "Input/button state for base+3. 0x00=inactive, 0x01=active.";
-CM_ SG_ 2617049136 TVMSRouge_Coarse_BasePlus4 "Input/button state for base+4. 0x00=inactive, 0x01=active.";
-CM_ SG_ 2617049136 TVMSRouge_Coarse_BasePlus5 "Input/button state for base+5. 0x00=inactive, 0x01=active.";
-CM_ SG_ 2617049136 TVMSRouge_Coarse_BasePlus6 "Input/button state for base+6. 0x00=inactive, 0x01=active.";
+BO_ 2617049136 TVMSRogue_Output_Coarse_Status: 8 TVMS_Rogue
+ SG_ TVMSRogue_Coarse_BaseChannel : 0|8@1+ (1,0) [0|255] "channel" Vector__XXX
+ SG_ TVMSRogue_Coarse_BasePlus0 : 8|8@1+ (1,0) [0|255] "state" Vector__XXX
+ SG_ TVMSRogue_Coarse_BasePlus1 : 16|8@1+ (1,0) [0|255] "state" Vector__XXX
+ SG_ TVMSRogue_Coarse_BasePlus2 : 24|8@1+ (1,0) [0|255] "state" Vector__XXX
+ SG_ TVMSRogue_Coarse_BasePlus3 : 32|8@1+ (1,0) [0|255] "state" Vector__XXX
+ SG_ TVMSRogue_Coarse_BasePlus4 : 40|8@1+ (1,0) [0|255] "state" Vector__XXX
+ SG_ TVMSRogue_Coarse_BasePlus5 : 48|8@1+ (1,0) [0|255] "state" Vector__XXX
+ SG_ TVMSRogue_Coarse_BasePlus6 : 56|8@1+ (1,0) [0|255] "state" Vector__XXX
+CM_ BO_ 2617049136 "CONFIRMED_CORRECT_DO_NOT_EDIT: TVMS Rogue physical input/button state. Raw CAN ID 0x1BFD0030, PGN 0x1FD00, SA 0x30. D1 is base input; D2-D8 are states for base+0..base+6. D1=0x01 covers inputs 1-7; D1=0x08 D2 covers input 8. 0x00=inactive, 0x01=active.";
+CM_ SG_ 2617049136 TVMSRogue_Coarse_BaseChannel "D1 base input/channel. D1=0x01 maps D2-D8 to Rogue inputs/buttons 1-7. D1=0x08 maps D2 to Rogue input/button 8; later bytes in that frame are not physical button states.";
+CM_ SG_ 2617049136 TVMSRogue_Coarse_BasePlus0 "Input/button state for base+0. 0x00=inactive, 0x01=active.";
+CM_ SG_ 2617049136 TVMSRogue_Coarse_BasePlus1 "Input/button state for base+1. 0x00=inactive, 0x01=active.";
+CM_ SG_ 2617049136 TVMSRogue_Coarse_BasePlus2 "Input/button state for base+2. 0x00=inactive, 0x01=active.";
+CM_ SG_ 2617049136 TVMSRogue_Coarse_BasePlus3 "Input/button state for base+3. 0x00=inactive, 0x01=active.";
+CM_ SG_ 2617049136 TVMSRogue_Coarse_BasePlus4 "Input/button state for base+4. 0x00=inactive, 0x01=active.";
+CM_ SG_ 2617049136 TVMSRogue_Coarse_BasePlus5 "Input/button state for base+5. 0x00=inactive, 0x01=active.";
+CM_ SG_ 2617049136 TVMSRogue_Coarse_BasePlus6 "Input/button state for base+6. 0x00=inactive, 0x01=active.";
 BA_ "Decode_Status" BO_ 2617049136 "CONFIRMED_CORRECT_DO_NOT_EDIT";
-BA_ "Decode_Status" SG_ 2617049136 TVMSRouge_Coarse_BaseChannel "CONFIRMED_CORRECT_DO_NOT_EDIT";
-BA_ "Decode_Status" SG_ 2617049136 TVMSRouge_Coarse_BasePlus0 "CONFIRMED_CORRECT_DO_NOT_EDIT";
-BA_ "Decode_Status" SG_ 2617049136 TVMSRouge_Coarse_BasePlus1 "CONFIRMED_CORRECT_DO_NOT_EDIT";
-BA_ "Decode_Status" SG_ 2617049136 TVMSRouge_Coarse_BasePlus2 "CONFIRMED_CORRECT_DO_NOT_EDIT";
-BA_ "Decode_Status" SG_ 2617049136 TVMSRouge_Coarse_BasePlus3 "CONFIRMED_CORRECT_DO_NOT_EDIT";
-BA_ "Decode_Status" SG_ 2617049136 TVMSRouge_Coarse_BasePlus4 "CONFIRMED_CORRECT_DO_NOT_EDIT";
-BA_ "Decode_Status" SG_ 2617049136 TVMSRouge_Coarse_BasePlus5 "CONFIRMED_CORRECT_DO_NOT_EDIT";
-BA_ "Decode_Status" SG_ 2617049136 TVMSRouge_Coarse_BasePlus6 "CONFIRMED_CORRECT_DO_NOT_EDIT";
+BA_ "Decode_Status" SG_ 2617049136 TVMSRogue_Coarse_BaseChannel "CONFIRMED_CORRECT_DO_NOT_EDIT";
+BA_ "Decode_Status" SG_ 2617049136 TVMSRogue_Coarse_BasePlus0 "CONFIRMED_CORRECT_DO_NOT_EDIT";
+BA_ "Decode_Status" SG_ 2617049136 TVMSRogue_Coarse_BasePlus1 "CONFIRMED_CORRECT_DO_NOT_EDIT";
+BA_ "Decode_Status" SG_ 2617049136 TVMSRogue_Coarse_BasePlus2 "CONFIRMED_CORRECT_DO_NOT_EDIT";
+BA_ "Decode_Status" SG_ 2617049136 TVMSRogue_Coarse_BasePlus3 "CONFIRMED_CORRECT_DO_NOT_EDIT";
+BA_ "Decode_Status" SG_ 2617049136 TVMSRogue_Coarse_BasePlus4 "CONFIRMED_CORRECT_DO_NOT_EDIT";
+BA_ "Decode_Status" SG_ 2617049136 TVMSRogue_Coarse_BasePlus5 "CONFIRMED_CORRECT_DO_NOT_EDIT";
+BA_ "Decode_Status" SG_ 2617049136 TVMSRogue_Coarse_BasePlus6 "CONFIRMED_CORRECT_DO_NOT_EDIT";
 
-BO_ 2617246256 TVMSRouge_WaterLevelStatus: 8 TVMS_Rouge
+BO_ 2617246256 TVMSRogue_WaterLevelStatus: 8 TVMS_Rogue
  SG_ WaterLevel_MUX M : 0|8@1+ (1,0) [0|255] "" Vector__XXX
- SG_ Rouge_Tank1_Percent m9 : 8|8@1+ (1,0) [0|100] "%" Vector__XXX
- SG_ Rouge_Tank2_Percent m9 : 16|8@1+ (1,0) [0|100] "%" Vector__XXX
-CM_ BO_ 2617246256 "UNCONFIRMED_PENDING_TEST: imported from inputs_outputs DBC. Original note: Raw CAN ID 0x1C000230, PGN 0x1C0002, source 0x30 TVMS_Rouge. Dual water tank level status from supplied DBC.";
+ SG_ Rogue_Tank1_Percent m9 : 8|8@1+ (1,0) [0|100] "%" Vector__XXX
+ SG_ Rogue_Tank2_Percent m9 : 16|8@1+ (1,0) [0|100] "%" Vector__XXX
+CM_ BO_ 2617246256 "UNCONFIRMED_PENDING_TEST: imported from inputs_outputs DBC. Original note: Raw CAN ID 0x1C000230, PGN 0x1C0002, source 0x30 TVMS_Rogue. Dual water tank level status from supplied DBC.";
 CM_ SG_ 2617246256 WaterLevel_MUX "UNCONFIRMED_PENDING_TEST: imported from inputs_outputs DBC. Original note: Multiplexor: 0x09 = TankLevels, 0x16 = Reserved.";
-CM_ SG_ 2617246256 Rouge_Tank1_Percent "UNCONFIRMED_PENDING_TEST: imported from inputs_outputs DBC. Original note: Confirmed fresh water tank 1 fill level.";
-CM_ SG_ 2617246256 Rouge_Tank2_Percent "UNCONFIRMED_PENDING_TEST: imported from inputs_outputs DBC. Original note: Confirmed fresh water tank 2 fill level.";
+CM_ SG_ 2617246256 Rogue_Tank1_Percent "UNCONFIRMED_PENDING_TEST: imported from inputs_outputs DBC. Original note: Confirmed fresh water tank 1 fill level.";
+CM_ SG_ 2617246256 Rogue_Tank2_Percent "UNCONFIRMED_PENDING_TEST: imported from inputs_outputs DBC. Original note: Confirmed fresh water tank 2 fill level.";
 VAL_ 2617246256 WaterLevel_MUX 9 "TankLevels" 22 "Reserved" ;
 BA_ "Decode_Status" BO_ 2617246256 "UNCONFIRMED_PENDING_TEST";
 BA_ "Decode_Status" SG_ 2617246256 WaterLevel_MUX "UNCONFIRMED_PENDING_TEST";
-BA_ "Decode_Status" SG_ 2617246256 Rouge_Tank1_Percent "UNCONFIRMED_PENDING_TEST";
-BA_ "Decode_Status" SG_ 2617246256 Rouge_Tank2_Percent "UNCONFIRMED_PENDING_TEST";
+BA_ "Decode_Status" SG_ 2617246256 Rogue_Tank1_Percent "UNCONFIRMED_PENDING_TEST";
+BA_ "Decode_Status" SG_ 2617246256 Rogue_Tank2_Percent "UNCONFIRMED_PENDING_TEST";
 
-BO_ 2617053744 TVMSRouge_Output_Level_Status: 8 TVMS_Rouge
- SG_ TVMSRouge_Level_BaseChannel : 0|8@1+ (1,0) [0|255] "channel" Vector__XXX
- SG_ TVMSRouge_Level_BasePlus0 : 8|8@1+ (1,0) [0|100] "%" Vector__XXX
- SG_ TVMSRouge_Level_BasePlus1 : 16|8@1+ (1,0) [0|100] "%" Vector__XXX
- SG_ TVMSRouge_Level_BasePlus2 : 24|8@1+ (1,0) [0|100] "%" Vector__XXX
- SG_ TVMSRouge_Level_BasePlus3 : 32|8@1+ (1,0) [0|100] "%" Vector__XXX
- SG_ TVMSRouge_Level_BasePlus4 : 40|8@1+ (1,0) [0|100] "%" Vector__XXX
- SG_ TVMSRouge_Level_BasePlus5 : 48|8@1+ (1,0) [0|100] "%" Vector__XXX
- SG_ TVMSRouge_Level_BasePlus6 : 56|8@1+ (1,0) [0|100] "%" Vector__XXX
-CM_ BO_ 2617053744 "CONFIRMED_CORRECT_DO_NOT_EDIT: TVMS Rouge actual output brightness/level feedback. Raw CAN ID 0x1BFD1230, PGN 0x1BFD12, SA 0x30. D1 is base channel; D2-D8 are brightness levels for base+0..base+6 in raw percent.";
-CM_ SG_ 2617053744 TVMSRouge_Level_BaseChannel "D1 base channel. Base 0x0C covers Rouge Outputs 1-7/channels 0x0C-0x12. Base 0x13 covers Outputs 8-10/channels 0x13-0x15.";
-CM_ SG_ 2617053744 TVMSRouge_Level_BasePlus0 "Brightness percent for channel base+0.";
-CM_ SG_ 2617053744 TVMSRouge_Level_BasePlus1 "Brightness percent for channel base+1.";
-CM_ SG_ 2617053744 TVMSRouge_Level_BasePlus2 "Brightness percent for channel base+2.";
-CM_ SG_ 2617053744 TVMSRouge_Level_BasePlus3 "Brightness percent for channel base+3.";
-CM_ SG_ 2617053744 TVMSRouge_Level_BasePlus4 "Brightness percent for channel base+4.";
-CM_ SG_ 2617053744 TVMSRouge_Level_BasePlus5 "Brightness percent for channel base+5.";
-CM_ SG_ 2617053744 TVMSRouge_Level_BasePlus6 "Brightness percent for channel base+6.";
+BO_ 2617053744 TVMSRogue_Output_Level_Status: 8 TVMS_Rogue
+ SG_ TVMSRogue_Level_BaseChannel : 0|8@1+ (1,0) [0|255] "channel" Vector__XXX
+ SG_ TVMSRogue_Level_BasePlus0 : 8|8@1+ (1,0) [0|100] "%" Vector__XXX
+ SG_ TVMSRogue_Level_BasePlus1 : 16|8@1+ (1,0) [0|100] "%" Vector__XXX
+ SG_ TVMSRogue_Level_BasePlus2 : 24|8@1+ (1,0) [0|100] "%" Vector__XXX
+ SG_ TVMSRogue_Level_BasePlus3 : 32|8@1+ (1,0) [0|100] "%" Vector__XXX
+ SG_ TVMSRogue_Level_BasePlus4 : 40|8@1+ (1,0) [0|100] "%" Vector__XXX
+ SG_ TVMSRogue_Level_BasePlus5 : 48|8@1+ (1,0) [0|100] "%" Vector__XXX
+ SG_ TVMSRogue_Level_BasePlus6 : 56|8@1+ (1,0) [0|100] "%" Vector__XXX
+CM_ BO_ 2617053744 "CONFIRMED_CORRECT_DO_NOT_EDIT: TVMS Rogue actual output brightness/level feedback. Raw CAN ID 0x1BFD1230, PGN 0x1BFD12, SA 0x30. D1 is base channel; D2-D8 are brightness levels for base+0..base+6 in raw percent.";
+CM_ SG_ 2617053744 TVMSRogue_Level_BaseChannel "D1 base channel. Base 0x0C covers Rogue Outputs 1-7/channels 0x0C-0x12. Base 0x13 covers Outputs 8-10/channels 0x13-0x15.";
+CM_ SG_ 2617053744 TVMSRogue_Level_BasePlus0 "Brightness percent for channel base+0.";
+CM_ SG_ 2617053744 TVMSRogue_Level_BasePlus1 "Brightness percent for channel base+1.";
+CM_ SG_ 2617053744 TVMSRogue_Level_BasePlus2 "Brightness percent for channel base+2.";
+CM_ SG_ 2617053744 TVMSRogue_Level_BasePlus3 "Brightness percent for channel base+3.";
+CM_ SG_ 2617053744 TVMSRogue_Level_BasePlus4 "Brightness percent for channel base+4.";
+CM_ SG_ 2617053744 TVMSRogue_Level_BasePlus5 "Brightness percent for channel base+5.";
+CM_ SG_ 2617053744 TVMSRogue_Level_BasePlus6 "Brightness percent for channel base+6.";
 BA_ "Decode_Status" BO_ 2617053744 "CONFIRMED_CORRECT_DO_NOT_EDIT";
-BA_ "Decode_Status" SG_ 2617053744 TVMSRouge_Level_BaseChannel "CONFIRMED_CORRECT_DO_NOT_EDIT";
-BA_ "Decode_Status" SG_ 2617053744 TVMSRouge_Level_BasePlus0 "CONFIRMED_CORRECT_DO_NOT_EDIT";
-BA_ "Decode_Status" SG_ 2617053744 TVMSRouge_Level_BasePlus1 "CONFIRMED_CORRECT_DO_NOT_EDIT";
-BA_ "Decode_Status" SG_ 2617053744 TVMSRouge_Level_BasePlus2 "CONFIRMED_CORRECT_DO_NOT_EDIT";
-BA_ "Decode_Status" SG_ 2617053744 TVMSRouge_Level_BasePlus3 "CONFIRMED_CORRECT_DO_NOT_EDIT";
-BA_ "Decode_Status" SG_ 2617053744 TVMSRouge_Level_BasePlus4 "CONFIRMED_CORRECT_DO_NOT_EDIT";
-BA_ "Decode_Status" SG_ 2617053744 TVMSRouge_Level_BasePlus5 "CONFIRMED_CORRECT_DO_NOT_EDIT";
-BA_ "Decode_Status" SG_ 2617053744 TVMSRouge_Level_BasePlus6 "CONFIRMED_CORRECT_DO_NOT_EDIT";
+BA_ "Decode_Status" SG_ 2617053744 TVMSRogue_Level_BaseChannel "CONFIRMED_CORRECT_DO_NOT_EDIT";
+BA_ "Decode_Status" SG_ 2617053744 TVMSRogue_Level_BasePlus0 "CONFIRMED_CORRECT_DO_NOT_EDIT";
+BA_ "Decode_Status" SG_ 2617053744 TVMSRogue_Level_BasePlus1 "CONFIRMED_CORRECT_DO_NOT_EDIT";
+BA_ "Decode_Status" SG_ 2617053744 TVMSRogue_Level_BasePlus2 "CONFIRMED_CORRECT_DO_NOT_EDIT";
+BA_ "Decode_Status" SG_ 2617053744 TVMSRogue_Level_BasePlus3 "CONFIRMED_CORRECT_DO_NOT_EDIT";
+BA_ "Decode_Status" SG_ 2617053744 TVMSRogue_Level_BasePlus4 "CONFIRMED_CORRECT_DO_NOT_EDIT";
+BA_ "Decode_Status" SG_ 2617053744 TVMSRogue_Level_BasePlus5 "CONFIRMED_CORRECT_DO_NOT_EDIT";
+BA_ "Decode_Status" SG_ 2617053744 TVMSRogue_Level_BasePlus6 "CONFIRMED_CORRECT_DO_NOT_EDIT";
 
-BO_ 2617054256 TVMSRouge_Button_Activity_Status: 8 TVMS_Rouge
- SG_ TVMSRouge_ButtonActivity_BaseChannel : 0|8@1+ (1,0) [0|255] "channel" Vector__XXX
- SG_ TVMSRouge_ButtonActivity_BasePlus0 : 8|8@1+ (1,0) [0|255] "state" Vector__XXX
- SG_ TVMSRouge_ButtonActivity_BasePlus1 : 16|8@1+ (1,0) [0|255] "state" Vector__XXX
- SG_ TVMSRouge_ButtonActivity_BasePlus2 : 24|8@1+ (1,0) [0|255] "state" Vector__XXX
- SG_ TVMSRouge_ButtonActivity_BasePlus3 : 32|8@1+ (1,0) [0|255] "state" Vector__XXX
- SG_ TVMSRouge_ButtonActivity_BasePlus4 : 40|8@1+ (1,0) [0|255] "state" Vector__XXX
- SG_ TVMSRouge_ButtonActivity_BasePlus5 : 48|8@1+ (1,0) [0|255] "state" Vector__XXX
- SG_ TVMSRouge_ButtonActivity_BasePlus6 : 56|8@1+ (1,0) [0|255] "state" Vector__XXX
-CM_ BO_ 2617054256 "CONFIRMED_CORRECT_DO_NOT_EDIT: TVMS Rouge output button/dimming-active/status frame, not the real physical input/button state. Raw CAN ID 0x1BFD1430, PGN 0x1BFD14, SA 0x30. In button 4-8 testing this frame stayed idle while 0x1BFD0030 carried actual input states.";
-CM_ SG_ 2617054256 TVMSRouge_ButtonActivity_BaseChannel "D1 base channel for output/dimming activity. Do not use this frame as the Rouge physical input/button state; use 0x1BFD0030 instead.";
-CM_ SG_ 2617054256 TVMSRouge_ButtonActivity_BasePlus0 "Button/dimming activity for channel base+0. 0x02=active/held/dimming, 0x00=inactive, other values ignored.";
-CM_ SG_ 2617054256 TVMSRouge_ButtonActivity_BasePlus1 "Button/dimming activity for channel base+1. 0x02=active/held/dimming, 0x00=inactive, other values ignored.";
-CM_ SG_ 2617054256 TVMSRouge_ButtonActivity_BasePlus2 "Button/dimming activity for channel base+2. 0x02=active/held/dimming, 0x00=inactive, other values ignored.";
-CM_ SG_ 2617054256 TVMSRouge_ButtonActivity_BasePlus3 "Button/dimming activity for channel base+3. 0x02=active/held/dimming, 0x00=inactive, other values ignored.";
-CM_ SG_ 2617054256 TVMSRouge_ButtonActivity_BasePlus4 "Button/dimming activity for channel base+4. 0x02=active/held/dimming, 0x00=inactive, other values ignored.";
-CM_ SG_ 2617054256 TVMSRouge_ButtonActivity_BasePlus5 "Button/dimming activity for channel base+5. 0x02=active/held/dimming, 0x00=inactive, other values ignored.";
-CM_ SG_ 2617054256 TVMSRouge_ButtonActivity_BasePlus6 "Button/dimming activity for channel base+6. 0x02=active/held/dimming, 0x00=inactive, other values ignored.";
+BO_ 2617054256 TVMSRogue_Button_Activity_Status: 8 TVMS_Rogue
+ SG_ TVMSRogue_ButtonActivity_BaseChannel : 0|8@1+ (1,0) [0|255] "channel" Vector__XXX
+ SG_ TVMSRogue_ButtonActivity_BasePlus0 : 8|8@1+ (1,0) [0|255] "state" Vector__XXX
+ SG_ TVMSRogue_ButtonActivity_BasePlus1 : 16|8@1+ (1,0) [0|255] "state" Vector__XXX
+ SG_ TVMSRogue_ButtonActivity_BasePlus2 : 24|8@1+ (1,0) [0|255] "state" Vector__XXX
+ SG_ TVMSRogue_ButtonActivity_BasePlus3 : 32|8@1+ (1,0) [0|255] "state" Vector__XXX
+ SG_ TVMSRogue_ButtonActivity_BasePlus4 : 40|8@1+ (1,0) [0|255] "state" Vector__XXX
+ SG_ TVMSRogue_ButtonActivity_BasePlus5 : 48|8@1+ (1,0) [0|255] "state" Vector__XXX
+ SG_ TVMSRogue_ButtonActivity_BasePlus6 : 56|8@1+ (1,0) [0|255] "state" Vector__XXX
+CM_ BO_ 2617054256 "CONFIRMED_CORRECT_DO_NOT_EDIT: TVMS Rogue output button/dimming-active/status frame, not the real physical input/button state. Raw CAN ID 0x1BFD1430, PGN 0x1BFD14, SA 0x30. In button 4-8 testing this frame stayed idle while 0x1BFD0030 carried actual input states.";
+CM_ SG_ 2617054256 TVMSRogue_ButtonActivity_BaseChannel "D1 base channel for output/dimming activity. Do not use this frame as the Rogue physical input/button state; use 0x1BFD0030 instead.";
+CM_ SG_ 2617054256 TVMSRogue_ButtonActivity_BasePlus0 "Button/dimming activity for channel base+0. 0x02=active/held/dimming, 0x00=inactive, other values ignored.";
+CM_ SG_ 2617054256 TVMSRogue_ButtonActivity_BasePlus1 "Button/dimming activity for channel base+1. 0x02=active/held/dimming, 0x00=inactive, other values ignored.";
+CM_ SG_ 2617054256 TVMSRogue_ButtonActivity_BasePlus2 "Button/dimming activity for channel base+2. 0x02=active/held/dimming, 0x00=inactive, other values ignored.";
+CM_ SG_ 2617054256 TVMSRogue_ButtonActivity_BasePlus3 "Button/dimming activity for channel base+3. 0x02=active/held/dimming, 0x00=inactive, other values ignored.";
+CM_ SG_ 2617054256 TVMSRogue_ButtonActivity_BasePlus4 "Button/dimming activity for channel base+4. 0x02=active/held/dimming, 0x00=inactive, other values ignored.";
+CM_ SG_ 2617054256 TVMSRogue_ButtonActivity_BasePlus5 "Button/dimming activity for channel base+5. 0x02=active/held/dimming, 0x00=inactive, other values ignored.";
+CM_ SG_ 2617054256 TVMSRogue_ButtonActivity_BasePlus6 "Button/dimming activity for channel base+6. 0x02=active/held/dimming, 0x00=inactive, other values ignored.";
 BA_ "Decode_Status" BO_ 2617054256 "CONFIRMED_CORRECT_DO_NOT_EDIT";
-BA_ "Decode_Status" SG_ 2617054256 TVMSRouge_ButtonActivity_BaseChannel "CONFIRMED_CORRECT_DO_NOT_EDIT";
-BA_ "Decode_Status" SG_ 2617054256 TVMSRouge_ButtonActivity_BasePlus0 "CONFIRMED_CORRECT_DO_NOT_EDIT";
-BA_ "Decode_Status" SG_ 2617054256 TVMSRouge_ButtonActivity_BasePlus1 "CONFIRMED_CORRECT_DO_NOT_EDIT";
-BA_ "Decode_Status" SG_ 2617054256 TVMSRouge_ButtonActivity_BasePlus2 "CONFIRMED_CORRECT_DO_NOT_EDIT";
-BA_ "Decode_Status" SG_ 2617054256 TVMSRouge_ButtonActivity_BasePlus3 "CONFIRMED_CORRECT_DO_NOT_EDIT";
-BA_ "Decode_Status" SG_ 2617054256 TVMSRouge_ButtonActivity_BasePlus4 "CONFIRMED_CORRECT_DO_NOT_EDIT";
-BA_ "Decode_Status" SG_ 2617054256 TVMSRouge_ButtonActivity_BasePlus5 "CONFIRMED_CORRECT_DO_NOT_EDIT";
-BA_ "Decode_Status" SG_ 2617054256 TVMSRouge_ButtonActivity_BasePlus6 "CONFIRMED_CORRECT_DO_NOT_EDIT";
+BA_ "Decode_Status" SG_ 2617054256 TVMSRogue_ButtonActivity_BaseChannel "CONFIRMED_CORRECT_DO_NOT_EDIT";
+BA_ "Decode_Status" SG_ 2617054256 TVMSRogue_ButtonActivity_BasePlus0 "CONFIRMED_CORRECT_DO_NOT_EDIT";
+BA_ "Decode_Status" SG_ 2617054256 TVMSRogue_ButtonActivity_BasePlus1 "CONFIRMED_CORRECT_DO_NOT_EDIT";
+BA_ "Decode_Status" SG_ 2617054256 TVMSRogue_ButtonActivity_BasePlus2 "CONFIRMED_CORRECT_DO_NOT_EDIT";
+BA_ "Decode_Status" SG_ 2617054256 TVMSRogue_ButtonActivity_BasePlus3 "CONFIRMED_CORRECT_DO_NOT_EDIT";
+BA_ "Decode_Status" SG_ 2617054256 TVMSRogue_ButtonActivity_BasePlus4 "CONFIRMED_CORRECT_DO_NOT_EDIT";
+BA_ "Decode_Status" SG_ 2617054256 TVMSRogue_ButtonActivity_BasePlus5 "CONFIRMED_CORRECT_DO_NOT_EDIT";
+BA_ "Decode_Status" SG_ 2617054256 TVMSRogue_ButtonActivity_BasePlus6 "CONFIRMED_CORRECT_DO_NOT_EDIT";
 
-BO_ 2399154208 TVMSRouge_Command_From_Redvision1: 8 Redvision_1
- SG_ TVMSRouge_Command_D1_Raw : 0|8@1+ (1,0) [0|255] "raw" Vector__XXX
- SG_ TVMSRouge_Command_D2_Raw : 8|8@1+ (1,0) [0|255] "raw" Vector__XXX
- SG_ TVMSRouge_Command_Channel M : 24|8@1+ (1,0) [0|255] "channel" Vector__XXX
- SG_ TVMSRouge_Command_State : 32|8@1+ (1,0) [0|255] "state" Vector__XXX
- SG_ TVMSRouge_Master_OnOffCmd m11 : 32|1@1+ (1,0) [0|1] "bool" Vector__XXX
- SG_ Rouge_Output_01_OnOffCmd m12 : 32|1@1+ (1,0) [0|1] "bool" Vector__XXX
- SG_ Rouge_Output_02_OnOffCmd m13 : 32|1@1+ (1,0) [0|1] "bool" Vector__XXX
- SG_ Rouge_Output_03_OnOffCmd m14 : 32|1@1+ (1,0) [0|1] "bool" Vector__XXX
- SG_ Rouge_Output_04_OnOffCmd m15 : 32|1@1+ (1,0) [0|1] "bool" Vector__XXX
- SG_ Rouge_Output_05_OnOffCmd m16 : 32|1@1+ (1,0) [0|1] "bool" Vector__XXX
- SG_ Rouge_Output_06_OnOffCmd m17 : 32|1@1+ (1,0) [0|1] "bool" Vector__XXX
- SG_ Rouge_Output_07_OnOffCmd m18 : 32|1@1+ (1,0) [0|1] "bool" Vector__XXX
- SG_ Rouge_Output_08_OnOffCmd m19 : 32|1@1+ (1,0) [0|1] "bool" Vector__XXX
- SG_ Rouge_Output_09_OnOffCmd m20 : 32|1@1+ (1,0) [0|1] "bool" Vector__XXX
- SG_ Rouge_Output_10_OnOffCmd m21 : 32|1@1+ (1,0) [0|1] "bool" Vector__XXX
-CM_ BO_ 2399154208 "UNCONFIRMED_PENDING_TEST: imported from inputs_outputs DBC. Original note: Raw CAN ID 0x0F003020, PGN 0x0F0030, source 0x20 Redvision_1. Logical Redvision commands to Rouge outputs; not physical button mapping.";
-VAL_ 2399154208 TVMSRouge_Command_Channel 11 "Master" 12 "Output_1" 13 "Output_2" 14 "Output_3" 15 "Output_4" 16 "Output_5" 17 "Output_6" 18 "Output_7" 19 "Output_8" 20 "Output_9" 21 "Output_10" ;
-CM_ SG_ 2399154208 TVMSRouge_Command_D1_Raw "UNCONFIRMED_PENDING_TEST: imported from inputs_outputs DBC. Signal was not present in v49 and requires validation.";
-CM_ SG_ 2399154208 TVMSRouge_Command_D2_Raw "UNCONFIRMED_PENDING_TEST: imported from inputs_outputs DBC. Signal was not present in v49 and requires validation.";
-CM_ SG_ 2399154208 TVMSRouge_Command_Channel "UNCONFIRMED_PENDING_TEST: imported from inputs_outputs DBC. Signal was not present in v49 and requires validation.";
-CM_ SG_ 2399154208 TVMSRouge_Command_State "UNCONFIRMED_PENDING_TEST: imported from inputs_outputs DBC. Signal was not present in v49 and requires validation.";
-CM_ SG_ 2399154208 TVMSRouge_Master_OnOffCmd "UNCONFIRMED_PENDING_TEST: TVMS Rouge config/label page identifies item/channel 0x0B as Master. ESPHome maps the master switch to the same on/off command shape as other Rouge logical channels.";
-CM_ SG_ 2399154208 Rouge_Output_01_OnOffCmd "UNCONFIRMED_PENDING_TEST: imported from inputs_outputs DBC. Signal was not present in v49 and requires validation.";
-CM_ SG_ 2399154208 Rouge_Output_02_OnOffCmd "UNCONFIRMED_PENDING_TEST: imported from inputs_outputs DBC. Signal was not present in v49 and requires validation.";
-CM_ SG_ 2399154208 Rouge_Output_03_OnOffCmd "UNCONFIRMED_PENDING_TEST: imported from inputs_outputs DBC. Signal was not present in v49 and requires validation.";
-CM_ SG_ 2399154208 Rouge_Output_04_OnOffCmd "UNCONFIRMED_PENDING_TEST: imported from inputs_outputs DBC. Signal was not present in v49 and requires validation.";
-CM_ SG_ 2399154208 Rouge_Output_05_OnOffCmd "UNCONFIRMED_PENDING_TEST: imported from inputs_outputs DBC. Signal was not present in v49 and requires validation.";
-CM_ SG_ 2399154208 Rouge_Output_06_OnOffCmd "UNCONFIRMED_PENDING_TEST: imported from inputs_outputs DBC. Signal was not present in v49 and requires validation.";
-CM_ SG_ 2399154208 Rouge_Output_07_OnOffCmd "UNCONFIRMED_PENDING_TEST: imported from inputs_outputs DBC. Signal was not present in v49 and requires validation.";
-CM_ SG_ 2399154208 Rouge_Output_08_OnOffCmd "UNCONFIRMED_PENDING_TEST: imported from inputs_outputs DBC. Signal was not present in v49 and requires validation.";
-CM_ SG_ 2399154208 Rouge_Output_09_OnOffCmd "UNCONFIRMED_PENDING_TEST: imported from inputs_outputs DBC. Signal was not present in v49 and requires validation.";
-CM_ SG_ 2399154208 Rouge_Output_10_OnOffCmd "UNCONFIRMED_PENDING_TEST: imported from inputs_outputs DBC. Signal was not present in v49 and requires validation.";
+BO_ 2399154208 TVMSRogue_Command_From_Redvision1: 8 Redvision_1
+ SG_ TVMSRogue_Command_D1_Raw : 0|8@1+ (1,0) [0|255] "raw" Vector__XXX
+ SG_ TVMSRogue_Command_D2_Raw : 8|8@1+ (1,0) [0|255] "raw" Vector__XXX
+ SG_ TVMSRogue_Command_Channel M : 24|8@1+ (1,0) [0|255] "channel" Vector__XXX
+ SG_ TVMSRogue_Command_State : 32|8@1+ (1,0) [0|255] "state" Vector__XXX
+ SG_ TVMSRogue_Master_OnOffCmd m11 : 32|1@1+ (1,0) [0|1] "bool" Vector__XXX
+ SG_ Rogue_Output_01_OnOffCmd m12 : 32|1@1+ (1,0) [0|1] "bool" Vector__XXX
+ SG_ Rogue_Output_02_OnOffCmd m13 : 32|1@1+ (1,0) [0|1] "bool" Vector__XXX
+ SG_ Rogue_Output_03_OnOffCmd m14 : 32|1@1+ (1,0) [0|1] "bool" Vector__XXX
+ SG_ Rogue_Output_04_OnOffCmd m15 : 32|1@1+ (1,0) [0|1] "bool" Vector__XXX
+ SG_ Rogue_Output_05_OnOffCmd m16 : 32|1@1+ (1,0) [0|1] "bool" Vector__XXX
+ SG_ Rogue_Output_06_OnOffCmd m17 : 32|1@1+ (1,0) [0|1] "bool" Vector__XXX
+ SG_ Rogue_Output_07_OnOffCmd m18 : 32|1@1+ (1,0) [0|1] "bool" Vector__XXX
+ SG_ Rogue_Output_08_OnOffCmd m19 : 32|1@1+ (1,0) [0|1] "bool" Vector__XXX
+ SG_ Rogue_Output_09_OnOffCmd m20 : 32|1@1+ (1,0) [0|1] "bool" Vector__XXX
+ SG_ Rogue_Output_10_OnOffCmd m21 : 32|1@1+ (1,0) [0|1] "bool" Vector__XXX
+CM_ BO_ 2399154208 "UNCONFIRMED_PENDING_TEST: imported from inputs_outputs DBC. Original note: Raw CAN ID 0x0F003020, PGN 0x0F0030, source 0x20 Redvision_1. Logical Redvision commands to Rogue outputs; not physical button mapping.";
+VAL_ 2399154208 TVMSRogue_Command_Channel 11 "Master" 12 "Output_1" 13 "Output_2" 14 "Output_3" 15 "Output_4" 16 "Output_5" 17 "Output_6" 18 "Output_7" 19 "Output_8" 20 "Output_9" 21 "Output_10" ;
+CM_ SG_ 2399154208 TVMSRogue_Command_D1_Raw "UNCONFIRMED_PENDING_TEST: imported from inputs_outputs DBC. Signal was not present in v49 and requires validation.";
+CM_ SG_ 2399154208 TVMSRogue_Command_D2_Raw "UNCONFIRMED_PENDING_TEST: imported from inputs_outputs DBC. Signal was not present in v49 and requires validation.";
+CM_ SG_ 2399154208 TVMSRogue_Command_Channel "UNCONFIRMED_PENDING_TEST: imported from inputs_outputs DBC. Signal was not present in v49 and requires validation.";
+CM_ SG_ 2399154208 TVMSRogue_Command_State "UNCONFIRMED_PENDING_TEST: imported from inputs_outputs DBC. Signal was not present in v49 and requires validation.";
+CM_ SG_ 2399154208 TVMSRogue_Master_OnOffCmd "UNCONFIRMED_PENDING_TEST: TVMS Rogue config/label page identifies item/channel 0x0B as Master. ESPHome maps the master switch to the same on/off command shape as other Rogue logical channels.";
+CM_ SG_ 2399154208 Rogue_Output_01_OnOffCmd "UNCONFIRMED_PENDING_TEST: imported from inputs_outputs DBC. Signal was not present in v49 and requires validation.";
+CM_ SG_ 2399154208 Rogue_Output_02_OnOffCmd "UNCONFIRMED_PENDING_TEST: imported from inputs_outputs DBC. Signal was not present in v49 and requires validation.";
+CM_ SG_ 2399154208 Rogue_Output_03_OnOffCmd "UNCONFIRMED_PENDING_TEST: imported from inputs_outputs DBC. Signal was not present in v49 and requires validation.";
+CM_ SG_ 2399154208 Rogue_Output_04_OnOffCmd "UNCONFIRMED_PENDING_TEST: imported from inputs_outputs DBC. Signal was not present in v49 and requires validation.";
+CM_ SG_ 2399154208 Rogue_Output_05_OnOffCmd "UNCONFIRMED_PENDING_TEST: imported from inputs_outputs DBC. Signal was not present in v49 and requires validation.";
+CM_ SG_ 2399154208 Rogue_Output_06_OnOffCmd "UNCONFIRMED_PENDING_TEST: imported from inputs_outputs DBC. Signal was not present in v49 and requires validation.";
+CM_ SG_ 2399154208 Rogue_Output_07_OnOffCmd "UNCONFIRMED_PENDING_TEST: imported from inputs_outputs DBC. Signal was not present in v49 and requires validation.";
+CM_ SG_ 2399154208 Rogue_Output_08_OnOffCmd "UNCONFIRMED_PENDING_TEST: imported from inputs_outputs DBC. Signal was not present in v49 and requires validation.";
+CM_ SG_ 2399154208 Rogue_Output_09_OnOffCmd "UNCONFIRMED_PENDING_TEST: imported from inputs_outputs DBC. Signal was not present in v49 and requires validation.";
+CM_ SG_ 2399154208 Rogue_Output_10_OnOffCmd "UNCONFIRMED_PENDING_TEST: imported from inputs_outputs DBC. Signal was not present in v49 and requires validation.";
 BA_ "Decode_Status" BO_ 2399154208 "UNCONFIRMED_PENDING_TEST";
-BA_ "Decode_Status" SG_ 2399154208 TVMSRouge_Command_D1_Raw "UNCONFIRMED_PENDING_TEST";
-BA_ "Decode_Status" SG_ 2399154208 TVMSRouge_Command_D2_Raw "UNCONFIRMED_PENDING_TEST";
-BA_ "Decode_Status" SG_ 2399154208 TVMSRouge_Command_Channel "UNCONFIRMED_PENDING_TEST";
-BA_ "Decode_Status" SG_ 2399154208 TVMSRouge_Command_State "UNCONFIRMED_PENDING_TEST";
-BA_ "Decode_Status" SG_ 2399154208 TVMSRouge_Master_OnOffCmd "UNCONFIRMED_PENDING_TEST";
-BA_ "Decode_Status" SG_ 2399154208 Rouge_Output_01_OnOffCmd "UNCONFIRMED_PENDING_TEST";
-BA_ "Decode_Status" SG_ 2399154208 Rouge_Output_02_OnOffCmd "UNCONFIRMED_PENDING_TEST";
-BA_ "Decode_Status" SG_ 2399154208 Rouge_Output_03_OnOffCmd "UNCONFIRMED_PENDING_TEST";
-BA_ "Decode_Status" SG_ 2399154208 Rouge_Output_04_OnOffCmd "UNCONFIRMED_PENDING_TEST";
-BA_ "Decode_Status" SG_ 2399154208 Rouge_Output_05_OnOffCmd "UNCONFIRMED_PENDING_TEST";
-BA_ "Decode_Status" SG_ 2399154208 Rouge_Output_06_OnOffCmd "UNCONFIRMED_PENDING_TEST";
-BA_ "Decode_Status" SG_ 2399154208 Rouge_Output_07_OnOffCmd "UNCONFIRMED_PENDING_TEST";
-BA_ "Decode_Status" SG_ 2399154208 Rouge_Output_08_OnOffCmd "UNCONFIRMED_PENDING_TEST";
-BA_ "Decode_Status" SG_ 2399154208 Rouge_Output_09_OnOffCmd "UNCONFIRMED_PENDING_TEST";
-BA_ "Decode_Status" SG_ 2399154208 Rouge_Output_10_OnOffCmd "UNCONFIRMED_PENDING_TEST";
+BA_ "Decode_Status" SG_ 2399154208 TVMSRogue_Command_D1_Raw "UNCONFIRMED_PENDING_TEST";
+BA_ "Decode_Status" SG_ 2399154208 TVMSRogue_Command_D2_Raw "UNCONFIRMED_PENDING_TEST";
+BA_ "Decode_Status" SG_ 2399154208 TVMSRogue_Command_Channel "UNCONFIRMED_PENDING_TEST";
+BA_ "Decode_Status" SG_ 2399154208 TVMSRogue_Command_State "UNCONFIRMED_PENDING_TEST";
+BA_ "Decode_Status" SG_ 2399154208 TVMSRogue_Master_OnOffCmd "UNCONFIRMED_PENDING_TEST";
+BA_ "Decode_Status" SG_ 2399154208 Rogue_Output_01_OnOffCmd "UNCONFIRMED_PENDING_TEST";
+BA_ "Decode_Status" SG_ 2399154208 Rogue_Output_02_OnOffCmd "UNCONFIRMED_PENDING_TEST";
+BA_ "Decode_Status" SG_ 2399154208 Rogue_Output_03_OnOffCmd "UNCONFIRMED_PENDING_TEST";
+BA_ "Decode_Status" SG_ 2399154208 Rogue_Output_04_OnOffCmd "UNCONFIRMED_PENDING_TEST";
+BA_ "Decode_Status" SG_ 2399154208 Rogue_Output_05_OnOffCmd "UNCONFIRMED_PENDING_TEST";
+BA_ "Decode_Status" SG_ 2399154208 Rogue_Output_06_OnOffCmd "UNCONFIRMED_PENDING_TEST";
+BA_ "Decode_Status" SG_ 2399154208 Rogue_Output_07_OnOffCmd "UNCONFIRMED_PENDING_TEST";
+BA_ "Decode_Status" SG_ 2399154208 Rogue_Output_08_OnOffCmd "UNCONFIRMED_PENDING_TEST";
+BA_ "Decode_Status" SG_ 2399154208 Rogue_Output_09_OnOffCmd "UNCONFIRMED_PENDING_TEST";
+BA_ "Decode_Status" SG_ 2399154208 Rogue_Output_10_OnOffCmd "UNCONFIRMED_PENDING_TEST";
 
-BO_ 2399219744 TVMSRouge_Dim_Command: 8 Redvision_1
- SG_ TVMSRouge_Dim_Channel M : 0|8@1+ (1,0) [0|255] "channel" Vector__XXX
- SG_ TVMSRouge_Dim_Enable : 8|8@1+ (1,0) [0|255] "raw" Vector__XXX
- SG_ Rouge_Output_01_TargetLevel m12 : 16|8@1+ (1,0) [0|100] "%" Vector__XXX
- SG_ Rouge_Output_02_TargetLevel m13 : 16|8@1+ (1,0) [0|100] "%" Vector__XXX
- SG_ Rouge_Output_03_TargetLevel m14 : 16|8@1+ (1,0) [0|100] "%" Vector__XXX
- SG_ Rouge_Output_04_TargetLevel m15 : 16|8@1+ (1,0) [0|100] "%" Vector__XXX
- SG_ Rouge_Output_05_TargetLevel m16 : 16|8@1+ (1,0) [0|100] "%" Vector__XXX
- SG_ Rouge_Output_06_TargetLevel m17 : 16|8@1+ (1,0) [0|100] "%" Vector__XXX
- SG_ Rouge_Output_07_TargetLevel m18 : 16|8@1+ (1,0) [0|100] "%" Vector__XXX
- SG_ Rouge_Output_08_TargetLevel m19 : 16|8@1+ (1,0) [0|100] "%" Vector__XXX
- SG_ Rouge_Output_09_TargetLevel m20 : 16|8@1+ (1,0) [0|100] "%" Vector__XXX
- SG_ Rouge_Output_10_TargetLevel m21 : 16|8@1+ (1,0) [0|100] "%" Vector__XXX
-CM_ BO_ 2399219744 "UNCONFIRMED_PENDING_TEST: imported from inputs_outputs DBC. Original note: Raw CAN ID 0x0F013020, PGN 0x0F0130. Logical dim command. Channel IDs 0x0C-0x15 are Rouge outputs 1-10.";
-VAL_ 2399219744 TVMSRouge_Dim_Channel 12 "Output_1" 13 "Output_2" 14 "Output_3" 15 "Output_4" 16 "Output_5" 17 "Output_6" 18 "Output_7" 19 "Output_8" 20 "Output_9" 21 "Output_10" ;
-CM_ SG_ 2399219744 TVMSRouge_Dim_Channel "UNCONFIRMED_PENDING_TEST: imported from inputs_outputs DBC. Signal was not present in v49 and requires validation.";
-CM_ SG_ 2399219744 TVMSRouge_Dim_Enable "UNCONFIRMED_PENDING_TEST: imported from inputs_outputs DBC. Signal was not present in v49 and requires validation.";
-CM_ SG_ 2399219744 Rouge_Output_01_TargetLevel "UNCONFIRMED_PENDING_TEST: imported from inputs_outputs DBC. Signal was not present in v49 and requires validation.";
-CM_ SG_ 2399219744 Rouge_Output_02_TargetLevel "UNCONFIRMED_PENDING_TEST: imported from inputs_outputs DBC. Signal was not present in v49 and requires validation.";
-CM_ SG_ 2399219744 Rouge_Output_03_TargetLevel "UNCONFIRMED_PENDING_TEST: imported from inputs_outputs DBC. Signal was not present in v49 and requires validation.";
-CM_ SG_ 2399219744 Rouge_Output_04_TargetLevel "UNCONFIRMED_PENDING_TEST: imported from inputs_outputs DBC. Signal was not present in v49 and requires validation.";
-CM_ SG_ 2399219744 Rouge_Output_05_TargetLevel "UNCONFIRMED_PENDING_TEST: imported from inputs_outputs DBC. Signal was not present in v49 and requires validation.";
-CM_ SG_ 2399219744 Rouge_Output_06_TargetLevel "UNCONFIRMED_PENDING_TEST: imported from inputs_outputs DBC. Signal was not present in v49 and requires validation.";
-CM_ SG_ 2399219744 Rouge_Output_07_TargetLevel "UNCONFIRMED_PENDING_TEST: imported from inputs_outputs DBC. Signal was not present in v49 and requires validation.";
-CM_ SG_ 2399219744 Rouge_Output_08_TargetLevel "UNCONFIRMED_PENDING_TEST: imported from inputs_outputs DBC. Signal was not present in v49 and requires validation.";
-CM_ SG_ 2399219744 Rouge_Output_09_TargetLevel "UNCONFIRMED_PENDING_TEST: imported from inputs_outputs DBC. Signal was not present in v49 and requires validation.";
-CM_ SG_ 2399219744 Rouge_Output_10_TargetLevel "UNCONFIRMED_PENDING_TEST: imported from inputs_outputs DBC. Signal was not present in v49 and requires validation.";
+BO_ 2399219744 TVMSRogue_Dim_Command: 8 Redvision_1
+ SG_ TVMSRogue_Dim_Channel M : 0|8@1+ (1,0) [0|255] "channel" Vector__XXX
+ SG_ TVMSRogue_Dim_Enable : 8|8@1+ (1,0) [0|255] "raw" Vector__XXX
+ SG_ Rogue_Output_01_TargetLevel m12 : 16|8@1+ (1,0) [0|100] "%" Vector__XXX
+ SG_ Rogue_Output_02_TargetLevel m13 : 16|8@1+ (1,0) [0|100] "%" Vector__XXX
+ SG_ Rogue_Output_03_TargetLevel m14 : 16|8@1+ (1,0) [0|100] "%" Vector__XXX
+ SG_ Rogue_Output_04_TargetLevel m15 : 16|8@1+ (1,0) [0|100] "%" Vector__XXX
+ SG_ Rogue_Output_05_TargetLevel m16 : 16|8@1+ (1,0) [0|100] "%" Vector__XXX
+ SG_ Rogue_Output_06_TargetLevel m17 : 16|8@1+ (1,0) [0|100] "%" Vector__XXX
+ SG_ Rogue_Output_07_TargetLevel m18 : 16|8@1+ (1,0) [0|100] "%" Vector__XXX
+ SG_ Rogue_Output_08_TargetLevel m19 : 16|8@1+ (1,0) [0|100] "%" Vector__XXX
+ SG_ Rogue_Output_09_TargetLevel m20 : 16|8@1+ (1,0) [0|100] "%" Vector__XXX
+ SG_ Rogue_Output_10_TargetLevel m21 : 16|8@1+ (1,0) [0|100] "%" Vector__XXX
+CM_ BO_ 2399219744 "UNCONFIRMED_PENDING_TEST: imported from inputs_outputs DBC. Original note: Raw CAN ID 0x0F013020, PGN 0x0F0130. Logical dim command. Channel IDs 0x0C-0x15 are Rogue outputs 1-10.";
+VAL_ 2399219744 TVMSRogue_Dim_Channel 12 "Output_1" 13 "Output_2" 14 "Output_3" 15 "Output_4" 16 "Output_5" 17 "Output_6" 18 "Output_7" 19 "Output_8" 20 "Output_9" 21 "Output_10" ;
+CM_ SG_ 2399219744 TVMSRogue_Dim_Channel "UNCONFIRMED_PENDING_TEST: imported from inputs_outputs DBC. Signal was not present in v49 and requires validation.";
+CM_ SG_ 2399219744 TVMSRogue_Dim_Enable "UNCONFIRMED_PENDING_TEST: imported from inputs_outputs DBC. Signal was not present in v49 and requires validation.";
+CM_ SG_ 2399219744 Rogue_Output_01_TargetLevel "UNCONFIRMED_PENDING_TEST: imported from inputs_outputs DBC. Signal was not present in v49 and requires validation.";
+CM_ SG_ 2399219744 Rogue_Output_02_TargetLevel "UNCONFIRMED_PENDING_TEST: imported from inputs_outputs DBC. Signal was not present in v49 and requires validation.";
+CM_ SG_ 2399219744 Rogue_Output_03_TargetLevel "UNCONFIRMED_PENDING_TEST: imported from inputs_outputs DBC. Signal was not present in v49 and requires validation.";
+CM_ SG_ 2399219744 Rogue_Output_04_TargetLevel "UNCONFIRMED_PENDING_TEST: imported from inputs_outputs DBC. Signal was not present in v49 and requires validation.";
+CM_ SG_ 2399219744 Rogue_Output_05_TargetLevel "UNCONFIRMED_PENDING_TEST: imported from inputs_outputs DBC. Signal was not present in v49 and requires validation.";
+CM_ SG_ 2399219744 Rogue_Output_06_TargetLevel "UNCONFIRMED_PENDING_TEST: imported from inputs_outputs DBC. Signal was not present in v49 and requires validation.";
+CM_ SG_ 2399219744 Rogue_Output_07_TargetLevel "UNCONFIRMED_PENDING_TEST: imported from inputs_outputs DBC. Signal was not present in v49 and requires validation.";
+CM_ SG_ 2399219744 Rogue_Output_08_TargetLevel "UNCONFIRMED_PENDING_TEST: imported from inputs_outputs DBC. Signal was not present in v49 and requires validation.";
+CM_ SG_ 2399219744 Rogue_Output_09_TargetLevel "UNCONFIRMED_PENDING_TEST: imported from inputs_outputs DBC. Signal was not present in v49 and requires validation.";
+CM_ SG_ 2399219744 Rogue_Output_10_TargetLevel "UNCONFIRMED_PENDING_TEST: imported from inputs_outputs DBC. Signal was not present in v49 and requires validation.";
 BA_ "Decode_Status" BO_ 2399219744 "UNCONFIRMED_PENDING_TEST";
-BA_ "Decode_Status" SG_ 2399219744 TVMSRouge_Dim_Channel "UNCONFIRMED_PENDING_TEST";
-BA_ "Decode_Status" SG_ 2399219744 TVMSRouge_Dim_Enable "UNCONFIRMED_PENDING_TEST";
-BA_ "Decode_Status" SG_ 2399219744 Rouge_Output_01_TargetLevel "UNCONFIRMED_PENDING_TEST";
-BA_ "Decode_Status" SG_ 2399219744 Rouge_Output_02_TargetLevel "UNCONFIRMED_PENDING_TEST";
-BA_ "Decode_Status" SG_ 2399219744 Rouge_Output_03_TargetLevel "UNCONFIRMED_PENDING_TEST";
-BA_ "Decode_Status" SG_ 2399219744 Rouge_Output_04_TargetLevel "UNCONFIRMED_PENDING_TEST";
-BA_ "Decode_Status" SG_ 2399219744 Rouge_Output_05_TargetLevel "UNCONFIRMED_PENDING_TEST";
-BA_ "Decode_Status" SG_ 2399219744 Rouge_Output_06_TargetLevel "UNCONFIRMED_PENDING_TEST";
-BA_ "Decode_Status" SG_ 2399219744 Rouge_Output_07_TargetLevel "UNCONFIRMED_PENDING_TEST";
-BA_ "Decode_Status" SG_ 2399219744 Rouge_Output_08_TargetLevel "UNCONFIRMED_PENDING_TEST";
-BA_ "Decode_Status" SG_ 2399219744 Rouge_Output_09_TargetLevel "UNCONFIRMED_PENDING_TEST";
-BA_ "Decode_Status" SG_ 2399219744 Rouge_Output_10_TargetLevel "UNCONFIRMED_PENDING_TEST";
+BA_ "Decode_Status" SG_ 2399219744 TVMSRogue_Dim_Channel "UNCONFIRMED_PENDING_TEST";
+BA_ "Decode_Status" SG_ 2399219744 TVMSRogue_Dim_Enable "UNCONFIRMED_PENDING_TEST";
+BA_ "Decode_Status" SG_ 2399219744 Rogue_Output_01_TargetLevel "UNCONFIRMED_PENDING_TEST";
+BA_ "Decode_Status" SG_ 2399219744 Rogue_Output_02_TargetLevel "UNCONFIRMED_PENDING_TEST";
+BA_ "Decode_Status" SG_ 2399219744 Rogue_Output_03_TargetLevel "UNCONFIRMED_PENDING_TEST";
+BA_ "Decode_Status" SG_ 2399219744 Rogue_Output_04_TargetLevel "UNCONFIRMED_PENDING_TEST";
+BA_ "Decode_Status" SG_ 2399219744 Rogue_Output_05_TargetLevel "UNCONFIRMED_PENDING_TEST";
+BA_ "Decode_Status" SG_ 2399219744 Rogue_Output_06_TargetLevel "UNCONFIRMED_PENDING_TEST";
+BA_ "Decode_Status" SG_ 2399219744 Rogue_Output_07_TargetLevel "UNCONFIRMED_PENDING_TEST";
+BA_ "Decode_Status" SG_ 2399219744 Rogue_Output_08_TargetLevel "UNCONFIRMED_PENDING_TEST";
+BA_ "Decode_Status" SG_ 2399219744 Rogue_Output_09_TargetLevel "UNCONFIRMED_PENDING_TEST";
+BA_ "Decode_Status" SG_ 2399219744 Rogue_Output_10_TargetLevel "UNCONFIRMED_PENDING_TEST";
 
 BO_ 2213676545 Manager30_Charger_Current_Status: 8 Manager30
  SG_ Manager30_ChargerCurrent_Candidate_A : 0|16@1+ (0.01,0) [0|200] "A" Vector__XXX
@@ -713,27 +713,27 @@ BA_ "Decode_Status" SG_ 2482047496 Battery_Low_SOC_Alarm_Report_Percent "CONFIRM
 BA_ "Decode_Status" SG_ 2482047496 Battery_Low_Voltage_Alarm_Report_V "CONFIRMED_CORRECT_DO_NOT_EDIT";
 
 
-CM_ "v51 update: merged latest reverse-engineering results from ESPHome/log work: Manager30 solar Wh confirmed as 0x03FCD601 D1=0x00 D2-D5 uint32 Wh; Rouge 1BFD1230 level feedback corrected to base-channel grouped byte layout; Rouge 1BFD1430 identified as hardware button/dimming-active status; Rouge 1BFD0030 documented as coarse status; TVMS1280 1BFD0024 documented as output feedback; module input voltage frames 13F10830/13F10824 added.";
-CM_ "v52 update: TVMS1280 hardware has 3 digital inputs. They are currently unused in this installation and no confirmed CAN PGN/byte decode has been identified. Do not confuse them with TVMS Rouge hardware button/dimming-active status 0x1BFD1430. Candidate TVMS1280 status/input frames to test: 0x1BFD0224, 0x1BFCF024, 0x1BFCF224, 0x13F10824.";
+CM_ "v51 update: merged latest reverse-engineering results from ESPHome/log work: Manager30 solar Wh confirmed as 0x03FCD601 D1=0x00 D2-D5 uint32 Wh; Rogue 1BFD1230 level feedback corrected to base-channel grouped byte layout; Rogue 1BFD1430 identified as hardware button/dimming-active status; Rogue 1BFD0030 documented as coarse status; TVMS1280 1BFD0024 documented as output feedback; module input voltage frames 13F10830/13F10824 added.";
+CM_ "v52 update: TVMS1280 hardware has 3 digital inputs. They are currently unused in this installation and no confirmed CAN PGN/byte decode has been identified. Do not confuse them with TVMS Rogue hardware button/dimming-active status 0x1BFD1430. Candidate TVMS1280 status/input frames to test: 0x1BFD0224, 0x1BFCF024, 0x1BFCF224, 0x13F10824.";
 
-BO_ 2482047024 PGN_13F108_TVMSRouge_InputStatus: 8 TVMS_Rouge
- SG_ TVMSRouge_Input_Voltage : 0|16@1+ (0.01,0) [0|60] "V" Vector__XXX
- SG_ TVMSRouge_Input_Status_D3 : 16|8@1+ (1,0) [0|255] "raw" Vector__XXX
- SG_ TVMSRouge_Input_Status_D4 : 24|8@1+ (1,0) [0|255] "raw" Vector__XXX
- SG_ TVMSRouge_Input_Status_D5 : 32|8@1+ (1,0) [0|255] "raw" Vector__XXX
- SG_ TVMSRouge_Input_Status_D6 : 40|8@1+ (1,0) [0|255] "raw" Vector__XXX
- SG_ TVMSRouge_Input_Status_D7 : 48|8@1+ (1,0) [0|255] "raw" Vector__XXX
- SG_ TVMSRouge_Input_Status_D8 : 56|8@1+ (1,0) [0|255] "raw" Vector__XXX
-CM_ BO_ 2482047024 "CONFIRMED_CORRECT_DO_NOT_EDIT: TVMS Rouge input/status frame. Raw CAN ID 0x13F10830, PGN 0x13F108, SA 0x30.";
-CM_ SG_ 2482047024 TVMSRouge_Input_Voltage "SUPERSEDED: Static frame — payload is fixed and does not track live voltage. Live voltage is in 0x1BFD0230 MUX 0x16 D2-D3 LE uint16 millivolts. D1-D2 little-endian, scale 0.01 V/count. Example F0 04 = 12.64 V; EC 04 = 12.60 V.";
+BO_ 2482047024 PGN_13F108_TVMSRogue_InputStatus: 8 TVMS_Rogue
+ SG_ TVMSRogue_Input_Voltage : 0|16@1+ (0.01,0) [0|60] "V" Vector__XXX
+ SG_ TVMSRogue_Input_Status_D3 : 16|8@1+ (1,0) [0|255] "raw" Vector__XXX
+ SG_ TVMSRogue_Input_Status_D4 : 24|8@1+ (1,0) [0|255] "raw" Vector__XXX
+ SG_ TVMSRogue_Input_Status_D5 : 32|8@1+ (1,0) [0|255] "raw" Vector__XXX
+ SG_ TVMSRogue_Input_Status_D6 : 40|8@1+ (1,0) [0|255] "raw" Vector__XXX
+ SG_ TVMSRogue_Input_Status_D7 : 48|8@1+ (1,0) [0|255] "raw" Vector__XXX
+ SG_ TVMSRogue_Input_Status_D8 : 56|8@1+ (1,0) [0|255] "raw" Vector__XXX
+CM_ BO_ 2482047024 "CONFIRMED_CORRECT_DO_NOT_EDIT: TVMS Rogue input/status frame. Raw CAN ID 0x13F10830, PGN 0x13F108, SA 0x30.";
+CM_ SG_ 2482047024 TVMSRogue_Input_Voltage "SUPERSEDED: Static frame — payload is fixed and does not track live voltage. Live voltage is in 0x1BFD0230 MUX 0x16 D2-D3 LE uint16 millivolts. D1-D2 little-endian, scale 0.01 V/count. Example F0 04 = 12.64 V; EC 04 = 12.60 V.";
 BA_ "Decode_Status" BO_ 2482047024 "CONFIRMED_CORRECT_DO_NOT_EDIT";
-BA_ "Decode_Status" SG_ 2482047024 TVMSRouge_Input_Voltage "SUPERSEDED";
-BA_ "Decode_Status" SG_ 2482047024 TVMSRouge_Input_Status_D3 "UNCONFIRMED_PENDING_TEST";
-BA_ "Decode_Status" SG_ 2482047024 TVMSRouge_Input_Status_D4 "UNCONFIRMED_PENDING_TEST";
-BA_ "Decode_Status" SG_ 2482047024 TVMSRouge_Input_Status_D5 "UNCONFIRMED_PENDING_TEST";
-BA_ "Decode_Status" SG_ 2482047024 TVMSRouge_Input_Status_D6 "UNCONFIRMED_PENDING_TEST";
-BA_ "Decode_Status" SG_ 2482047024 TVMSRouge_Input_Status_D7 "UNCONFIRMED_PENDING_TEST";
-BA_ "Decode_Status" SG_ 2482047024 TVMSRouge_Input_Status_D8 "UNCONFIRMED_PENDING_TEST";
+BA_ "Decode_Status" SG_ 2482047024 TVMSRogue_Input_Voltage "SUPERSEDED";
+BA_ "Decode_Status" SG_ 2482047024 TVMSRogue_Input_Status_D3 "UNCONFIRMED_PENDING_TEST";
+BA_ "Decode_Status" SG_ 2482047024 TVMSRogue_Input_Status_D4 "UNCONFIRMED_PENDING_TEST";
+BA_ "Decode_Status" SG_ 2482047024 TVMSRogue_Input_Status_D5 "UNCONFIRMED_PENDING_TEST";
+BA_ "Decode_Status" SG_ 2482047024 TVMSRogue_Input_Status_D6 "UNCONFIRMED_PENDING_TEST";
+BA_ "Decode_Status" SG_ 2482047024 TVMSRogue_Input_Status_D7 "UNCONFIRMED_PENDING_TEST";
+BA_ "Decode_Status" SG_ 2482047024 TVMSRogue_Input_Status_D8 "UNCONFIRMED_PENDING_TEST";
 
 BO_ 2482047012 PGN_13F108_TVMS1280_InputStatus: 8 TVMS_1280
  SG_ TVMS1280_Supply_Voltage : 0|16@1+ (0.01,0) [0|60] "V" Vector__XXX
@@ -754,46 +754,46 @@ BA_ "Decode_Status" SG_ 2482047012 TVMS1280_Input_Status_D6 "UNCONFIRMED_PENDING
 BA_ "Decode_Status" SG_ 2482047012 TVMS1280_Input_Status_D7 "UNCONFIRMED_PENDING_TEST";
 BA_ "Decode_Status" SG_ 2482047012 TVMS1280_Input_Status_D8 "UNCONFIRMED_PENDING_TEST";
 
-BO_ 2399481888 TVMSRouge_Dim_Command_Actual: 8 Redvision_1
- SG_ TVMSRouge_DimActual_Channel : 0|8@1+ (1,0) [0|255] "channel" Vector__XXX
- SG_ TVMSRouge_DimActual_Enable : 8|8@1+ (1,0) [0|255] "raw" Vector__XXX
- SG_ TVMSRouge_DimActual_Direction : 16|8@1+ (1,0) [0|255] "raw" Vector__XXX
- SG_ TVMSRouge_DimActual_DurationHint : 24|8@1+ (1,0) [0|255] "raw" Vector__XXX
- SG_ TVMSRouge_DimActual_D5 : 32|8@1+ (1,0) [0|255] "raw" Vector__XXX
-CM_ BO_ 2399481888 "CONFIRMED_CORRECT_DO_NOT_EDIT: actual TVMS Rouge dim command used by RedVision/ESPHome. Raw CAN ID 0x0F053020. Pattern: <channel> 01 <01 down / 64 up> 05 00 FF FF FF; release is <channel> 01 FF 00 00 FF FF FF.";
-CM_ SG_ 2399481888 TVMSRouge_DimActual_Channel "Rouge output channel 0x0C-0x15.";
-CM_ SG_ 2399481888 TVMSRouge_DimActual_Direction "0x01=dim down, 0x64=dim up, 0xFF=release.";
-VAL_ 2399481888 TVMSRouge_DimActual_Direction 1 "DimDown" 100 "DimUp" 255 "Release";
+BO_ 2399481888 TVMSRogue_Dim_Command_Actual: 8 Redvision_1
+ SG_ TVMSRogue_DimActual_Channel : 0|8@1+ (1,0) [0|255] "channel" Vector__XXX
+ SG_ TVMSRogue_DimActual_Enable : 8|8@1+ (1,0) [0|255] "raw" Vector__XXX
+ SG_ TVMSRogue_DimActual_Direction : 16|8@1+ (1,0) [0|255] "raw" Vector__XXX
+ SG_ TVMSRogue_DimActual_DurationHint : 24|8@1+ (1,0) [0|255] "raw" Vector__XXX
+ SG_ TVMSRogue_DimActual_D5 : 32|8@1+ (1,0) [0|255] "raw" Vector__XXX
+CM_ BO_ 2399481888 "CONFIRMED_CORRECT_DO_NOT_EDIT: actual TVMS Rogue dim command used by RedVision/ESPHome. Raw CAN ID 0x0F053020. Pattern: <channel> 01 <01 down / 64 up> 05 00 FF FF FF; release is <channel> 01 FF 00 00 FF FF FF.";
+CM_ SG_ 2399481888 TVMSRogue_DimActual_Channel "Rogue output channel 0x0C-0x15.";
+CM_ SG_ 2399481888 TVMSRogue_DimActual_Direction "0x01=dim down, 0x64=dim up, 0xFF=release.";
+VAL_ 2399481888 TVMSRogue_DimActual_Direction 1 "DimDown" 100 "DimUp" 255 "Release";
 BA_ "Decode_Status" BO_ 2399481888 "CONFIRMED_CORRECT_DO_NOT_EDIT";
-BA_ "Decode_Status" SG_ 2399481888 TVMSRouge_DimActual_Channel "CONFIRMED_CORRECT_DO_NOT_EDIT";
-BA_ "Decode_Status" SG_ 2399481888 TVMSRouge_DimActual_Enable "CONFIRMED_CORRECT_DO_NOT_EDIT";
-BA_ "Decode_Status" SG_ 2399481888 TVMSRouge_DimActual_Direction "CONFIRMED_CORRECT_DO_NOT_EDIT";
-BA_ "Decode_Status" SG_ 2399481888 TVMSRouge_DimActual_DurationHint "CONFIRMED_CORRECT_DO_NOT_EDIT";
-BA_ "Decode_Status" SG_ 2399481888 TVMSRouge_DimActual_D5 "CONFIRMED_CORRECT_DO_NOT_EDIT";
+BA_ "Decode_Status" SG_ 2399481888 TVMSRogue_DimActual_Channel "CONFIRMED_CORRECT_DO_NOT_EDIT";
+BA_ "Decode_Status" SG_ 2399481888 TVMSRogue_DimActual_Enable "CONFIRMED_CORRECT_DO_NOT_EDIT";
+BA_ "Decode_Status" SG_ 2399481888 TVMSRogue_DimActual_Direction "CONFIRMED_CORRECT_DO_NOT_EDIT";
+BA_ "Decode_Status" SG_ 2399481888 TVMSRogue_DimActual_DurationHint "CONFIRMED_CORRECT_DO_NOT_EDIT";
+BA_ "Decode_Status" SG_ 2399481888 TVMSRogue_DimActual_D5 "CONFIRMED_CORRECT_DO_NOT_EDIT";
 
-BO_ 2549941296 TVMSRouge_Label_Page: 8 TVMS_Rouge
- SG_ TVMSRouge_Label_Item : 0|8@1+ (1,0) [0|255] "item" Vector__XXX
- SG_ TVMSRouge_Label_Segment : 8|8@1+ (1,0) [0|255] "segment" Vector__XXX
- SG_ TVMSRouge_Label_TextByte1 : 16|8@1+ (1,0) [0|255] "ascii" Vector__XXX
- SG_ TVMSRouge_Label_TextByte2 : 24|8@1+ (1,0) [0|255] "ascii" Vector__XXX
- SG_ TVMSRouge_Label_TextByte3 : 32|8@1+ (1,0) [0|255] "ascii" Vector__XXX
- SG_ TVMSRouge_Label_TextByte4 : 40|8@1+ (1,0) [0|255] "ascii" Vector__XXX
- SG_ TVMSRouge_Label_TextByte5 : 48|8@1+ (1,0) [0|255] "ascii" Vector__XXX
- SG_ TVMSRouge_Label_TextByte6 : 56|8@1+ (1,0) [0|255] "ascii" Vector__XXX
-CM_ BO_ 2549941296 "CONFIRMED_CORRECT_DO_NOT_EDIT: TVMS Rouge label/name page. Raw CAN ID 0x17FD0430, PGN 0x17FD04, SA 0x30. D1=item id, D2=string segment, D3-D8=ASCII text bytes; 0xFF pads unused text bytes.";
-CM_ SG_ 2549941296 TVMSRouge_Label_Item "CONFIRMED_CORRECT_DO_NOT_EDIT: Label item id. Config log confirms item 0x16 = InputVoltage and item 0x17 = InputCurrent.";
-CM_ SG_ 2549941296 TVMSRouge_Label_Segment "String segment index. Concatenate D3-D8 ASCII chunks ordered by D2 for the same item id.";
-VAL_ 2549941296 TVMSRouge_Label_Item 22 "InputVoltage" 23 "InputCurrent" ;
+BO_ 2549941296 TVMSRogue_Label_Page: 8 TVMS_Rogue
+ SG_ TVMSRogue_Label_Item : 0|8@1+ (1,0) [0|255] "item" Vector__XXX
+ SG_ TVMSRogue_Label_Segment : 8|8@1+ (1,0) [0|255] "segment" Vector__XXX
+ SG_ TVMSRogue_Label_TextByte1 : 16|8@1+ (1,0) [0|255] "ascii" Vector__XXX
+ SG_ TVMSRogue_Label_TextByte2 : 24|8@1+ (1,0) [0|255] "ascii" Vector__XXX
+ SG_ TVMSRogue_Label_TextByte3 : 32|8@1+ (1,0) [0|255] "ascii" Vector__XXX
+ SG_ TVMSRogue_Label_TextByte4 : 40|8@1+ (1,0) [0|255] "ascii" Vector__XXX
+ SG_ TVMSRogue_Label_TextByte5 : 48|8@1+ (1,0) [0|255] "ascii" Vector__XXX
+ SG_ TVMSRogue_Label_TextByte6 : 56|8@1+ (1,0) [0|255] "ascii" Vector__XXX
+CM_ BO_ 2549941296 "CONFIRMED_CORRECT_DO_NOT_EDIT: TVMS Rogue label/name page. Raw CAN ID 0x17FD0430, PGN 0x17FD04, SA 0x30. D1=item id, D2=string segment, D3-D8=ASCII text bytes; 0xFF pads unused text bytes.";
+CM_ SG_ 2549941296 TVMSRogue_Label_Item "CONFIRMED_CORRECT_DO_NOT_EDIT: Label item id. Config log confirms item 0x16 = InputVoltage and item 0x17 = InputCurrent.";
+CM_ SG_ 2549941296 TVMSRogue_Label_Segment "String segment index. Concatenate D3-D8 ASCII chunks ordered by D2 for the same item id.";
+VAL_ 2549941296 TVMSRogue_Label_Item 22 "InputVoltage" 23 "InputCurrent" ;
 BA_ "Decode_Status" BO_ 2549941296 "CONFIRMED_CORRECT_DO_NOT_EDIT";
-BA_ "Decode_Status" SG_ 2549941296 TVMSRouge_Label_Item "CONFIRMED_CORRECT_DO_NOT_EDIT";
-BA_ "Decode_Status" SG_ 2549941296 TVMSRouge_Label_Segment "CONFIRMED_CORRECT_DO_NOT_EDIT";
+BA_ "Decode_Status" SG_ 2549941296 TVMSRogue_Label_Item "CONFIRMED_CORRECT_DO_NOT_EDIT";
+BA_ "Decode_Status" SG_ 2549941296 TVMSRogue_Label_Segment "CONFIRMED_CORRECT_DO_NOT_EDIT";
 BA_ "VFrameFormat" BO_ 2549941296 1;
 
-CM_ "v54 update: Added explicit TVMS Rouge label-page decode for raw CAN ID 0x17FD0430. Label item 0x17 is InputCurrent. Later review shows this does not support the 0x1BFD0230 D1=0x16 D3/10 A candidate because D3 is part of input voltage.";
+CM_ "v54 update: Added explicit TVMS Rogue label-page decode for raw CAN ID 0x17FD0430. Label item 0x17 is InputCurrent. Later review shows this does not support the 0x1BFD0230 D1=0x16 D3/10 A candidate because D3 is part of input voltage.";
 CM_ "v56 update: Added confirmed Battery Sensor configured-capacity decode. Config write raw CAN ID 0x0F0008FA uses D5-D6 little-endian Ah; status echo raw CAN ID 0x13F10008 uses D2-D3 little-endian Ah. Confirmed from battery 450ah - 350 - 400.csv sequence 450, 400, 350, 400 Ah.";
 CM_ "v57 update: Added confirmed Battery Sensor max charge current decode. Config write raw CAN ID 0x0F0008FA with D1=0x14 uses D5-D6 little-endian A; status echo raw CAN ID 0x13F10008 uses D5 raw A. Confirmed corrected sequence 20, 14, 10, 30 A.";
 CM_ "v58 update: Added confirmed Battery Sensor alarm config writes. Raw CAN ID 0x0F0008FA D1=0x41 uses D5-D6 little-endian percent for low SOC alarm; D1=0x42 uses D5-D6 little-endian millivolts for low voltage alarm. Confirmed sequences 10,15,20,30% and 10.0,11.0,11.5,12.0 V.";
-CM_ "v72 decode model: TVMS status DGNs commonly use D1 as the base item/channel ID. For byte-state pages D2-D8 map to base..base+6. For analog pages, each item may consume multiple bytes, so the next byte is not automatically the next item. Example: Rouge item 0x16 InputVoltage uses D2-D3 little-endian millivolts; D3 must not be decoded as item 0x17 InputCurrent.";
+CM_ "v72 decode model: TVMS status DGNs commonly use D1 as the base item/channel ID. For byte-state pages D2-D8 map to base..base+6. For analog pages, each item may consume multiple bytes, so the next byte is not automatically the next item. Example: Rogue item 0x16 InputVoltage uses D2-D3 little-endian millivolts; D3 must not be decoded as item 0x17 InputCurrent.";
 CM_ "v73 update: Manager30 solar generation history on raw CAN ID 0x03FCD601 / DGN 0x1FCD6 is paged daily Wh data, not one 32-bit counter. D1=page index. D2-D3, D4-D5 and D6-D7 are little-endian Wh buckets. Page 0 = today, day-1, day-2; page 1 = day-3, day-4, day-5; page 2 = day-6, day-7, unused. Example from solar per day.csv: 45,208,26,1,149,406,397,402 Wh sum to 1634 Wh.";
 CM_ "v74 update: Added conservative CAN status/heartbeat abnormal monitor in ESPHome. It watches known repeated status frames and reports HA abnormal only for confirmed suspicious values: unknown Manager30 charging-stage byte, invalid Manager30 vehicle-trigger byte, short CAN payloads, or unexpected byte values on TVMS byte-state pages. Unknown private DGNs are not treated as abnormal.";
 CM_ "v75 update: solar WH.csv confirms Manager30 solar history pages 0x03FCD601 are emitted after request raw CAN ID 0x0FFCD6FA with all-zero payload. ESPHome now periodically sends 0x0FFCD6FA to refresh Solar Today and the 8-day history without needing the RedVision screen/app to open the solar history page.";
@@ -804,9 +804,9 @@ CM_ "v60 update: Added confirmed Battery Sensor SOC calibration target command. 
 CM_ "v61 update: Added confirmed Battery Sensor battery type decode. Config write raw CAN ID 0x0F0008FA D1=0x11 uses D5-D6 little-endian type; status raw CAN ID 0x13F10008 D1 reports type. Mapping: 0=Gel, 1=AGM, 2=LeadAcid, 3=Calcium, 4=Lithium.";
 CM_ "v62 update: Added confirmed Manager30 vehicle input trigger decode. Config write raw CAN ID 0x0F0001FA uses D1=0x68, D3=0x03, D5-D6 little-endian trigger; status raw CAN ID 0x03F20601 reports trigger in D8. Mapping: 0=Auto, 1=12V, 2=24V, 3=Ignition, 5=On.";
 CM_ "v63 update: Added confirmed Redvision Display setting-change broadcast decode. Raw CAN ID 0x0F00FF20 from source 0x20 uses D1 as setting ID and D5-D6 little-endian value for battery type, capacity, max charge current, low SOC alarm, low voltage alarm, and vehicle input trigger.";
-CM_ "v64 update: Added unconfirmed TVMS master command entries based on config/label pages: TVMS1280 item/channel 0x0F is Master switch, TVMS Rouge item/channel 0x0B is Master. ESPHome exposes them as HA switches using the existing TVMS on/off command shape.";
+CM_ "v64 update: Added unconfirmed TVMS master command entries based on config/label pages: TVMS1280 item/channel 0x0F is Master switch, TVMS Rogue item/channel 0x0B is Master. ESPHome exposes them as HA switches using the existing TVMS on/off command shape.";
 CM_ "v65 update: Added ESPHome test entities for TVMS1280 digital inputs 1-3. Channel map supplied by user: digital inputs are 0x01-0x03, outputs are 0x04-0x0D, inverter is 0x0E, master is 0x0F. Live-state PGN is still candidate; current test path uses 0x1BFD0024 channel feedback.";
-CM_ "v66 update: Confirmed TVMS Rouge physical input/button states on 0x1BFD0030. D1=0x01 maps D2-D8 to inputs/buttons 1-7; D1=0x08 maps D2 to input/button 8. State values: 0x00 inactive, 0x01 active. 0x1BFD1430 remained idle in this test and is retained only as output/dimming activity status.";
+CM_ "v66 update: Confirmed TVMS Rogue physical input/button states on 0x1BFD0030. D1=0x01 maps D2-D8 to inputs/buttons 1-7; D1=0x08 maps D2 to input/button 8. State values: 0x00 inactive, 0x01 active. 0x1BFD1430 remained idle in this test and is retained only as output/dimming activity status.";
 CM_ "v67 update: Added Manager30 charging mode and charging stage decode. RedVision 0x0F00FF20 D1=0x43 D5 sets mode: 0=Touring, 1=Storage. Manager30 0x03F10801 D1 bit0 confirms mode. Manager30 0x03F20001 D1 reports stage: 0x00/0x01=Not Charging, 0x21=Soft-start, 0x30/0x31=Boost, 0x40/0x41=Absorption, 0x70/0x71=Float, 0x80/0x81=Maintenance; low bit 1 means Storage mode. 0x4D remains a charge-cycle/stage request candidate.";
 
 CM_ SG_ 2617049636 TVMS1280_Temp2_C "NOTE: TVMS1280 voltage inputs are item/channel 0x11 and 0x12 within the 0x1BFD0224 mux 0x11 page. Voltage Input 1 is D2-D3 millivolts, Voltage Input 2 is D4-D5 millivolts.";
