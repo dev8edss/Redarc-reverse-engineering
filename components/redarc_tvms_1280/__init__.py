@@ -59,6 +59,8 @@ _AUTO_IDS[cv.GenerateID("voltage_input2_id")] = cv.declare_id(_SensorClass)
 _AUTO_IDS[cv.GenerateID("inverter_id")] = cv.declare_id(TVMS1280Switch)
 _AUTO_IDS[cv.GenerateID("master_id")] = cv.declare_id(TVMS1280Switch)
 _AUTO_IDS[cv.GenerateID("output_status_id")] = cv.declare_id(_TSClass)
+for _i in range(10):
+    _AUTO_IDS[cv.GenerateID(f"output_status_{_i}_id")] = cv.declare_id(_SensorClass)
 
 CONFIG_SCHEMA = cv.Schema({
     cv.GenerateID(): cv.declare_id(TVMS1280Component),
@@ -132,6 +134,15 @@ async def to_code(config):
         CONF_ENTITY_CATEGORY: ENTITY_CATEGORY_DIAGNOSTIC,
     })
     cg.add(var.set_output_status_text_sensor(ts))
+
+    # Per-output status sensors (diagnostic). Value is the raw 0x1FD00 status
+    # code (0 off, 1 on, 6 fuse blown, 10 over temp, 20 off override, 21 on
+    # override); an unconfigured (0xF8) output publishes NaN -> unavailable in HA.
+    for i in range(10):
+        s = await _make_sensor(config[f"output_status_{i}_id"], f"{p} Output {i} Status",
+                               state_class=STATE_CLASS_MEASUREMENT, decimals=0,
+                               entity_category=ENTITY_CATEGORY_DIAGNOSTIC)
+        cg.add(var.set_output_status_sensor(i, s))
 
     # Output switches (channels 0x04–0x0D)
     # Digital input binary sensors (candidate decode from channel status 0x01..0x03)
