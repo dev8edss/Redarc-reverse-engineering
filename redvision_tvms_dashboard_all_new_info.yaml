@@ -203,9 +203,6 @@ cards:
       - entity: sensor.redvision_can_bridge_tvms_rouge_input_voltage
         name: TVMS Rouge Input Voltage
         icon: mdi:sine-wave
-      - entity: sensor.redvision_can_bridge_tvms_rouge_input_current
-        name: TVMS Rouge Input Current
-        icon: mdi:current-dc
       - entity: sensor.redvision_can_bridge_tvms1280_voltage_input_1
         name: TVMS1280 Voltage Input 1
         icon: mdi:meter-electric-outline
@@ -222,8 +219,6 @@ cards:
         name: Battery
       - entity: sensor.redvision_can_bridge_manager30_device_current
         name: Devices
-      - entity: sensor.redvision_can_bridge_tvms_rouge_input_current
-        name: Rouge Input
   - type: history-graph
     title: Voltage History
     hours_to_show: 6
@@ -548,15 +543,6 @@ cards:
         icon: mdi:thermometer
   - type: markdown
     content: "# Diagnostics"
-  - type: entities
-    title: CAN Status
-    show_header_toggle: false
-    state_color: true
-    entities:
-      - entity: binary_sensor.redvision_can_bridge_manager30_can_status_abnormal
-        name: CAN Status Abnormal
-      - entity: sensor.redvision_can_bridge_manager30_can_status
-        name: Last CAN Status Change
   - type: markdown
     content: >
       # RedVision Diagnostics

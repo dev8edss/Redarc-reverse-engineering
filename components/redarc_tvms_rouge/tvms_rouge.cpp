@@ -13,7 +13,6 @@ static constexpr uint8_t ROUGE_ITEM_MASTER = 0x0B;
 static constexpr uint8_t ROUGE_ITEM_OUTPUT_1 = 0x0C;
 static constexpr uint8_t ROUGE_ITEM_OUTPUT_10 = 0x15;
 static constexpr uint8_t ROUGE_ITEM_INPUT_VOLTAGE = 0x16;
-static constexpr uint8_t ROUGE_ITEM_INPUT_CURRENT = 0x17;
 }  // namespace
 
 void TVMSRougeSwitch::write_state(bool state) {
@@ -116,7 +115,6 @@ void TVMSRougeComponent::dump_config() {
   ESP_LOGCONFIG(TAG, "TVMS Rouge SA=0x%02X HA=0x%02X", this->source_address_, this->host_address_);
   ESP_LOGCONFIG(TAG, "  Output cmd: 0x%08X  DGN: 0x1F108, 0x1FD00, 0x1FD02, 0x1FD12", this->output_command_id_);
   LOG_SENSOR("  ", "Input Voltage", this->input_voltage_sensor_);
-  LOG_SENSOR("  ", "Input Current", this->input_current_sensor_);
   LOG_SWITCH("  ", "Master", this->master_switch_);
   ESP_LOGCONFIG(TAG, "  True-off threshold: %.1f%%", this->true_off_threshold_percent_);
 }
@@ -207,12 +205,6 @@ void TVMSRougeComponent::handle_can_frame(uint32_t can_id, const std::vector<uin
           const uint16_t raw_mv = (uint16_t) data[1] | ((uint16_t) data[2] << 8);
           this->input_voltage_sensor_->publish_state((float) raw_mv / 1000.0f);
         }
-      }
-    } else if (data[0] == ROUGE_ITEM_INPUT_CURRENT) {
-      if (now - this->last_input_current_ms_ >= this->filter_interval_ms_) {
-        this->last_input_current_ms_ = now;
-        ESP_LOGV(TAG, "Rouge input-current page candidate: %02X %02X %02X %02X %02X %02X %02X %02X",
-                 data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7]);
       }
     } else if (now - this->last_unknown_1fd02_ms_ >= this->filter_interval_ms_) {
       this->last_unknown_1fd02_ms_ = now;

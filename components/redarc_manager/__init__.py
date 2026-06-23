@@ -1,6 +1,6 @@
 import esphome.codegen as cg
 import esphome.config_validation as cv
-from esphome.components import binary_sensor, select, sensor, text_sensor
+from esphome.components import select, sensor, text_sensor
 from esphome.const import (
     CONF_ACCURACY_DECIMALS, CONF_DEVICE_CLASS, CONF_DISABLED_BY_DEFAULT,
     CONF_ENTITY_CATEGORY, CONF_FORCE_UPDATE, CONF_ICON, CONF_ID, CONF_NAME,
@@ -10,7 +10,7 @@ from esphome.const import (
 )
 
 CODEOWNERS = ["@dev8edss"]
-AUTO_LOAD = ["binary_sensor", "select", "sensor", "text_sensor", "redarc_common"]
+AUTO_LOAD = ["select", "sensor", "text_sensor", "redarc_common"]
 MULTI_CONF = False
 
 CONF_SOURCE_ADDRESS = "source_address"
@@ -43,8 +43,6 @@ _SC_MAP = {
 
 _text_sensor_ns = cg.esphome_ns.namespace("text_sensor")
 _TextSensorClass = _text_sensor_ns.class_("TextSensor")
-_bs_ns = cg.esphome_ns.namespace("binary_sensor")
-_BSClass = _bs_ns.class_("BinarySensor")
 
 CONFIG_SCHEMA = cv.Schema({
     cv.GenerateID(): cv.declare_id(Manager30Component),
@@ -67,8 +65,6 @@ CONFIG_SCHEMA = cv.Schema({
     cv.GenerateID("clock_time_id"): cv.declare_id(_TextSensorClass),
     cv.GenerateID("clock_datetime_id"): cv.declare_id(_TextSensorClass),
     cv.GenerateID("charging_stage_id"): cv.declare_id(_TextSensorClass),
-    cv.GenerateID("can_status_abnormal_id"): cv.declare_id(_BSClass),
-    cv.GenerateID("can_status_id"): cv.declare_id(_TextSensorClass),
     cv.GenerateID("vehicle_input_trigger_select_id"): cv.declare_id(VehicleInputTriggerSelect),
     cv.GenerateID("charging_mode_select_id"): cv.declare_id(ChargingModeSelect),
 }).extend(cv.COMPONENT_SCHEMA)
@@ -193,21 +189,6 @@ async def to_code(config):
 
     ts = await _make_text_sensor(config["charging_stage_id"], f"{p} Charging Stage")
     cg.add(var.set_charging_stage_text_sensor(ts))
-
-    bs = cg.new_Pvariable(config["can_status_abnormal_id"])
-    bs_cfg = {
-        CONF_ID: config["can_status_abnormal_id"],
-        CONF_NAME: f"{p} CAN Status Abnormal",
-        CONF_DISABLED_BY_DEFAULT: False,
-        CONF_ICON: "",
-        CONF_ENTITY_CATEGORY: ENTITY_CATEGORY_DIAGNOSTIC,
-    }
-    await binary_sensor.register_binary_sensor(bs, bs_cfg)
-    cg.add(var.set_can_status_abnormal_sensor(bs))
-
-    ts = await _make_text_sensor(config["can_status_id"], f"{p} CAN Status",
-                                 entity_category=ENTITY_CATEGORY_DIAGNOSTIC)
-    cg.add(var.set_can_status_text_sensor(ts))
 
     sel = await _make_select(config["vehicle_input_trigger_select_id"], f"{p} Vehicle Input Trigger",
                              ["Auto", "12V", "24V", "Ignition", "On"])

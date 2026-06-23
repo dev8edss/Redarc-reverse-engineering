@@ -1,7 +1,6 @@
 #pragma once
 #include "esphome/core/component.h"
 #include "esphome/core/log.h"
-#include "esphome/components/binary_sensor/binary_sensor.h"
 #include "esphome/components/select/select.h"
 #include "esphome/components/sensor/sensor.h"
 #include "esphome/components/text_sensor/text_sensor.h"
@@ -54,8 +53,6 @@ class Manager30Component : public Component {
   void set_clock_time_text_sensor(text_sensor::TextSensor *s) { this->clock_time_text_sensor_ = s; }
   void set_clock_datetime_text_sensor(text_sensor::TextSensor *s) { this->clock_datetime_text_sensor_ = s; }
   void set_charging_stage_text_sensor(text_sensor::TextSensor *s) { this->charging_stage_text_sensor_ = s; }
-  void set_can_status_abnormal_sensor(binary_sensor::BinarySensor *s) { this->can_status_abnormal_sensor_ = s; }
-  void set_can_status_text_sensor(text_sensor::TextSensor *s) { this->can_status_text_sensor_ = s; }
   void set_vehicle_input_trigger_select(VehicleInputTriggerSelect *s) { this->vehicle_input_trigger_select_ = s; }
   void set_charging_mode_select(ChargingModeSelect *s) { this->charging_mode_select_ = s; }
 
@@ -73,10 +70,6 @@ class Manager30Component : public Component {
   void publish_solar_energy_total_();
   void publish_solar_day_history_();
   void send_solar_history_request_();
-  void inspect_status_heartbeat_(uint32_t can_id, const std::vector<uint8_t> &data);
-  void publish_can_status_(bool abnormal, const char *message);
-  bool is_valid_charging_stage_(uint8_t stage) const;
-  bool is_valid_vehicle_trigger_(uint8_t trigger) const;
 
   uint8_t source_address_{0x01};
   uint8_t host_address_{0x20};
@@ -109,10 +102,6 @@ class Manager30Component : public Component {
   text_sensor::TextSensor *clock_time_text_sensor_{nullptr};
   text_sensor::TextSensor *clock_datetime_text_sensor_{nullptr};
   text_sensor::TextSensor *charging_stage_text_sensor_{nullptr};
-  binary_sensor::BinarySensor *can_status_abnormal_sensor_{nullptr};
-  text_sensor::TextSensor *can_status_text_sensor_{nullptr};
-  bool can_status_abnormal_{false};
-  bool can_status_published_{false};
   VehicleInputTriggerSelect *vehicle_input_trigger_select_{nullptr};
   ChargingModeSelect *charging_mode_select_{nullptr};
 };
