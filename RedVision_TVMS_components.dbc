@@ -1,4 +1,4 @@
-VERSION "1.1 redarc-components-time-command"
+VERSION "1.2 redarc-components-time-history-commands"
 
 
 NS_ :
@@ -185,6 +185,17 @@ BO_ 2617044992 TVMS1280_1FCF0_InverterStatus: 8 TVMS1280
  SG_ InverterItemId : 8|8@1+ (1,0) [0|255] "" Bridge
 
 
+
+BO_ 2617036288 CMD_1FCCE_ClearHistory: 8 Bridge
+ SG_ HistoryDataset : 0|8@1+ (1,0) [0|255] "" Manager30,BatterySensor
+ SG_ HistoryClearCommand : 8|8@1+ (1,0) [252|252] "" Manager30,BatterySensor
+ SG_ HistoryReservedD3 : 16|8@1+ (1,0) [255|255] "" Manager30,BatterySensor
+ SG_ HistoryReservedD4 : 24|8@1+ (1,0) [255|255] "" Manager30,BatterySensor
+ SG_ HistoryReservedD5 : 32|8@1+ (1,0) [255|255] "" Manager30,BatterySensor
+ SG_ HistoryReservedD6 : 40|8@1+ (1,0) [255|255] "" Manager30,BatterySensor
+ SG_ HistoryReservedD7 : 48|8@1+ (1,0) [255|255] "" Manager30,BatterySensor
+ SG_ HistoryReservedD8 : 56|8@1+ (1,0) [255|255] "" Manager30,BatterySensor
+
 BO_ 2415068160 CMD_0FF304_SetClock: 8 Bridge
  SG_ SetClockWeekday : 0|3@1+ (1,0) [0|7] "" Manager30
  SG_ SetClockDay : 3|5@1+ (1,1) [1|31] "" Manager30
@@ -246,6 +257,15 @@ CM_ BO_ 2415710720 "RTR remote-request frame (no payload). Polls SOC daily-low h
 CM_ BO_ 2415711232 "RTR remote-request frame (no payload). Polls SOC daily-high history; reply is BATT_1FCD4.";
 CM_ BO_ 2415711744 "RTR remote-request frame (no payload). Polls the manager for solar history; reply is MGR_1FCD6.";
 CM_ BO_ 2415068160 "CONFIRMED Manager30 set-clock command. Actual CAN ID is 0x0FF304<source_address>; this DBC leaves the source byte at 0x00, so OR in the transmitting host address. D1=((day-1)<<3)|weekday, where weekday 1=Monday through 7=Sunday. D2=month, D3-D4=year little-endian, D5=hour, D6=minute, D7=second, D8=0x00. Confirmed example: ID 0x0FF304FA, B2 06 EA 07 10 23 29 00 set 23 June 2026 16:35:41 Tuesday. Manager30 confirmed approximately 230 ms later on 0x03F30401.";
+CM_ BO_ 2617036288 "CONFIRMED history-clear command. Actual CAN ID is 0x1BFCCE<source_address>; this compact DBC leaves the source byte at 0x00. D1 selects the history dataset, D2 must be 0xFC, and D3-D8 must be 0xFF. Confirmed selectors: 0xD0=Hourly SOC history (reply DGN 0x1FCD0), 0xD2=Daily Low SOC history (reply 0x1FCD2), 0xD4=Daily High SOC history (reply 0x1FCD4), and 0xD6=Solar Energy history (reply 0x1FCD6). Observed from RedVision source 0x20 as CAN ID 0x1BFCCE20. No separate acknowledgement was identified; deletion was confirmed by reading back zeroed history pages.";
+CM_ SG_ 2617036288 HistoryDataset "History dataset selector: D0=Hourly SOC, D2=Daily Low SOC, D4=Daily High SOC, D6=Solar Energy.";
+CM_ SG_ 2617036288 HistoryClearCommand "Clear/delete command marker. Confirmed value is 0xFC.";
+CM_ SG_ 2617036288 HistoryReservedD3 "Required constant 0xFF in confirmed clear-history commands.";
+CM_ SG_ 2617036288 HistoryReservedD4 "Required constant 0xFF in confirmed clear-history commands.";
+CM_ SG_ 2617036288 HistoryReservedD5 "Required constant 0xFF in confirmed clear-history commands.";
+CM_ SG_ 2617036288 HistoryReservedD6 "Required constant 0xFF in confirmed clear-history commands.";
+CM_ SG_ 2617036288 HistoryReservedD7 "Required constant 0xFF in confirmed clear-history commands.";
+CM_ SG_ 2617036288 HistoryReservedD8 "Required constant 0xFF in confirmed clear-history commands.";
 CM_ SG_ 2482045440 BatteryCurrent "Signed via offset: A = raw/1000 - 1000. Positive = charging, negative = discharging.";
 CM_ SG_ 2213677568 OutputCurrent "A = raw/1000 - 1000.";
 CM_ SG_ 2482143232 BatteryCurrentDisplay "Display rebroadcast value: A = raw/10 - 1000.";
@@ -256,6 +276,10 @@ CM_ BO_ 2482143744 "RedVision display mirror, ~1 Hz. DisplayVehicleCurrent (D3-D
 CM_ BO_ 2482144256 "RedVision display mirror of the Manager30 vehicle input voltage, ~1 Hz. D3-D4, scale 0.1 V. Example 0x13F28420 F1 00 7D 00 ... -> 12.5 V.";
 CM_ SG_ 2617049600 RogueInputCurrent "CONFIRMED: DGN 0x1FD02, page 0x16, D4-D5 little-endian. Rogue input current in amperes = raw * 0.001. Controlled capture rose from approximately 0.05 A to 8.781 A and returned to approximately 0.05 A.";
 
+
+
+VAL_ 2617036288 HistoryDataset 208 "HourlySOCHistory" 210 "DailyLowSOCHistory" 212 "DailyHighSOCHistory" 214 "SolarEnergyHistory" ;
+VAL_ 2617036288 HistoryClearCommand 252 "ClearDelete" ;
 
 VAL_ 2415068160 SetClockWeekday 0 "Unknown" 1 "Monday" 2 "Tuesday" 3 "Wednesday" 4 "Thursday" 5 "Friday" 6 "Saturday" 7 "Sunday" ;
 VAL_ 2213741568 ClockFlags 0 "Unknown" 1 "Monday" 2 "Tuesday" 3 "Wednesday" 4 "Thursday" 5 "Friday" 6 "Saturday" 7 "Sunday" ;
