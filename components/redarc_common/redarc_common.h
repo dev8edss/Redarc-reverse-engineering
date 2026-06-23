@@ -1,4 +1,5 @@
 #pragma once
+#include <algorithm>
 #include <cstdint>
 #include <cstdio>
 #include <functional>
@@ -9,6 +10,8 @@
 
 namespace esphome {
 namespace redarc_common {
+
+static const char *const TAG = "redarc_common";
 
 inline void log_can_frame(const char *direction, uint32_t can_id, const std::vector<uint8_t> &data, bool rtr = false) {
 #if ESPHOME_LOG_LEVEL >= ESPHOME_LOG_LEVEL_DEBUG
@@ -23,7 +26,7 @@ inline void log_can_frame(const char *direction, uint32_t can_id, const std::vec
   const uint8_t d6 = data.size() > 5 ? data[5] : 0xFF;
   const uint8_t d7 = data.size() > 6 ? data[6] : 0xFF;
   const uint8_t d8 = data.size() > 7 ? data[7] : 0xFF;
-  ESP_LOGD("redarc_common", "%s id=0x%08X dgn=0x%05X sa=0x%02X rtr=%u dlc=%u data=%02X %02X %02X %02X %02X %02X %02X %02X",
+  ESP_LOGD(TAG, "%s id=0x%08X dgn=0x%05X sa=0x%02X rtr=%u dlc=%u data=%02X %02X %02X %02X %02X %02X %02X %02X",
            direction, (unsigned) rvc_id, (unsigned) dgn, (unsigned) sa, (unsigned) rtr, (unsigned) data.size(),
            (unsigned) d1, (unsigned) d2, (unsigned) d3, (unsigned) d4,
            (unsigned) d5, (unsigned) d6, (unsigned) d7, (unsigned) d8);
@@ -56,12 +59,98 @@ class RedarcCanDispatcher {
 class RedarcCommonComponent : public Component {
  public:
   void set_canbus(canbus::Canbus *canbus) { this->canbus_ = canbus; }
+  void set_host_address(uint8_t host_address) { this->host_address_ = host_address; }
+  void set_discovery_delay_ms(uint32_t discovery_delay_ms) { this->discovery_delay_ms_ = discovery_delay_ms; }
+
   void setup() override {
-    RedarcCanDispatcher::instance().set_canbus(this->canbus_);
+    auto &dispatcher = RedarcCanDispatcher::instance();
+    dispatcher.set_canbus(this->canbus_);
+    dispatcher.add_listener([this](uint32_t can_id, const std::vector<uint8_t> &data) {
+      this->handle_device_identity_(can_id, data);
+    });
+
+    // Delay the global request until the CAN controller and the remaining
+    // external components have completed setup. Periodic 0x1F404 broadcasts
+    // are also decoded, so discovery still works in LISTENONLY mode.
+    this->set_timeout("redarc_device_discovery", this->discovery_delay_ms_, [this]() {
+      this->request_all_devices_();
+    });
   }
+
   float get_setup_priority() const override { return setup_priority::BUS; }
+
  protected:
+  static const char *device_type_name_(uint8_t device_type) {
+    switch (device_type) {
+      case 0x01: return "Manager30";
+      case 0x03: return "BMS Battery Sensor";
+      case 0x0C: return "RedVision Display";
+      case 0x0E: return "TVMS 1280";
+      case 0x16: return "TVMS Rouge";
+      default: return nullptr;
+    }
+  }
+
+  void request_all_devices_() {
+    if (this->canbus_ == nullptr) {
+      ESP_LOGW(TAG, "Cannot request device discovery: CAN bus is unavailable");
+      return;
+    }
+
+    // Global destination 0xFF, requester source address in the low byte.
+    // Payload 04 F4 requests DGN 0x1F404 (Device Serial Identity).
+    const uint32_t can_id = 0x0F03FF00UL | this->host_address_;
+    const std::vector<uint8_t> data = {0x04, 0xF4, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+
+    log_can_frame("CAN_TX", can_id, data, false);
+    this->canbus_->send_data(can_id, true, false, data);
+    ESP_LOGD(TAG, "Requested DGN 0x1F404 from all devices using source address 0x%02X",
+             (unsigned) this->host_address_);
+  }
+
+  void handle_device_identity_(uint32_t can_id, const std::vector<uint8_t> &data) {
+    const uint32_t id = can_id & 0x1FFFFFFFUL;
+    const uint32_t dgn = (id >> 8) & 0x1FFFFUL;
+    if (dgn != 0x1F404UL || data.size() < 8) return;
+
+    const uint8_t source_address = (uint8_t) (id & 0xFFU);
+    const uint32_t serial_prefix =
+        ((uint32_t) data[0]) |
+        ((uint32_t) data[1] << 8) |
+        ((uint32_t) data[2] << 16) |
+        ((uint32_t) data[3] << 24);
+    const uint16_t serial_suffix =
+        (uint16_t) data[4] | ((uint16_t) data[5] << 8);
+    const uint8_t device_type = data[6];
+
+    // Include address, type and both serial parts so a spoofed device sharing
+    // an address is still logged if its factory serial differs.
+    const uint64_t device_key =
+        ((uint64_t) serial_prefix << 32) |
+        ((uint64_t) serial_suffix << 16) |
+        ((uint64_t) device_type << 8) |
+        (uint64_t) source_address;
+
+    if (std::find(this->seen_device_keys_.begin(), this->seen_device_keys_.end(), device_key) !=
+        this->seen_device_keys_.end()) {
+      return;
+    }
+    this->seen_device_keys_.push_back(device_key);
+
+    const char *device_name = device_type_name_(device_type);
+    if (device_name != nullptr) {
+      ESP_LOGI(TAG, "Device Type: %s", device_name);
+    } else {
+      ESP_LOGI(TAG, "Device Type: Unknown (0x%02X)", (unsigned) device_type);
+    }
+    ESP_LOGI(TAG, "Address: %u", (unsigned) source_address);
+    ESP_LOGI(TAG, "Serial No: %010lu-%04u", (unsigned long) serial_prefix, (unsigned) serial_suffix);
+  }
+
   canbus::Canbus *canbus_{nullptr};
+  uint8_t host_address_{0x22};
+  uint32_t discovery_delay_ms_{1500};
+  std::vector<uint64_t> seen_device_keys_;
 };
 
 inline uint16_t u16_le(const std::vector<uint8_t> &data, uint8_t i) {
