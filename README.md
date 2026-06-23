@@ -8,8 +8,9 @@ exposed as native Home Assistant entities.
 
 The decode is reverse-engineered from captured bus traffic. The byte-level
 findings live in the companion DBC file
-[`Current_SOC_v53_rogue_input_current.dbc`](Current_SOC_v53_rogue_input_current.dbc);
-this README is the human-readable summary plus a build/wiring guide.
+[`RedVision_TVMS_components.dbc`](RedVision_TVMS_components.dbc) — the signals
+for exactly what the components decode and transmit; this README is the
+human-readable summary plus a build/wiring guide.
 
 > **Status legend** (used throughout): `CONFIRMED` = validated against capture,
 > safe to rely on. `PARTLY CONFIRMED` = purpose known, some bytes unknown.
@@ -131,7 +132,7 @@ components/
   redarc_tvms_rogue/        <- TVMS Rogue  (0x30)
   redarc_tvms_1280/         <- TVMS1280    (0x24)
 redvision_tvms_dashboard_all_new_info.yaml                 <- example Home Assistant Lovelace dashboard
-Current_SOC_v53_rogue_input_current.dbc                    <- byte-level decode reference
+RedVision_TVMS_components.dbc                              <- byte-level signal database (component-derived)
 ```
 
 The top-level YAML is intentionally thin: a `substitutions:` block (pins, bus
