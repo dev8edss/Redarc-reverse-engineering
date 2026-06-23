@@ -100,7 +100,9 @@ BO_ 2213611520 MGR_1F108_ChargingMode: 8 Manager30
 BO_ 2213675008 MGR_1F200_ChargingStage: 8 Manager30
  SG_ ChargingStage : 0|8@1+ (1,0) [0|255] "" Bridge
 
-BO_ 2213676544 MGR_1F206_VehicleInputTrigger: 8 Manager30
+BO_ 2213676544 MGR_1F206_VehicleInput: 8 Manager30
+ SG_ VehicleInputCurrent : 0|32@1+ (0.001,-1000) [-1000|1000] "A" Bridge
+ SG_ VehicleInputVoltage : 32|16@1+ (0.001,0) [0|65.535] "V" Bridge
  SG_ VehicleInputTrigger : 56|8@1+ (1,0) [0|255] "" Bridge
 
 BO_ 2213741568 MGR_1F304_Clock: 8 Manager30
@@ -131,8 +133,12 @@ BO_ 2482143232 DISP_1F280_DisplayCurrents: 8 RedVisionDisplay
  SG_ BatteryCurrentDisplay : 0|16@1+ (0.1,-1000) [-1000|5553.5] "A" Bridge
  SG_ DeviceCurrentDisplay : 32|16@1+ (0.1,-1000) [-1000|5553.5] "A" Bridge
 
-BO_ 2482143744 DISP_1F282_ManagerOutputDisplay: 8 RedVisionDisplay
+BO_ 2482143744 DISP_1F282_DisplayMirror: 8 RedVisionDisplay
+ SG_ DisplayVehicleCurrent : 16|16@1+ (0.1,-1000) [-1000|5553.5] "A" Bridge
  SG_ ManagerOutputCurrentDisplay : 48|16@1+ (0.1,-1000) [-1000|5553.5] "A" Bridge
+
+BO_ 2482144256 DISP_1F284_DisplayVehicleVoltage: 8 RedVisionDisplay
+ SG_ DisplayVehicleVoltage : 16|16@1+ (0.1,0) [0|6553.5] "V" Bridge
 
 BO_ 2617049088 TVMS_1FD00_ChannelStateArray: 8 Vector__XXX
  SG_ BaseItem : 0|8@1+ (1,0) [0|255] "" Bridge
@@ -230,6 +236,11 @@ CM_ BO_ 2415711744 "RTR remote-request frame (no payload). Polls the manager for
 CM_ SG_ 2482045440 BatteryCurrent "Signed via offset: A = raw/1000 - 1000. Positive = charging, negative = discharging.";
 CM_ SG_ 2213677568 OutputCurrent "A = raw/1000 - 1000.";
 CM_ SG_ 2482143232 BatteryCurrentDisplay "Display rebroadcast value: A = raw/10 - 1000.";
+CM_ BO_ 2213676544 "Native Manager30 vehicle input, ~10 Hz. Confirmed from capture (224 frames): current D1-D4, voltage D5-D6, mode trigger D8. Example 0x03F20601 40 42 0F 00 31 31 FC 01 -> 0.000 A, 12.593 V, trigger 0x01.";
+CM_ SG_ 2213676544 VehicleInputCurrent "Confirmed: A = raw/1000 - 1000. Constant 0 A across the capture.";
+CM_ SG_ 2213676544 VehicleInputVoltage "Confirmed: V = raw/1000. Ranged 12.552-12.629 V across the capture.";
+CM_ BO_ 2482143744 "RedVision display mirror, ~1 Hz. DisplayVehicleCurrent (D3-D4) and ManagerOutputCurrentDisplay (D7-D8) both scale 0.1, offset -1000.";
+CM_ BO_ 2482144256 "RedVision display mirror of the Manager30 vehicle input voltage, ~1 Hz. D3-D4, scale 0.1 V. Example 0x13F28420 F1 00 7D 00 ... -> 12.5 V.";
 
 VAL_ 2482044928 BatteryType 0 "Gel" 1 "AGM" 2 "LeadAcid" 3 "Calcium" 4 "Lithium" ;
 VAL_ 2213611520 ChargingMode 0 "Touring" 1 "Storage" ;

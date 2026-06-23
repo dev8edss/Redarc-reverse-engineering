@@ -383,6 +383,9 @@ Rouge buttons   : 0x1BFD0030   <base> <b1..b7>     (00=inactive,01=active; D1=0x
 | Manager30 `0x01` | `0x03FCD601` | `0x1FCD6` | D1 page | Solar Energy Wh (per-day buckets) | D2-D7 | 16-bit LE Wh per day slot | CONFIRMED |
 | Manager30 `0x01` | `0x03F10801` | `0x1F108` | — | Charging Mode | D1 bit0 | 0=Touring,1=Storage | CONFIRMED |
 | Manager30 `0x01` | `0x03F20001` | `0x1F200` | — | Charging Stage | D1 | 0x21 Soft-start, 0x30/31 Boost, 0x40/41 Absorption, 0x70/71 Float, 0x80/81 Maintenance | CONFIRMED |
+| Manager30 `0x01` | `0x03F20601` | `0x1F206` | — | Vehicle Input Current A | D1-D4 | raw/1000−1000 | CONFIRMED |
+| Manager30 `0x01` | `0x03F20601` | `0x1F206` | — | Vehicle Input Voltage | D5-D6 | raw×0.001 V | CONFIRMED |
+| Manager30 `0x01` | `0x03F20601` | `0x1F206` | — | Vehicle Input Trigger | D8 | 0 Auto, 1 12V, 2 24V, 3 Ignition, 5 On | CONFIRMED |
 | Battery `0x08` | `0x13F10208` | `0x1F102` | — | Current A | D1-D4 | raw/1000−1000 | CONFIRMED |
 | Battery `0x08` | `0x13F10208` | `0x1F102` | — | Voltage | D5-D6 | raw×0.001 V | CONFIRMED |
 | Battery `0x08` | `0x13F10208` | `0x1F102` | — | Temperature | D7 | raw−60 | CONFIRMED |
@@ -390,6 +393,8 @@ Rouge buttons   : 0x1BFD0030   <base> <b1..b7>     (00=inactive,01=active; D1=0x
 | RedVision `0x20` | `0x13F28020` | `0x1F280` | — | Battery Current Display A | D1-D2 | raw/10−1000 | CONFIRMED |
 | RedVision `0x20` | `0x13F28020` | `0x1F280` | — | Device Current Display A | D5-D6 | raw/10−1000 | CONFIRMED |
 | RedVision `0x21` | `0x13F28221` | `0x1F282` | — | Manager Output Current Display A | D7-D8 | raw/10−1000 | CONFIRMED |
+| RedVision disp | `0x13F28220` | `0x1F282` | — | Vehicle Current Display A | D3-D4 | raw/10−1000 | CONFIRMED |
+| RedVision disp | `0x13F28420` | `0x1F284` | — | Vehicle Voltage Display | D3-D4 | raw×0.1 V | CONFIRMED |
 | TVMS Rouge `0x30` | `0x1BFD0230` | `0x1FD02` | D1=`0x09` | Water Tank 1 % | D2 | raw % | CONFIRMED |
 | TVMS Rouge `0x30` | `0x1BFD0230` | `0x1FD02` | D1=`0x09` | Water Tank 2 % | D3 | raw % | CONFIRMED |
 | TVMS Rouge `0x30` | `0x1BFD1230` | `0x1FD12` | D1 base | Output Level +0..6 | D2-D8 | raw % | CONFIRMED |
