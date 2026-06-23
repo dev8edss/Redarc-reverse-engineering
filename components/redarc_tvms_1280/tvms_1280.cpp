@@ -36,6 +36,7 @@ void TVMS1280Component::dump_config() {
   LOG_BINARY_SENSOR("  ", "Digital Input 1", this->digital_input_sensors_[1]);
   LOG_BINARY_SENSOR("  ", "Digital Input 2", this->digital_input_sensors_[2]);
   LOG_BINARY_SENSOR("  ", "Digital Input 3", this->digital_input_sensors_[3]);
+  LOG_TEXT_SENSOR("  ", "Output Faults", this->output_faults_text_sensor_);
 }
 
 void TVMS1280Component::register_output_switch(TVMS1280Switch *sw) {
@@ -55,6 +56,22 @@ void TVMS1280Component::send_channel(uint8_t channel, bool state) {
 void TVMS1280Component::publish_output_(uint8_t output_number, bool state) {
   if (output_number > 9) return;
   if (this->output_switches_[output_number] != nullptr) this->output_switches_[output_number]->publish_state(state);
+}
+
+void TVMS1280Component::publish_output_faults_() {
+  if (this->output_faults_text_sensor_ == nullptr) return;
+  std::string summary;
+  for (uint8_t i = 0; i < this->output_state_.size(); i++) {
+    const uint8_t v = this->output_state_[i];
+    const char *fault = v == 0x06 ? "Fault 1" : (v == 0x0A ? "Fault 2" : nullptr);
+    if (fault == nullptr) continue;
+    if (!summary.empty()) summary += ", ";
+    summary += "Output " + std::to_string(i) + " " + fault;
+  }
+  if (summary.empty()) summary = "None";
+  if (summary == this->last_output_faults_) return;
+  this->last_output_faults_ = summary;
+  this->output_faults_text_sensor_->publish_state(summary);
 }
 
 void TVMS1280Component::publish_channel_(uint8_t channel, bool state) {
@@ -121,17 +138,22 @@ void TVMS1280Component::handle_can_frame(uint32_t can_id, const std::vector<uint
   }
 
   if (redarc_common::rvc_matches(can_id, 0x1FD00UL, this->source_address_)) {
-    // TVMS1280 output feedback. Logs show D1 is the base channel and D2-D8
-    // contain the states for base+0 through base+6.
-    // Valid states are 0x00 = OFF and 0x01 = ON. Values such as 0xF8/0xFF
-    // are unavailable/no-data markers and must not overwrite HA state.
+    // TVMS1280 output feedback. D1 is the base channel and D2-D8 are the states
+    // for base+0..base+6. State codes: 0x00 off, 0x01 on (healthy), 0x06 fault 1,
+    // 0x0A fault 2, 0xF8 unconfigured, 0xFF no-data. Only 0x00/0x01 drive the
+    // on/off switch state; faults are reported via the Output Faults text sensor.
     const uint8_t base_channel = data[0];
+    bool output_seen = false;
     for (uint8_t i = 1; i < 8; i++) {
       const uint8_t value = data[i];
-      if (value != 0x00 && value != 0x01) continue;
       const uint8_t channel = base_channel + i - 1;
-      this->publish_channel_(channel, value == 0x01);
+      if (channel >= TVMS1280_ITEM_OUTPUT_1 && channel <= TVMS1280_ITEM_OUTPUT_10) {
+        this->output_state_[channel - TVMS1280_ITEM_OUTPUT_1] = value;
+        output_seen = true;
+      }
+      if (value == 0x00 || value == 0x01) this->publish_channel_(channel, value == 0x01);
     }
+    if (output_seen) this->publish_output_faults_();
     return;
   }
 

@@ -306,6 +306,7 @@ The dimmable-lighting module.
 | Master | **switch** | channel `0x0B` | module master |
 | Tank 1 / Tank 2 | sensors % | `0x1FD02` (D1=`0x09`) | analog tank levels |
 | Input Voltage / Current | sensors V/A | `0x1FD02` (D1=`0x16`) | D2-D3 voltage, D4-D5 current, raw × 0.001 |
+| Output Faults | text *(diagnostic)* | `0x1FD00` | lists faulted outputs (`0x06` Fault 1, `0x0A` Fault 2) |
 
 Dimming uses a **timed hold/ramp**: HA sets a target brightness, the component
 decides up vs down from the latest `0x1FD12` feedback, sends timed hold pulses
@@ -322,6 +323,7 @@ The relay / inverter module.
 | Output 0–9 | **switch** | cmd `0x0F0024` / fb `0x1FD00` | channels `0x04`–`0x0D` |
 | Inverter | **switch** | channel `0x0E` | inverter output |
 | Master | **switch** | channel `0x0F` | module master |
+| Output Faults | text *(diagnostic)* | `0x1FD00` | lists faulted outputs (`0x06` Fault 1, `0x0A` Fault 2) |
 | Digital Input 1–3 | binary *(diagnostic)* | `0x1FD00` candidate | hardware inputs `0x01`–`0x03` |
 | Temperature 1 / 2 | sensors °C | `0x1FD02` (D1=`0x14`/`0x11`) | raw − 100 |
 | Voltage Input 1 / 2 | sensors V | `0x1FD02` (D1=`0x11`) | items `0x11`/`0x12`, mV/1000 |
@@ -365,7 +367,7 @@ Charging mode   : 0x0F00FF20   43 00 FF FF <00|01> 00 00 00        (00=Touring,0
 ### Feedback frames
 
 ```text
-TVMS1280 out fb : 0x1BFD0024   <base> <s0..s6>     (00=off,01=on,F8/FF=ignore)
+TVMS1280 out fb : 0x1BFD0024   <base> <s0..s6>     (00=off,01=on,06=fault1,0A=fault2,F8=unconfigured,FF=ignore)
 Rogue level fb  : 0x1BFD1230   <base> <l0..l6>     (% per channel)
 Rogue buttons   : 0x1BFD0030   <base> <b1..b7>     (00=inactive,01=active; D1=0x08 D2 = button 8)
 ```
@@ -403,7 +405,7 @@ Rogue buttons   : 0x1BFD0030   <base> <b1..b7>     (00=inactive,01=active; D1=0x
 | TVMS Rogue `0x30` | `0x1BFD1430` | `0x1FD14` | D1 base | Output Dim Activity +0..6 | D2-D8 | activity only, not input state | CONFIRMED |
 | TVMS Rogue `0x30` | `0x1BFD0230` | `0x1FD02` | D1=`0x16` | Input Voltage | D2-D3 | uint16 LE × 0.001 V | CONFIRMED |
 | TVMS Rogue `0x30` | `0x1BFD0230` | `0x1FD02` | D1=`0x16` | Input Current | D4-D5 | uint16 LE × 0.001 A | CONFIRMED |
-| TVMS1280 `0x24` | `0x1BFD0024` | `0x1FD00` | D1 base | Output Feedback +0..6 | D2-D8 | 0=off,1=on,F8/FF=ignore | CONFIRMED |
+| TVMS1280 `0x24` | `0x1BFD0024` | `0x1FD00` | D1 base | Output Feedback +0..6 | D2-D8 | 0=off,1=on,06=fault1,0A=fault2,F8=unconfigured,FF=ignore | CONFIRMED |
 | TVMS1280 `0x24` | `0x1BFD0224` | `0x1FD02` | D1=`0x14` | Temperature 1 °C | D2 | raw−100 | CONFIRMED |
 | TVMS1280 `0x24` | `0x1BFD0224` | `0x1FD02` | D1=`0x11` | Temperature 2 °C | D6 | raw−100 | CONFIRMED |
 | TVMS1280 `0x24` | `0x1BFD0224` | `0x1FD02` | D1=`0x14` | Tank 1 % | D4 | raw % | CONFIRMED |

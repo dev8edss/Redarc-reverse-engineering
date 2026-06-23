@@ -4,8 +4,10 @@
 #include "esphome/components/binary_sensor/binary_sensor.h"
 #include "esphome/components/sensor/sensor.h"
 #include "esphome/components/switch/switch.h"
+#include "esphome/components/text_sensor/text_sensor.h"
 #include "esphome/components/redarc_common/redarc_common.h"
 #include <array>
+#include <string>
 #include <vector>
 
 namespace esphome {
@@ -41,6 +43,7 @@ class TVMS1280Component : public Component {
   void set_voltage_input2_sensor(sensor::Sensor *s) { this->voltage_input2_sensor_ = s; }
   void set_tank_sensor(uint8_t tank, sensor::Sensor *s) { if (tank >= 1 && tank <= 6) this->tank_sensors_[tank] = s; }
   void set_digital_input_sensor(uint8_t input, binary_sensor::BinarySensor *s) { if (input >= 1 && input <= 3) this->digital_input_sensors_[input] = s; }
+  void set_output_faults_text_sensor(text_sensor::TextSensor *s) { this->output_faults_text_sensor_ = s; }
 
   void setup() override;
   void register_output_switch(TVMS1280Switch *sw);
@@ -53,6 +56,7 @@ class TVMS1280Component : public Component {
  protected:
   void publish_output_(uint8_t output_number, bool state);
   void publish_channel_(uint8_t channel, bool state);
+  void publish_output_faults_();
 
   uint8_t source_address_{0x24};
   uint8_t host_address_{0x20};
@@ -72,6 +76,9 @@ class TVMS1280Component : public Component {
   sensor::Sensor *voltage_input2_sensor_{nullptr};
   std::array<sensor::Sensor *, 7> tank_sensors_{};
   std::array<binary_sensor::BinarySensor *, 4> digital_input_sensors_{};
+  text_sensor::TextSensor *output_faults_text_sensor_{nullptr};
+  std::array<uint8_t, 10> output_state_{};
+  std::string last_output_faults_;
 };
 
 }  // namespace redarc_tvms_1280

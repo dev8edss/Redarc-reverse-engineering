@@ -116,6 +116,7 @@ void TVMSRogueComponent::dump_config() {
   ESP_LOGCONFIG(TAG, "  Output cmd: 0x%08X  DGN: 0x1FD00, 0x1FD02, 0x1FD12", this->output_command_id_);
   LOG_SENSOR("  ", "Input Voltage", this->input_voltage_sensor_);
   LOG_SENSOR("  ", "Input Current", this->input_current_sensor_);
+  LOG_TEXT_SENSOR("  ", "Output Faults", this->output_faults_text_sensor_);
   LOG_SWITCH("  ", "Master", this->master_switch_);
   ESP_LOGCONFIG(TAG, "  True-off threshold: %.1f%%", this->true_off_threshold_percent_);
 }
@@ -273,20 +274,42 @@ void TVMSRogueComponent::handle_channel_status_frame_(const std::vector<uint8_t>
   if (data.size() < 8) return;
 
   // DGN 0x1FD00 is a paginated byte-state array. D1 is the base item ID and
-  // D2-D8 are states for base..base+6. Only 0x00/0x01 are valid states;
-  // 0xF8/0xFF no-data markers and dimming-level bytes are ignored.
+  // D2-D8 are states for base..base+6. State codes: 0x00 off, 0x01 on (healthy),
+  // 0x06 fault 1, 0x0A fault 2, 0xF8 unconfigured, 0xFF no-data. Only 0x00/0x01
+  // drive button/master state; output faults feed the Output Faults text sensor.
   const uint8_t base_channel = data[0];
+  bool output_seen = false;
   for (uint8_t i = 1; i <= 7; i++) {
     const uint8_t value = data[i];
-    if (value != 0x00 && value != 0x01) continue;
-
     const uint8_t channel = base_channel + i - 1;
+    if (channel >= ROGUE_ITEM_OUTPUT_1 && channel <= ROGUE_ITEM_OUTPUT_10) {
+      this->output_state_[channel - ROGUE_ITEM_OUTPUT_1] = value;
+      output_seen = true;
+    }
+    if (value != 0x00 && value != 0x01) continue;
     if (channel >= ROGUE_ITEM_DIGITAL_INPUT_1 && channel <= ROGUE_ITEM_DIGITAL_INPUT_8) {
       this->set_button_state_(channel, value == 0x01);
     } else if (channel == ROGUE_ITEM_MASTER && this->master_switch_ != nullptr) {
       this->master_switch_->publish_state(value == 0x01);
     }
   }
+  if (output_seen) this->publish_output_faults_();
+}
+
+void TVMSRogueComponent::publish_output_faults_() {
+  if (this->output_faults_text_sensor_ == nullptr) return;
+  std::string summary;
+  for (uint8_t i = 0; i < this->output_state_.size(); i++) {
+    const uint8_t v = this->output_state_[i];
+    const char *fault = v == 0x06 ? "Fault 1" : (v == 0x0A ? "Fault 2" : nullptr);
+    if (fault == nullptr) continue;
+    if (!summary.empty()) summary += ", ";
+    summary += "Output " + std::to_string(i + 1) + " " + fault;
+  }
+  if (summary.empty()) summary = "None";
+  if (summary == this->last_output_faults_) return;
+  this->last_output_faults_ = summary;
+  this->output_faults_text_sensor_->publish_state(summary);
 }
 
 void TVMSRogueComponent::set_button_state_(uint8_t output_number, bool active) {

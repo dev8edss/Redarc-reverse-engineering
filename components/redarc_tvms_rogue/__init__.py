@@ -1,6 +1,6 @@
 import esphome.codegen as cg
 import esphome.config_validation as cv
-from esphome.components import binary_sensor, light, sensor, switch
+from esphome.components import binary_sensor, light, sensor, switch, text_sensor
 from esphome.const import (
     CONF_ACCURACY_DECIMALS, CONF_DEFAULT_TRANSITION_LENGTH, CONF_DEVICE_CLASS,
     CONF_DISABLED_BY_DEFAULT, CONF_EFFECTS, CONF_ENTITY_CATEGORY,
@@ -35,7 +35,7 @@ except AttributeError:
     _SWITCH_RESTORE_MODE_OFF = _switch_ns.enum("SwitchRestoreMode", is_class=True).SWITCH_RESTORE_DEFAULT_OFF
 
 CODEOWNERS = ["@dev8edss"]
-AUTO_LOAD = ["binary_sensor", "light", "sensor", "switch", "redarc_common"]
+AUTO_LOAD = ["binary_sensor", "light", "sensor", "switch", "text_sensor", "redarc_common"]
 MULTI_CONF = False
 
 CONF_SOURCE_ADDRESS = "source_address"
@@ -57,6 +57,8 @@ _SC_MAP = {
 }
 _bs_ns = cg.esphome_ns.namespace("binary_sensor")
 _BSClass = _bs_ns.class_("BinarySensor")
+_ts_ns = cg.esphome_ns.namespace("text_sensor")
+_TSClass = _ts_ns.class_("TextSensor")
 
 # Auto-generated IDs for sensors and lights.
 _AUTO_IDS = {}
@@ -71,6 +73,7 @@ _AUTO_IDS[cv.GenerateID("tank2_id")] = cv.declare_id(_SensorClass)
 _AUTO_IDS[cv.GenerateID("input_voltage_id")] = cv.declare_id(_SensorClass)
 _AUTO_IDS[cv.GenerateID("input_current_id")] = cv.declare_id(_SensorClass)
 _AUTO_IDS[cv.GenerateID("master_id")] = cv.declare_id(TVMSRogueSwitch)
+_AUTO_IDS[cv.GenerateID("output_faults_id")] = cv.declare_id(_TSClass)
 
 CONFIG_SCHEMA = cv.Schema(
     {
@@ -135,6 +138,15 @@ async def to_code(config):
                            unit="A", device_class="current",
                            state_class=STATE_CLASS_MEASUREMENT, decimals=3)
     cg.add(var.set_input_current_sensor(s))
+
+    ts = await text_sensor.new_text_sensor({
+        CONF_ID: config["output_faults_id"],
+        CONF_NAME: f"{p} Output Faults",
+        CONF_DISABLED_BY_DEFAULT: False,
+        CONF_ICON: "",
+        CONF_ENTITY_CATEGORY: ENTITY_CATEGORY_DIAGNOSTIC,
+    })
+    cg.add(var.set_output_faults_text_sensor(ts))
 
     # Output level sensors
     for i in range(1, 11):

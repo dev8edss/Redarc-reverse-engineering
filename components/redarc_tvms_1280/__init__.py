@@ -1,6 +1,6 @@
 import esphome.codegen as cg
 import esphome.config_validation as cv
-from esphome.components import binary_sensor, sensor, switch
+from esphome.components import binary_sensor, sensor, switch, text_sensor
 from esphome.const import (
     CONF_ACCURACY_DECIMALS, CONF_DEVICE_CLASS, CONF_DISABLED_BY_DEFAULT,
     CONF_ENTITY_CATEGORY, CONF_FORCE_UPDATE, CONF_ICON, CONF_ID, CONF_NAME,
@@ -22,7 +22,7 @@ except AttributeError:
     _SWITCH_RESTORE_MODE_OFF = _switch_ns.enum("SwitchRestoreMode", is_class=True).SWITCH_RESTORE_DEFAULT_OFF
 
 CODEOWNERS = ["@dev8edss"]
-AUTO_LOAD = ["binary_sensor", "sensor", "switch", "redarc_common"]
+AUTO_LOAD = ["binary_sensor", "sensor", "switch", "text_sensor", "redarc_common"]
 MULTI_CONF = False
 
 CONF_SOURCE_ADDRESS = "source_address"
@@ -42,6 +42,8 @@ _SC_MAP = {
 }
 _bs_ns = cg.esphome_ns.namespace("binary_sensor")
 _BSClass = _bs_ns.class_("BinarySensor")
+_ts_ns = cg.esphome_ns.namespace("text_sensor")
+_TSClass = _ts_ns.class_("TextSensor")
 
 _AUTO_IDS = {}
 for _i in range(1, 4):
@@ -56,6 +58,7 @@ _AUTO_IDS[cv.GenerateID("voltage_input1_id")] = cv.declare_id(_SensorClass)
 _AUTO_IDS[cv.GenerateID("voltage_input2_id")] = cv.declare_id(_SensorClass)
 _AUTO_IDS[cv.GenerateID("inverter_id")] = cv.declare_id(TVMS1280Switch)
 _AUTO_IDS[cv.GenerateID("master_id")] = cv.declare_id(TVMS1280Switch)
+_AUTO_IDS[cv.GenerateID("output_faults_id")] = cv.declare_id(_TSClass)
 
 CONFIG_SCHEMA = cv.Schema({
     cv.GenerateID(): cv.declare_id(TVMS1280Component),
@@ -120,6 +123,15 @@ async def to_code(config):
         s = await _make_sensor(config[f"tank_{i}_id"], f"{p} Tank {i}",
                                unit="%", state_class=STATE_CLASS_MEASUREMENT, decimals=0)
         cg.add(var.set_tank_sensor(i, s))
+
+    ts = await text_sensor.new_text_sensor({
+        CONF_ID: config["output_faults_id"],
+        CONF_NAME: f"{p} Output Faults",
+        CONF_DISABLED_BY_DEFAULT: False,
+        CONF_ICON: "",
+        CONF_ENTITY_CATEGORY: ENTITY_CATEGORY_DIAGNOSTIC,
+    })
+    cg.add(var.set_output_faults_text_sensor(ts))
 
     # Output switches (channels 0x04–0x0D)
     # Digital input binary sensors (candidate decode from channel status 0x01..0x03)
