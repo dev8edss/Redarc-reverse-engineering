@@ -69,6 +69,7 @@ for _i in range(1, 9):
 _AUTO_IDS[cv.GenerateID("tank1_id")] = cv.declare_id(_SensorClass)
 _AUTO_IDS[cv.GenerateID("tank2_id")] = cv.declare_id(_SensorClass)
 _AUTO_IDS[cv.GenerateID("input_voltage_id")] = cv.declare_id(_SensorClass)
+_AUTO_IDS[cv.GenerateID("input_current_id")] = cv.declare_id(_SensorClass)
 _AUTO_IDS[cv.GenerateID("master_id")] = cv.declare_id(TVMSRougeSwitch)
 
 CONFIG_SCHEMA = cv.Schema(
@@ -129,6 +130,11 @@ async def to_code(config):
                            unit="V", device_class="voltage",
                            state_class=STATE_CLASS_MEASUREMENT, decimals=2)
     cg.add(var.set_input_voltage_sensor(s))
+
+    s = await _make_sensor(config["input_current_id"], f"{p} Input Current",
+                           unit="A", device_class="current",
+                           state_class=STATE_CLASS_MEASUREMENT, decimals=3)
+    cg.add(var.set_input_current_sensor(s))
 
     # Output level sensors
     for i in range(1, 11):

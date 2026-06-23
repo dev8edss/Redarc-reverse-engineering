@@ -155,6 +155,7 @@ BO_ 2617049600 TVMS_1FD02_MuxSensors: 8 Vector__XXX
  SG_ RougeTank1 m9 : 8|8@1+ (1,0) [0|100] "%" Bridge
  SG_ RougeTank2 m9 : 16|8@1+ (1,0) [0|100] "%" Bridge
  SG_ RougeInputVoltage m22 : 8|16@1+ (0.001,0) [0|65.535] "V" Bridge
+ SG_ RougeInputCurrent m22 : 24|16@1+ (0.001,0) [0|65.535] "A" Bridge
  SG_ TVMS1280VoltageInput1 m17 : 8|16@1+ (0.001,0) [0|65.535] "V" Bridge
  SG_ TVMS1280VoltageInput2 m17 : 24|16@1+ (0.001,0) [0|65.535] "V" Bridge
  SG_ TVMS1280Temp2 m17 : 40|8@1+ (1,-100) [-100|155] "degC" Bridge
@@ -241,6 +242,7 @@ CM_ SG_ 2213676544 VehicleInputCurrent "Confirmed: A = raw/1000 - 1000. Constant
 CM_ SG_ 2213676544 VehicleInputVoltage "Confirmed: V = raw/1000. Ranged 12.552-12.629 V across the capture.";
 CM_ BO_ 2482143744 "RedVision display mirror, ~1 Hz. DisplayVehicleCurrent (D3-D4) and ManagerOutputCurrentDisplay (D7-D8) both scale 0.1, offset -1000.";
 CM_ BO_ 2482144256 "RedVision display mirror of the Manager30 vehicle input voltage, ~1 Hz. D3-D4, scale 0.1 V. Example 0x13F28420 F1 00 7D 00 ... -> 12.5 V.";
+CM_ SG_ 2617049600 RougeInputCurrent "CONFIRMED: DGN 0x1FD02, page 0x16, D4-D5 little-endian. Rouge input current in amperes = raw * 0.001. Controlled capture rose from approximately 0.05 A to 8.781 A and returned to approximately 0.05 A.";
 
 VAL_ 2482044928 BatteryType 0 "Gel" 1 "AGM" 2 "LeadAcid" 3 "Calcium" 4 "Lithium" ;
 VAL_ 2213611520 ChargingMode 0 "Touring" 1 "Storage" ;

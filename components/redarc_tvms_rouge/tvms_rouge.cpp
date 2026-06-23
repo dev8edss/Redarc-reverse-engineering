@@ -115,6 +115,7 @@ void TVMSRougeComponent::dump_config() {
   ESP_LOGCONFIG(TAG, "TVMS Rouge SA=0x%02X HA=0x%02X", this->source_address_, this->host_address_);
   ESP_LOGCONFIG(TAG, "  Output cmd: 0x%08X  DGN: 0x1FD00, 0x1FD02, 0x1FD12", this->output_command_id_);
   LOG_SENSOR("  ", "Input Voltage", this->input_voltage_sensor_);
+  LOG_SENSOR("  ", "Input Current", this->input_current_sensor_);
   LOG_SWITCH("  ", "Master", this->master_switch_);
   ESP_LOGCONFIG(TAG, "  True-off threshold: %.1f%%", this->true_off_threshold_percent_);
 }
@@ -199,11 +200,16 @@ void TVMSRougeComponent::handle_can_frame(uint32_t can_id, const std::vector<uin
         if (this->tank2_sensor_ != nullptr) this->tank2_sensor_->publish_state((float) data[2]);
       }
     } else if (data[0] == ROUGE_ITEM_INPUT_VOLTAGE) {
+      // Input page: D2-D3 voltage, D4-D5 current, both little-endian, raw / 1000.
       if (now - this->last_input_voltage_ms_ >= this->filter_interval_ms_) {
         this->last_input_voltage_ms_ = now;
         if (this->input_voltage_sensor_ != nullptr) {
           const uint16_t raw_mv = (uint16_t) data[1] | ((uint16_t) data[2] << 8);
           this->input_voltage_sensor_->publish_state((float) raw_mv / 1000.0f);
+        }
+        if (this->input_current_sensor_ != nullptr) {
+          const uint16_t raw_ma = (uint16_t) data[3] | ((uint16_t) data[4] << 8);
+          this->input_current_sensor_->publish_state((float) raw_ma / 1000.0f);
         }
       }
     } else if (now - this->last_unknown_1fd02_ms_ >= this->filter_interval_ms_) {

@@ -305,7 +305,7 @@ The dimmable-lighting module.
 | Input Button 1–8 | binary *(diagnostic)* | `0x1FD00` | physical wall-button state |
 | Master | **switch** | channel `0x0B` | module master |
 | Tank 1 / Tank 2 | sensors % | `0x1FD02` (D1=`0x09`) | analog tank levels |
-| Input Voltage | sensor V | `0x1F108` | supply voltage |
+| Input Voltage / Current | sensors V/A | `0x1FD02` (D1=`0x16`) | D2-D3 voltage, D4-D5 current, raw × 0.001 |
 
 Dimming uses a **timed hold/ramp**: HA sets a target brightness, the component
 decides up vs down from the latest `0x1FD12` feedback, sends timed hold pulses
@@ -401,7 +401,8 @@ Rouge buttons   : 0x1BFD0030   <base> <b1..b7>     (00=inactive,01=active; D1=0x
 | TVMS Rouge `0x30` | `0x1BFD1230` | `0x1FD12` | D1 base | Output Level +0..6 | D2-D8 | raw % | CONFIRMED |
 | TVMS Rouge `0x30` | `0x1BFD0030` | `0x1FD00` | D1 base | Input Button 1..8 | D2-D8 | 0=inactive,1=active | CONFIRMED |
 | TVMS Rouge `0x30` | `0x1BFD1430` | `0x1FD14` | D1 base | Output Dim Activity +0..6 | D2-D8 | activity only, not input state | CONFIRMED |
-| TVMS Rouge `0x30` | `0x13F10830` | `0x1F108` | — | Input Voltage | D1-D2 | uint16 LE ×0.01 V | CONFIRMED |
+| TVMS Rouge `0x30` | `0x1BFD0230` | `0x1FD02` | D1=`0x16` | Input Voltage | D2-D3 | uint16 LE × 0.001 V | CONFIRMED |
+| TVMS Rouge `0x30` | `0x1BFD0230` | `0x1FD02` | D1=`0x16` | Input Current | D4-D5 | uint16 LE × 0.001 A | CONFIRMED |
 | TVMS1280 `0x24` | `0x1BFD0024` | `0x1FD00` | D1 base | Output Feedback +0..6 | D2-D8 | 0=off,1=on,F8/FF=ignore | CONFIRMED |
 | TVMS1280 `0x24` | `0x1BFD0224` | `0x1FD02` | D1=`0x14` | Temperature 1 °C | D2 | raw−100 | CONFIRMED |
 | TVMS1280 `0x24` | `0x1BFD0224` | `0x1FD02` | D1=`0x11` | Temperature 2 °C | D6 | raw−100 | CONFIRMED |
