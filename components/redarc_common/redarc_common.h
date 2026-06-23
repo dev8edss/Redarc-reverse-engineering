@@ -105,5 +105,18 @@ inline float current_display_16_centered(uint16_t raw) {
   return ((float) raw / 10.0f) - 1000.0f;
 }
 
+// DGN 0x1FD00 output status codes. Returns a human-readable name for the
+// non-normal states, or nullptr for 0x00 (Off), 0x01 (On) and 0xFF (no-data).
+inline const char *output_status_name(uint8_t status) {
+  switch (status) {
+    case 0x06: return "Fuse Blown";
+    case 0x0A: return "Over Temp";
+    case 0x14: return "Off Override";
+    case 0x15: return "On Override";
+    case 0xF8: return "Unconfigured";
+    default: return nullptr;
+  }
+}
+
 }  // namespace redarc_common
 }  // namespace esphome

@@ -73,7 +73,7 @@ _AUTO_IDS[cv.GenerateID("tank2_id")] = cv.declare_id(_SensorClass)
 _AUTO_IDS[cv.GenerateID("input_voltage_id")] = cv.declare_id(_SensorClass)
 _AUTO_IDS[cv.GenerateID("input_current_id")] = cv.declare_id(_SensorClass)
 _AUTO_IDS[cv.GenerateID("master_id")] = cv.declare_id(TVMSRogueSwitch)
-_AUTO_IDS[cv.GenerateID("output_faults_id")] = cv.declare_id(_TSClass)
+_AUTO_IDS[cv.GenerateID("output_status_id")] = cv.declare_id(_TSClass)
 
 CONFIG_SCHEMA = cv.Schema(
     {
@@ -140,13 +140,13 @@ async def to_code(config):
     cg.add(var.set_input_current_sensor(s))
 
     ts = await text_sensor.new_text_sensor({
-        CONF_ID: config["output_faults_id"],
-        CONF_NAME: f"{p} Output Faults",
+        CONF_ID: config["output_status_id"],
+        CONF_NAME: f"{p} Output Status",
         CONF_DISABLED_BY_DEFAULT: False,
         CONF_ICON: "",
         CONF_ENTITY_CATEGORY: ENTITY_CATEGORY_DIAGNOSTIC,
     })
-    cg.add(var.set_output_faults_text_sensor(ts))
+    cg.add(var.set_output_status_text_sensor(ts))
 
     # Output level sensors
     for i in range(1, 11):

@@ -58,7 +58,7 @@ _AUTO_IDS[cv.GenerateID("voltage_input1_id")] = cv.declare_id(_SensorClass)
 _AUTO_IDS[cv.GenerateID("voltage_input2_id")] = cv.declare_id(_SensorClass)
 _AUTO_IDS[cv.GenerateID("inverter_id")] = cv.declare_id(TVMS1280Switch)
 _AUTO_IDS[cv.GenerateID("master_id")] = cv.declare_id(TVMS1280Switch)
-_AUTO_IDS[cv.GenerateID("output_faults_id")] = cv.declare_id(_TSClass)
+_AUTO_IDS[cv.GenerateID("output_status_id")] = cv.declare_id(_TSClass)
 
 CONFIG_SCHEMA = cv.Schema({
     cv.GenerateID(): cv.declare_id(TVMS1280Component),
@@ -125,13 +125,13 @@ async def to_code(config):
         cg.add(var.set_tank_sensor(i, s))
 
     ts = await text_sensor.new_text_sensor({
-        CONF_ID: config["output_faults_id"],
-        CONF_NAME: f"{p} Output Faults",
+        CONF_ID: config["output_status_id"],
+        CONF_NAME: f"{p} Output Status",
         CONF_DISABLED_BY_DEFAULT: False,
         CONF_ICON: "",
         CONF_ENTITY_CATEGORY: ENTITY_CATEGORY_DIAGNOSTIC,
     })
-    cg.add(var.set_output_faults_text_sensor(ts))
+    cg.add(var.set_output_status_text_sensor(ts))
 
     # Output switches (channels 0x04–0x0D)
     # Digital input binary sensors (candidate decode from channel status 0x01..0x03)

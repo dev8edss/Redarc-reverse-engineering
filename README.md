@@ -306,7 +306,7 @@ The dimmable-lighting module.
 | Master | **switch** | channel `0x0B` | module master |
 | Tank 1 / Tank 2 | sensors % | `0x1FD02` (D1=`0x09`) | analog tank levels |
 | Input Voltage / Current | sensors V/A | `0x1FD02` (D1=`0x16`) | D2-D3 voltage, D4-D5 current, raw × 0.001 |
-| Output Faults | text *(diagnostic)* | `0x1FD00` | lists faulted outputs (`0x06` Fault 1, `0x0A` Fault 2) |
+| Output Status | text *(diagnostic)* | `0x1FD00` | non-normal output states (`0x06` fuse blown, `0x0A` over temp, `0x14`/`0x15` off/on override, `0xF8` unconfigured) |
 
 Dimming uses a **timed hold/ramp**: HA sets a target brightness, the component
 decides up vs down from the latest `0x1FD12` feedback, sends timed hold pulses
@@ -323,18 +323,22 @@ The relay / inverter module.
 | Output 0–9 | **switch** | cmd `0x0F0024` / fb `0x1FD00` | channels `0x04`–`0x0D` |
 | Inverter | **switch** | channel `0x0E` | inverter output |
 | Master | **switch** | channel `0x0F` | module master |
-| Output Faults | text *(diagnostic)* | `0x1FD00` | lists faulted outputs (`0x06` Fault 1, `0x0A` Fault 2) |
+| Output Status | text *(diagnostic)* | `0x1FD00` | non-normal output states (`0x06` fuse blown, `0x0A` over temp, `0x14`/`0x15` off/on override, `0xF8` unconfigured) |
 | Digital Input 1–3 | binary *(diagnostic)* | `0x1FD00` candidate | hardware inputs `0x01`–`0x03` |
 | Temperature 1 / 2 | sensors °C | `0x1FD02` (D1=`0x14`/`0x11`) | raw − 100 |
 | Voltage Input 1 / 2 | sensors V | `0x1FD02` (D1=`0x11`) | items `0x11`/`0x12`, mV/1000 |
 | Tank 1–6 | sensors % | `0x1FD02` (D1=`0x14`/`0x17`/`0x1A`) | multiplexed by page |
 
 TVMS1280 has **no** Rogue-style dimming; its outputs are on/off switches and its
-authoritative state comes from the `0x1BFD0024` feedback frame. An output that
-reports `0xF8` (not configured / unavailable) has its switch entity marked
-**unavailable** in Home Assistant; `0x06`/`0x0A` faults are summarised in the
-Output Faults text sensor. (Rogue outputs are dimmable lights, which ESPHome
-cannot mark unavailable, so Rogue unconfigured outputs are not disabled this way.)
+authoritative state comes from the `0x1BFD0024` feedback frame. The `0x1FD00`
+state byte carries a **status code** per output: `0x00`/`0x01` off/on, `0x06`
+fuse blown, `0x0A` output over temp, `0x14`/`0x15` off/on override, `0xF8`
+unconfigured. Off/On and the override variants drive the switch state (so an
+overridden output still shows the right on/off); `0xF8` marks the switch
+**unavailable** in Home Assistant; and every non-normal code is summarised in
+the **Output Status** text sensor. (Rogue outputs are dimmable lights, which
+ESPHome cannot mark unavailable, so Rogue's `0xF8` outputs are reported in the
+status text sensor rather than disabled.)
 
 ### History polling (RTR requests)
 
@@ -371,7 +375,7 @@ Charging mode   : 0x0F00FF20   43 00 FF FF <00|01> 00 00 00        (00=Touring,0
 ### Feedback frames
 
 ```text
-TVMS1280 out fb : 0x1BFD0024   <base> <s0..s6>     (00=off,01=on,06=fault1,0A=fault2,F8=unconfigured,FF=ignore)
+TVMS1280 out fb : 0x1BFD0024   <base> <s0..s6>     (00=off,01=on,06=fuse-blown,0A=over-temp,14/15=off/on-override,F8=unconfigured,FF=ignore)
 Rogue level fb  : 0x1BFD1230   <base> <l0..l6>     (% per channel)
 Rogue buttons   : 0x1BFD0030   <base> <b1..b7>     (00=inactive,01=active; D1=0x08 D2 = button 8)
 ```
@@ -409,7 +413,7 @@ Rogue buttons   : 0x1BFD0030   <base> <b1..b7>     (00=inactive,01=active; D1=0x
 | TVMS Rogue `0x30` | `0x1BFD1430` | `0x1FD14` | D1 base | Output Dim Activity +0..6 | D2-D8 | activity only, not input state | CONFIRMED |
 | TVMS Rogue `0x30` | `0x1BFD0230` | `0x1FD02` | D1=`0x16` | Input Voltage | D2-D3 | uint16 LE × 0.001 V | CONFIRMED |
 | TVMS Rogue `0x30` | `0x1BFD0230` | `0x1FD02` | D1=`0x16` | Input Current | D4-D5 | uint16 LE × 0.001 A | CONFIRMED |
-| TVMS1280 `0x24` | `0x1BFD0024` | `0x1FD00` | D1 base | Output Feedback +0..6 | D2-D8 | 0=off,1=on,06=fault1,0A=fault2,F8=unconfigured,FF=ignore | CONFIRMED |
+| TVMS1280 `0x24` | `0x1BFD0024` | `0x1FD00` | D1 base | Output Status +0..6 | D2-D8 | 00=off,01=on,06=fuse-blown,0A=over-temp,14/15=off/on-override,F8=unconfigured,FF=ignore | CONFIRMED |
 | TVMS1280 `0x24` | `0x1BFD0224` | `0x1FD02` | D1=`0x14` | Temperature 1 °C | D2 | raw−100 | CONFIRMED |
 | TVMS1280 `0x24` | `0x1BFD0224` | `0x1FD02` | D1=`0x11` | Temperature 2 °C | D6 | raw−100 | CONFIRMED |
 | TVMS1280 `0x24` | `0x1BFD0224` | `0x1FD02` | D1=`0x14` | Tank 1 % | D4 | raw % | CONFIRMED |

@@ -36,7 +36,7 @@ void TVMS1280Component::dump_config() {
   LOG_BINARY_SENSOR("  ", "Digital Input 1", this->digital_input_sensors_[1]);
   LOG_BINARY_SENSOR("  ", "Digital Input 2", this->digital_input_sensors_[2]);
   LOG_BINARY_SENSOR("  ", "Digital Input 3", this->digital_input_sensors_[3]);
-  LOG_TEXT_SENSOR("  ", "Output Faults", this->output_faults_text_sensor_);
+  LOG_TEXT_SENSOR("  ", "Output Status", this->output_status_text_sensor_);
 }
 
 void TVMS1280Component::register_output_switch(TVMS1280Switch *sw) {
@@ -70,20 +70,19 @@ void TVMS1280Component::invalidate_channel_(uint8_t channel) {
   if (sw != nullptr) sw->invalidate_state();
 }
 
-void TVMS1280Component::publish_output_faults_() {
-  if (this->output_faults_text_sensor_ == nullptr) return;
+void TVMS1280Component::publish_output_status_() {
+  if (this->output_status_text_sensor_ == nullptr) return;
   std::string summary;
   for (uint8_t i = 0; i < this->output_state_.size(); i++) {
-    const uint8_t v = this->output_state_[i];
-    const char *fault = v == 0x06 ? "Fault 1" : (v == 0x0A ? "Fault 2" : nullptr);
-    if (fault == nullptr) continue;
+    const char *st = redarc_common::output_status_name(this->output_state_[i]);
+    if (st == nullptr) continue;  // 0x00/0x01/0xFF: normal or no-data
     if (!summary.empty()) summary += ", ";
-    summary += "Output " + std::to_string(i) + " " + fault;
+    summary += "Output " + std::to_string(i) + " " + st;
   }
   if (summary.empty()) summary = "None";
-  if (summary == this->last_output_faults_) return;
-  this->last_output_faults_ = summary;
-  this->output_faults_text_sensor_->publish_state(summary);
+  if (summary == this->last_output_status_) return;
+  this->last_output_status_ = summary;
+  this->output_status_text_sensor_->publish_state(summary);
 }
 
 void TVMS1280Component::publish_channel_(uint8_t channel, bool state) {
@@ -151,9 +150,11 @@ void TVMS1280Component::handle_can_frame(uint32_t can_id, const std::vector<uint
 
   if (redarc_common::rvc_matches(can_id, 0x1FD00UL, this->source_address_)) {
     // TVMS1280 output feedback. D1 is the base channel and D2-D8 are the states
-    // for base+0..base+6. State codes: 0x00 off, 0x01 on (healthy), 0x06 fault 1,
-    // 0x0A fault 2, 0xF8 unconfigured, 0xFF no-data. Only 0x00/0x01 drive the
-    // on/off switch state; faults are reported via the Output Faults text sensor.
+    // for base+0..base+6. Status codes: 0x00 off, 0x01 on, 0x06 fuse blown,
+    // 0x0A output over temp, 0x14 off override, 0x15 on override, 0xF8
+    // unconfigured, 0xFF no-data. Off/On and the override variants drive the
+    // switch state; 0xF8 marks the entity unavailable; all non-normal codes are
+    // summarised in the Output Status text sensor.
     const uint8_t base_channel = data[0];
     bool output_seen = false;
     for (uint8_t i = 1; i < 8; i++) {
@@ -163,14 +164,23 @@ void TVMS1280Component::handle_can_frame(uint32_t can_id, const std::vector<uint
         this->output_state_[channel - TVMS1280_ITEM_OUTPUT_1] = value;
         output_seen = true;
       }
-      if (value == 0x00 || value == 0x01) {
-        this->publish_channel_(channel, value == 0x01);
-      } else if (value == 0xF8) {
-        // Unconfigured / unavailable output: mark its HA entity unavailable.
-        this->invalidate_channel_(channel);
+      switch (value) {
+        case 0x00:  // Off
+        case 0x14:  // Off override (state still updates)
+          this->publish_channel_(channel, false);
+          break;
+        case 0x01:  // On
+        case 0x15:  // On override (state still updates)
+          this->publish_channel_(channel, true);
+          break;
+        case 0xF8:  // Unconfigured: mark the HA entity unavailable
+          this->invalidate_channel_(channel);
+          break;
+        default:    // 0x06 fuse blown, 0x0A over temp, 0xFF no-data: leave state
+          break;
       }
     }
-    if (output_seen) this->publish_output_faults_();
+    if (output_seen) this->publish_output_status_();
     return;
   }
 

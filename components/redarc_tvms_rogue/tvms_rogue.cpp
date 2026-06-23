@@ -116,7 +116,7 @@ void TVMSRogueComponent::dump_config() {
   ESP_LOGCONFIG(TAG, "  Output cmd: 0x%08X  DGN: 0x1FD00, 0x1FD02, 0x1FD12", this->output_command_id_);
   LOG_SENSOR("  ", "Input Voltage", this->input_voltage_sensor_);
   LOG_SENSOR("  ", "Input Current", this->input_current_sensor_);
-  LOG_TEXT_SENSOR("  ", "Output Faults", this->output_faults_text_sensor_);
+  LOG_TEXT_SENSOR("  ", "Output Status", this->output_status_text_sensor_);
   LOG_SWITCH("  ", "Master", this->master_switch_);
   ESP_LOGCONFIG(TAG, "  True-off threshold: %.1f%%", this->true_off_threshold_percent_);
 }
@@ -293,23 +293,22 @@ void TVMSRogueComponent::handle_channel_status_frame_(const std::vector<uint8_t>
       this->master_switch_->publish_state(value == 0x01);
     }
   }
-  if (output_seen) this->publish_output_faults_();
+  if (output_seen) this->publish_output_status_();
 }
 
-void TVMSRogueComponent::publish_output_faults_() {
-  if (this->output_faults_text_sensor_ == nullptr) return;
+void TVMSRogueComponent::publish_output_status_() {
+  if (this->output_status_text_sensor_ == nullptr) return;
   std::string summary;
   for (uint8_t i = 0; i < this->output_state_.size(); i++) {
-    const uint8_t v = this->output_state_[i];
-    const char *fault = v == 0x06 ? "Fault 1" : (v == 0x0A ? "Fault 2" : nullptr);
-    if (fault == nullptr) continue;
+    const char *st = redarc_common::output_status_name(this->output_state_[i]);
+    if (st == nullptr) continue;  // 0x00/0x01/0xFF: normal or no-data
     if (!summary.empty()) summary += ", ";
-    summary += "Output " + std::to_string(i + 1) + " " + fault;
+    summary += "Output " + std::to_string(i + 1) + " " + st;
   }
   if (summary.empty()) summary = "None";
-  if (summary == this->last_output_faults_) return;
-  this->last_output_faults_ = summary;
-  this->output_faults_text_sensor_->publish_state(summary);
+  if (summary == this->last_output_status_) return;
+  this->last_output_status_ = summary;
+  this->output_status_text_sensor_->publish_state(summary);
 }
 
 void TVMSRogueComponent::set_button_state_(uint8_t output_number, bool active) {

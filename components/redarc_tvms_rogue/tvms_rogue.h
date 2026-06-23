@@ -64,7 +64,7 @@ class TVMSRogueComponent : public Component {
   void set_input_current_sensor(sensor::Sensor *s) { this->input_current_sensor_ = s; }
   void set_level_sensor(uint8_t output, sensor::Sensor *s) { if (output >= 1 && output <= 10) this->level_sensors_[output] = s; }
   void set_button_sensor(uint8_t input, binary_sensor::BinarySensor *s) { if (input >= 1 && input <= 8) this->button_sensors_[input] = s; }
-  void set_output_faults_text_sensor(text_sensor::TextSensor *s) { this->output_faults_text_sensor_ = s; }
+  void set_output_status_text_sensor(text_sensor::TextSensor *s) { this->output_status_text_sensor_ = s; }
 
   void set_true_off_threshold(float v) { this->true_off_threshold_percent_ = v; }
 
@@ -90,7 +90,7 @@ class TVMSRogueComponent : public Component {
   void publish_actual_light_level_(uint8_t output_number);
   void set_button_state_(uint8_t output_number, bool active);
   void handle_channel_status_frame_(const std::vector<uint8_t> &data);
-  void publish_output_faults_();
+  void publish_output_status_();
 
   uint8_t source_address_{0x30};
   uint8_t host_address_{0x20};
@@ -111,9 +111,9 @@ class TVMSRogueComponent : public Component {
   sensor::Sensor *tank2_sensor_{nullptr};
   sensor::Sensor *input_voltage_sensor_{nullptr};
   sensor::Sensor *input_current_sensor_{nullptr};
-  text_sensor::TextSensor *output_faults_text_sensor_{nullptr};
+  text_sensor::TextSensor *output_status_text_sensor_{nullptr};
   std::array<uint8_t, 10> output_state_{};
-  std::string last_output_faults_;
+  std::string last_output_status_;
 
   float true_off_threshold_percent_{1.5f};
 };
