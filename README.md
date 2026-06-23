@@ -122,7 +122,7 @@ unless you are the physical end of the bus.
 ### File map
 
 ```text
-redvision_tvms_atom_lite_cais3050g_v86_all_new_info.yaml   <- the device config you flash
+RedVision_TVMS_Atom_lite_Cais3050g.yaml                    <- the device config you flash
 packages/base.yaml                                         <- shared infra (esp32, wifi, api, canbus)
 components/
   redarc_common/            <- CAN dispatcher, address claim, decode helpers (no entities)
@@ -131,7 +131,7 @@ components/
   redarc_redvision_display/ <- Display(s)  (0x20 / 0x21)
   redarc_tvms_rogue/        <- TVMS Rogue  (0x30)
   redarc_tvms_1280/         <- TVMS1280    (0x24)
-redvision_tvms_dashboard_all_new_info.yaml                 <- example Home Assistant Lovelace dashboard
+RedVision_TVMS_Dashboard.yaml                              <- example Home Assistant Lovelace dashboard
 RedVision_TVMS_components.dbc                              <- byte-level signal database (component-derived)
 ```
 
