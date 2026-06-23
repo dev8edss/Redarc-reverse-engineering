@@ -56,6 +56,7 @@ class TVMS1280Component : public Component {
  protected:
   void publish_output_(uint8_t output_number, bool state);
   void publish_channel_(uint8_t channel, bool state);
+  void invalidate_channel_(uint8_t channel);
   void publish_output_faults_();
 
   uint8_t source_address_{0x24};

@@ -330,7 +330,11 @@ The relay / inverter module.
 | Tank 1–6 | sensors % | `0x1FD02` (D1=`0x14`/`0x17`/`0x1A`) | multiplexed by page |
 
 TVMS1280 has **no** Rogue-style dimming; its outputs are on/off switches and its
-authoritative state comes from the `0x1BFD0024` feedback frame.
+authoritative state comes from the `0x1BFD0024` feedback frame. An output that
+reports `0xF8` (not configured / unavailable) has its switch entity marked
+**unavailable** in Home Assistant; `0x06`/`0x0A` faults are summarised in the
+Output Faults text sensor. (Rogue outputs are dimmable lights, which ESPHome
+cannot mark unavailable, so Rogue unconfigured outputs are not disabled this way.)
 
 ### History polling (RTR requests)
 

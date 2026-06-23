@@ -58,6 +58,18 @@ void TVMS1280Component::publish_output_(uint8_t output_number, bool state) {
   if (this->output_switches_[output_number] != nullptr) this->output_switches_[output_number]->publish_state(state);
 }
 
+void TVMS1280Component::invalidate_channel_(uint8_t channel) {
+  switch_::Switch *sw = nullptr;
+  if (channel >= TVMS1280_ITEM_OUTPUT_1 && channel <= TVMS1280_ITEM_OUTPUT_10) {
+    sw = this->output_switches_[channel - TVMS1280_ITEM_OUTPUT_1];
+  } else if (channel == TVMS1280_ITEM_INVERTER) {
+    sw = this->inverter_switch_;
+  } else if (channel == TVMS1280_ITEM_MASTER) {
+    sw = this->master_switch_;
+  }
+  if (sw != nullptr) sw->invalidate_state();
+}
+
 void TVMS1280Component::publish_output_faults_() {
   if (this->output_faults_text_sensor_ == nullptr) return;
   std::string summary;
@@ -151,7 +163,12 @@ void TVMS1280Component::handle_can_frame(uint32_t can_id, const std::vector<uint
         this->output_state_[channel - TVMS1280_ITEM_OUTPUT_1] = value;
         output_seen = true;
       }
-      if (value == 0x00 || value == 0x01) this->publish_channel_(channel, value == 0x01);
+      if (value == 0x00 || value == 0x01) {
+        this->publish_channel_(channel, value == 0x01);
+      } else if (value == 0xF8) {
+        // Unconfigured / unavailable output: mark its HA entity unavailable.
+        this->invalidate_channel_(channel);
+      }
     }
     if (output_seen) this->publish_output_faults_();
     return;
