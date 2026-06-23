@@ -1,4 +1,4 @@
-VERSION "1.0 redarc-components"
+VERSION "1.1 redarc-components-time-command"
 
 
 NS_ :
@@ -184,6 +184,17 @@ BO_ 2617044992 TVMS1280_1FCF0_InverterStatus: 8 TVMS1280
  SG_ InverterState : 0|8@1+ (1,0) [0|1] "" Bridge
  SG_ InverterItemId : 8|8@1+ (1,0) [0|255] "" Bridge
 
+
+BO_ 2415068160 CMD_0FF304_SetClock: 8 Bridge
+ SG_ SetClockWeekday : 0|3@1+ (1,0) [0|7] "" Manager30
+ SG_ SetClockDay : 3|5@1+ (1,1) [1|31] "" Manager30
+ SG_ SetClockMonth : 8|8@1+ (1,0) [1|12] "" Manager30
+ SG_ SetClockYear : 16|16@1+ (1,0) [2000|2100] "" Manager30
+ SG_ SetClockHour : 32|8@1+ (1,0) [0|23] "" Manager30
+ SG_ SetClockMinute : 40|8@1+ (1,0) [0|59] "" Manager30
+ SG_ SetClockSecond : 48|8@1+ (1,0) [0|59] "" Manager30
+ SG_ SetClockCommandMarker : 56|8@1+ (1,0) [0|0] "" Manager30
+
 BO_ 2399207168 CMD_0F00FF_ConfigSetting: 8 Bridge
  SG_ CommandId : 0|8@1+ (1,0) [0|255] "" Manager30,BatterySensor
  SG_ ConfigValue : 32|16@1+ (1,0) [0|65535] "" Manager30,BatterySensor
@@ -220,7 +231,7 @@ CM_ BO_ 2482819072 "Paginated history array. PageIndex (D1) selects the block; a
 CM_ BO_ 2482819584 "Paginated history array. Absolute day index = PageIndex*7 + SlotN. 255 = no data. Combined with the daily-high page into the SOC Daily Range entity.";
 CM_ BO_ 2482820096 "Paginated history array. Absolute day index = PageIndex*7 + SlotN. 255 = no data.";
 CM_ BO_ 2213675008 "ChargingStage is also used to derive ChargingMode (bit0) when 0x1F108 has not been seen.";
-CM_ BO_ 2213741568 "Bus clock. ClockDay = (D1>>3)+1, ClockFlags = D1 & 0x07. Only published when all fields are in valid calendar ranges.";
+CM_ BO_ 2213741568 "Manager30 clock/status response. D1 bits 7-3 encode day-1; D1 bits 2-0 encode weekday (1=Monday through 7=Sunday). D2=month, D3-D4=year little-endian, D5=hour, D6=minute, D7=second, D8 is normally 0xFF. Observed from source address 0x01.";
 CM_ BO_ 2214385152 "Solar generation history, 4 pages x 3 days = 12 days. Day 0 = today, Day 1..11 = previous days, in Wh. Requested via REQ_0FFCD6 (RTR).";
 CM_ BO_ 2617049088 "DGN 0x1FD00 shared by TVMS1280 (SA 0x24) and TVMSRogue (SA 0x30). Byte array: BaseItem (D1) then State_Plus0..6 for channels BaseItem..BaseItem+6. Status codes: 0x00 Off, 0x01 On, 0x06 Fuse blown, 0x0A Output over temp, 0x14 Off override, 0x15 On override, 0xF8 Unconfigured, 0xFF no-data. TVMS1280 channel map: 0x01-0x03 Digital Inputs 1-3, 0x04-0x0D Outputs 0-9, 0x0E Inverter, 0x0F Master. TVMSRogue channel map: 0x01-0x08 Input Buttons 1-8, 0x0B Master, 0x0C-0x15 Outputs 1-10.";
 CM_ BO_ 2617049600 "DGN 0x1FD02 shared by TVMS1280 (SA 0x24) and TVMSRogue (SA 0x30), multiplexed by ItemId (D1). Item codes do not collide between the two devices, so one definition serves both.";
@@ -234,6 +245,7 @@ CM_ BO_ 2415710208 "RTR remote-request frame (no payload, DLC 8). Polls the batt
 CM_ BO_ 2415710720 "RTR remote-request frame (no payload). Polls SOC daily-low history; reply is BATT_1FCD2.";
 CM_ BO_ 2415711232 "RTR remote-request frame (no payload). Polls SOC daily-high history; reply is BATT_1FCD4.";
 CM_ BO_ 2415711744 "RTR remote-request frame (no payload). Polls the manager for solar history; reply is MGR_1FCD6.";
+CM_ BO_ 2415068160 "CONFIRMED Manager30 set-clock command. Actual CAN ID is 0x0FF304<source_address>; this DBC leaves the source byte at 0x00, so OR in the transmitting host address. D1=((day-1)<<3)|weekday, where weekday 1=Monday through 7=Sunday. D2=month, D3-D4=year little-endian, D5=hour, D6=minute, D7=second, D8=0x00. Confirmed example: ID 0x0FF304FA, B2 06 EA 07 10 23 29 00 set 23 June 2026 16:35:41 Tuesday. Manager30 confirmed approximately 230 ms later on 0x03F30401.";
 CM_ SG_ 2482045440 BatteryCurrent "Signed via offset: A = raw/1000 - 1000. Positive = charging, negative = discharging.";
 CM_ SG_ 2213677568 OutputCurrent "A = raw/1000 - 1000.";
 CM_ SG_ 2482143232 BatteryCurrentDisplay "Display rebroadcast value: A = raw/10 - 1000.";
@@ -243,6 +255,10 @@ CM_ SG_ 2213676544 VehicleInputVoltage "Confirmed: V = raw/1000. Ranged 12.552-1
 CM_ BO_ 2482143744 "RedVision display mirror, ~1 Hz. DisplayVehicleCurrent (D3-D4) and ManagerOutputCurrentDisplay (D7-D8) both scale 0.1, offset -1000.";
 CM_ BO_ 2482144256 "RedVision display mirror of the Manager30 vehicle input voltage, ~1 Hz. D3-D4, scale 0.1 V. Example 0x13F28420 F1 00 7D 00 ... -> 12.5 V.";
 CM_ SG_ 2617049600 RogueInputCurrent "CONFIRMED: DGN 0x1FD02, page 0x16, D4-D5 little-endian. Rogue input current in amperes = raw * 0.001. Controlled capture rose from approximately 0.05 A to 8.781 A and returned to approximately 0.05 A.";
+
+
+VAL_ 2415068160 SetClockWeekday 0 "Unknown" 1 "Monday" 2 "Tuesday" 3 "Wednesday" 4 "Thursday" 5 "Friday" 6 "Saturday" 7 "Sunday" ;
+VAL_ 2213741568 ClockFlags 0 "Unknown" 1 "Monday" 2 "Tuesday" 3 "Wednesday" 4 "Thursday" 5 "Friday" 6 "Saturday" 7 "Sunday" ;
 
 VAL_ 2482044928 BatteryType 0 "Gel" 1 "AGM" 2 "LeadAcid" 3 "Calcium" 4 "Lithium" ;
 VAL_ 2213611520 ChargingMode 0 "Touring" 1 "Storage" ;
