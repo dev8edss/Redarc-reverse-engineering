@@ -82,7 +82,7 @@ class BatterySensorComponent : public Component {
   bool has_current() const { return !std::isnan(this->current_a_); }
 
  protected:
-  bool send_pending_soc_history_request_(uint32_t now);
+  void send_soc_history_requests_();
   void handle_soc_history_page_(uint32_t dgn, const std::vector<uint8_t> &data);
   void publish_soc_hourly_history_();
   void publish_soc_daily_history_();
@@ -122,8 +122,6 @@ class BatterySensorComponent : public Component {
   std::array<bool, 35> soc_daily_high_seen_{};
   uint32_t soc_history_poll_interval_ms_{60000};
   uint32_t last_soc_history_poll_ms_{0};
-  uint32_t last_soc_history_request_ms_{0};
-  uint8_t pending_soc_history_request_index_{0xFF};
 };
 
 }  // namespace redarc_battery_sensor

@@ -11,7 +11,6 @@ static const char *const TAG = "redarc_battery_sensor";
 static const uint32_t SOC_HISTORY_REQUEST_BASES[] = {0x0FFCD000UL, 0x0FFCD200UL, 0x0FFCD400UL};
 static const uint8_t SOC_HISTORY_REQUEST_COUNT =
     sizeof(SOC_HISTORY_REQUEST_BASES) / sizeof(SOC_HISTORY_REQUEST_BASES[0]);
-static const uint32_t SOC_HISTORY_REQUEST_SPACING_MS = 100;
 
 void BatterySOCCalibrateButton::press_action() {
   if (this->parent_ == nullptr) return;
@@ -43,14 +42,11 @@ void BatterySensorComponent::setup() {
 
 void BatterySensorComponent::loop() {
   const uint32_t now = millis();
-  // Drain any queued SOC history request frames, spaced out.
-  if (this->send_pending_soc_history_request_(now)) return;
   if (this->soc_history_poll_interval_ms_ == 0) return;
   if (this->last_soc_history_poll_ms_ == 0 ||
       now - this->last_soc_history_poll_ms_ >= this->soc_history_poll_interval_ms_) {
     this->last_soc_history_poll_ms_ = now;
-    this->pending_soc_history_request_index_ = 0;  // queue the 24h / daily-low / daily-high requests
-    this->last_soc_history_request_ms_ = 0;
+    this->send_soc_history_requests_();  // 24h / daily-low / daily-high, back-to-back
   }
 }
 
@@ -218,27 +214,18 @@ void BatterySensorComponent::handle_can_frame(uint32_t can_id, const std::vector
   }
 }
 
-bool BatterySensorComponent::send_pending_soc_history_request_(uint32_t now) {
-  if (this->pending_soc_history_request_index_ >= SOC_HISTORY_REQUEST_COUNT) return false;
-  if (this->last_soc_history_request_ms_ != 0 &&
-      now - this->last_soc_history_request_ms_ < SOC_HISTORY_REQUEST_SPACING_MS)
-    return true;
-
+void BatterySensorComponent::send_soc_history_requests_() {
   auto *bus = redarc_common::RedarcCanDispatcher::instance().canbus();
-  if (bus == nullptr) {
-    this->pending_soc_history_request_index_ = 0xFF;
-    return false;
-  }
+  if (bus == nullptr) return;
 
-  const uint8_t idx = this->pending_soc_history_request_index_;
-  const uint32_t can_id = SOC_HISTORY_REQUEST_BASES[idx] | this->host_address_;
-  // RTR frame, extended ID, DLC 8, no payload (the RTR flag suppresses data on the wire).
+  // RTR frames, extended ID, DLC 8, no payload (the RTR flag suppresses data on
+  // the wire). All sent back-to-back with no inter-request delay.
   const std::vector<uint8_t> rtr_dlc8(8, 0x00);
-  redarc_common::log_can_frame("CAN_TX", can_id, rtr_dlc8, true);
-  bus->send_data(can_id, true, true, rtr_dlc8);
-  this->pending_soc_history_request_index_++;
-  this->last_soc_history_request_ms_ = now;
-  return this->pending_soc_history_request_index_ < SOC_HISTORY_REQUEST_COUNT;
+  for (uint8_t idx = 0; idx < SOC_HISTORY_REQUEST_COUNT; idx++) {
+    const uint32_t can_id = SOC_HISTORY_REQUEST_BASES[idx] | this->host_address_;
+    redarc_common::log_can_frame("CAN_TX", can_id, rtr_dlc8, true);
+    bus->send_data(can_id, true, true, rtr_dlc8);
+  }
 }
 
 void BatterySensorComponent::handle_soc_history_page_(uint32_t dgn, const std::vector<uint8_t> &data) {
