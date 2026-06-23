@@ -155,7 +155,7 @@ async def to_code(config):
         cg.add(sw.set_is_inverter(False))
         sw_cfg = {
             CONF_ID: config[f"output_{i}_id"],
-            CONF_NAME: f"{p} Output {i}",
+            CONF_NAME: f"{p} Output {i + 1}",
             CONF_DISABLED_BY_DEFAULT: False,
             CONF_ICON: "",
             CONF_ENTITY_CATEGORY: ENTITY_CATEGORY_NONE,

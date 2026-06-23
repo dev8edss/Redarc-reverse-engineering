@@ -217,20 +217,20 @@ Observed examples include:
 
 ### Output channel map
 
-The project now labels TVMS1280 relay outputs as `0-9` to match the zero-based component configuration.
+The project labels TVMS1280 relay outputs as `1-10` (channels are still the zero-based `0x04`–`0x0D`).
 
 | Output label | Channel | Status |
 |---:|---:|---|
-| Output 0 | `0x04` | assumed sequence |
-| Output 1 | `0x05` | assumed sequence |
-| Output 2 | `0x06` | assumed sequence |
-| Output 3 | `0x07` | assumed sequence |
-| Output 4 | `0x08` | observed in feedback group |
-| Output 5 | `0x09` | confirmed toggled |
-| Output 6 | `0x0A` | confirmed toggled |
-| Output 7 | `0x0B` | assumed sequence |
-| Output 8 | `0x0C` | assumed sequence |
-| Output 9 | `0x0D` | assumed sequence |
+| Output 1 | `0x04` | assumed sequence |
+| Output 2 | `0x05` | assumed sequence |
+| Output 3 | `0x06` | assumed sequence |
+| Output 4 | `0x07` | assumed sequence |
+| Output 5 | `0x08` | observed in feedback group |
+| Output 6 | `0x09` | confirmed toggled |
+| Output 7 | `0x0A` | confirmed toggled |
+| Output 8 | `0x0B` | assumed sequence |
+| Output 9 | `0x0C` | assumed sequence |
+| Output 10 | `0x0D` | assumed sequence |
 | Inverter | `0x0E` | observed/confirmed command pattern |
 
 ### Command and feedback frames

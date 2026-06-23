@@ -321,7 +321,7 @@ The relay / inverter module.
 
 | Entity | Type | From / to | Notes |
 |---|---|---|---|
-| Output 0–9 | **switch** | cmd `0x0F0024` / fb `0x1FD00` | channels `0x04`–`0x0D` |
+| Output 1–10 | **switch** | cmd `0x0F0024` / fb `0x1FD00` | channels `0x04`–`0x0D` |
 | Inverter | **switch** | channel `0x0E` | inverter output |
 | Master | **switch** | channel `0x0F` | module master |
 | Output Status | text *(diagnostic)* | `0x1FD00` | non-normal output states (`0x06` fuse blown, `0x0A` over temp, `0x14`/`0x15` off/on override, `0xF8` unconfigured) |

@@ -426,8 +426,6 @@ cards:
     entities:
       - entity: switch.redvision_can_bridge_tvms1280_master
         name: Master
-      - entity: switch.redvision_can_bridge_tvms1280_output_0
-        name: Output 0
       - entity: switch.redvision_can_bridge_tvms1280_output_1
         name: Output 1
       - entity: switch.redvision_can_bridge_tvms1280_output_2
@@ -446,6 +444,8 @@ cards:
         name: Output 8
       - entity: switch.redvision_can_bridge_tvms1280_output_9
         name: Output 9
+      - entity: switch.redvision_can_bridge_tvms1280_output_10
+        name: Output 10
       - entity: switch.redvision_can_bridge_tvms1280_inverter
         name: Inverter
   - type: entities
