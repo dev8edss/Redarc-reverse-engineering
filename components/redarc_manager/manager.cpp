@@ -25,7 +25,6 @@ void Manager30Component::setup() {
 }
 
 void Manager30Component::loop() {
-  if (!redarc_common::RedarcCanDispatcher::instance().address_claim_sent()) return;
   if (this->solar_history_poll_interval_ms_ == 0) return;
   const uint32_t now = millis();
   if (this->last_solar_history_poll_ms_ == 0 ||

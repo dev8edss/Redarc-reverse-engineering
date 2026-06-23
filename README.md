@@ -48,7 +48,7 @@ display's rebroadcast of the same numbers.
 | `0x21` | RedVision display 2 | Second screen / status |
 | `0x24` | TVMS1280 | 10 relay outputs + inverter, tanks, temps, voltage inputs |
 | `0x30` | TVMS Rouge | 10 dimmable outputs, hardware buttons, tanks, input V/A |
-| `0x22` | **This ESP32 bridge** | Our own claimed address (configurable) |
+| `0x22` | **This ESP32 bridge** | Our own address, used as the source of command/poll frames (configurable) |
 | `0xFA` | Diagnostic / request tool | Readout & history-request traffic |
 
 ### Recurring decode patterns
@@ -164,9 +164,10 @@ canbus:
   an `rtr=` flag) and hands it to every listener. **RTR (remote-request) frames
   are logged but not decoded** — they carry no payload. So all decoding is just
   "did this data frame match my `(DGN, source address)`?".
-- **Address claim** — on boot it transmits an address-claim frame so the bus
-  accepts our `host_address` (default `0x22`). Device components wait for
-  `address_claim_sent()` before transmitting.
+- **Bus handle** — on boot it stores the single `canbus` interface in the
+  dispatcher (at `setup_priority::BUS`, so it is ready before any device
+  component's `loop()` runs). Transmit helpers just null-check that handle; the
+  bridge does not announce/claim an address on the bus.
 - **Decode helpers** — `u16_le` / `u32_le`, `rvc_dgn` / `rvc_source_address`,
   `rvc_matches`, and the `current_32_centered` / `current_display_16_centered`
   scalers described above.

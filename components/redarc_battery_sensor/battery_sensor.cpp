@@ -42,7 +42,6 @@ void BatterySensorComponent::setup() {
 }
 
 void BatterySensorComponent::loop() {
-  if (!redarc_common::RedarcCanDispatcher::instance().address_claim_sent()) return;
   const uint32_t now = millis();
   // Drain any queued SOC history request frames, spaced out.
   if (this->send_pending_soc_history_request_(now)) return;
