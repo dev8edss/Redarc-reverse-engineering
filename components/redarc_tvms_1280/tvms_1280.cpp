@@ -58,18 +58,6 @@ void TVMS1280Component::publish_output_(uint8_t output_number, bool state) {
   if (this->output_switches_[output_number] != nullptr) this->output_switches_[output_number]->publish_state(state);
 }
 
-void TVMS1280Component::invalidate_channel_(uint8_t channel) {
-  switch_::Switch *sw = nullptr;
-  if (channel >= TVMS1280_ITEM_OUTPUT_1 && channel <= TVMS1280_ITEM_OUTPUT_10) {
-    sw = this->output_switches_[channel - TVMS1280_ITEM_OUTPUT_1];
-  } else if (channel == TVMS1280_ITEM_INVERTER) {
-    sw = this->inverter_switch_;
-  } else if (channel == TVMS1280_ITEM_MASTER) {
-    sw = this->master_switch_;
-  }
-  if (sw != nullptr) sw->invalidate_state();
-}
-
 void TVMS1280Component::publish_output_status_() {
   if (this->output_status_text_sensor_ == nullptr) return;
   std::string summary;
@@ -153,8 +141,9 @@ void TVMS1280Component::handle_can_frame(uint32_t can_id, const std::vector<uint
     // for base+0..base+6. Status codes: 0x00 off, 0x01 on, 0x06 fuse blown,
     // 0x0A output over temp, 0x14 off override, 0x15 on override, 0xF8
     // unconfigured, 0xFF no-data. Off/On and the override variants drive the
-    // switch state; 0xF8 marks the entity unavailable; all non-normal codes are
-    // summarised in the Output Status text sensor.
+    // switch state; all non-normal codes (incl. 0xF8 unconfigured) are
+    // summarised in the Output Status text sensor. (ESPHome cannot mark an
+    // individual switch entity unavailable, so 0xF8 is reported, not disabled.)
     const uint8_t base_channel = data[0];
     bool output_seen = false;
     for (uint8_t i = 1; i < 8; i++) {
@@ -173,11 +162,9 @@ void TVMS1280Component::handle_can_frame(uint32_t can_id, const std::vector<uint
         case 0x15:  // On override (state still updates)
           this->publish_channel_(channel, true);
           break;
-        case 0xF8:  // Unconfigured: mark the HA entity unavailable
-          this->invalidate_channel_(channel);
-          break;
-        default:    // 0x06 fuse blown, 0x0A over temp, 0xFF no-data: leave state
-          break;
+        default:    // 0x06 fuse blown, 0x0A over temp, 0xF8 unconfigured, 0xFF
+          break;    // no-data: leave switch state; reported via Output Status
+
       }
     }
     if (output_seen) this->publish_output_status_();

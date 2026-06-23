@@ -334,11 +334,11 @@ authoritative state comes from the `0x1BFD0024` feedback frame. The `0x1FD00`
 state byte carries a **status code** per output: `0x00`/`0x01` off/on, `0x06`
 fuse blown, `0x0A` output over temp, `0x14`/`0x15` off/on override, `0xF8`
 unconfigured. Off/On and the override variants drive the switch state (so an
-overridden output still shows the right on/off); `0xF8` marks the switch
-**unavailable** in Home Assistant; and every non-normal code is summarised in
-the **Output Status** text sensor. (Rogue outputs are dimmable lights, which
-ESPHome cannot mark unavailable, so Rogue's `0xF8` outputs are reported in the
-status text sensor rather than disabled.)
+overridden output still shows the right on/off); every non-normal code (the
+`0x06`/`0x0A` faults and `0xF8` unconfigured) is summarised in the **Output
+Status** text sensor. (ESPHome cannot mark an individual switch/light entity
+unavailable at runtime, so unconfigured outputs are reported there rather than
+disabled.)
 
 ### History polling (RTR requests)
 
