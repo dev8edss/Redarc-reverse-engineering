@@ -17,7 +17,7 @@ CONFIG_SCHEMA = cv.Schema({
     cv.GenerateID(): cv.declare_id(RedarcCommonComponent),
     cv.Required(CONF_CANBUS_ID): cv.use_id(canbus.CanbusComponent),
     cv.Optional(CONF_HOST_ADDRESS, default=0x22): cv.hex_uint8_t,
-    cv.Optional(CONF_DISCOVERY_DELAY, default="1500ms"): cv.positive_time_period_milliseconds,
+    cv.Optional(CONF_DISCOVERY_DELAY, default="2000ms"): cv.positive_time_period_milliseconds,
 }).extend(cv.COMPONENT_SCHEMA)
 
 
