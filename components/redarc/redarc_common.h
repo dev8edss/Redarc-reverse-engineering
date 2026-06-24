@@ -75,8 +75,10 @@ class RedarcCommonComponent : public Component {
     if (this->last_discovery_ms_ != 0 && now - this->last_discovery_ms_ < 10000U) return;
     this->last_discovery_ms_ = now;
     // Forget previously-seen devices so this scan re-prints the full list to the
-    // logs (discovery otherwise de-duplicates and would log nothing).
+    // logs (discovery otherwise de-duplicates and would log nothing). The bus
+    // addresses re-print as each device's next frame arrives (within seconds).
     this->seen_device_keys_.clear();
+    this->seen_addresses_.clear();
     this->start_discovery_burst_(DISCOVERY_BURST_ATTEMPTS);
   }
 
@@ -95,6 +97,7 @@ class RedarcCommonComponent : public Component {
           const uint32_t rvc_id = can_id & 0x1FFFFFFFUL;
           RedarcCanDispatcher::instance().dispatch(rvc_id, data, rtr);
           if (!extended_id || rtr) return;
+          this->note_bus_address_(rvc_id);
           this->handle_device_identity_(rvc_id, data);
         });
 
@@ -149,6 +152,36 @@ class RedarcCommonComponent : public Component {
       case 0x16: return "TVMS Rouge";
       default: return nullptr;
     }
+  }
+
+  // Friendly name for a device's source address. Only some devices answer the
+  // 0x1F404 identity request, so we also name devices by the address they
+  // transmit on (the standard REDARC defaults).
+  static const char *device_name_for_address_(uint8_t source_address) {
+    switch (source_address) {
+      case 0x01: return "Manager30";
+      case 0x08: return "Battery Sensor";
+      case 0x20: return "RedVision Display";
+      case 0x21: return "RedVision Display 2";
+      case 0x24: return "TVMS 1280";
+      case 0x30: return "TVMS Rogue";
+      default: return nullptr;
+    }
+  }
+
+  // Log each source address seen transmitting on the bus, once per scan. This
+  // catches every active device, not just the few that answer 0x1F404.
+  void note_bus_address_(uint32_t id) {
+    const uint8_t source_address = (uint8_t) (id & 0xFFU);
+    if (source_address == 0xFF || source_address == this->host_address_) return;
+    if (std::find(this->seen_addresses_.begin(), this->seen_addresses_.end(), source_address) !=
+        this->seen_addresses_.end()) {
+      return;
+    }
+    this->seen_addresses_.push_back(source_address);
+    const char *name = device_name_for_address_(source_address);
+    ESP_LOGI(TAG, "Device on bus: %s at %u (0x%02X)", name != nullptr ? name : "Unknown",
+             (unsigned) source_address, (unsigned) source_address);
   }
 
   void request_all_devices_() {
@@ -209,6 +242,7 @@ class RedarcCommonComponent : public Component {
   uint32_t discovery_delay_ms_{2000};
   uint32_t last_discovery_ms_{0};
   std::vector<uint64_t> seen_device_keys_;
+  std::vector<uint8_t> seen_addresses_;
 };
 
 inline uint16_t u16_le(const std::vector<uint8_t> &data, uint8_t i) {
