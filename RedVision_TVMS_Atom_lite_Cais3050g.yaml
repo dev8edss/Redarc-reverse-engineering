@@ -80,8 +80,8 @@ redarc:
     bit_rate: ${can_bit_rate}
     mode: ${can_mode}
     rx_queue_len: 64
-  # Home Assistant time source for the Manager Set Time button.
-  time: {}
+  # Home Assistant time + the Manager "Set Time" button are enabled by default.
+  # Add `time: false` to disable them.
 
   host_address: ${host_address}
   discovery_delay: 60s

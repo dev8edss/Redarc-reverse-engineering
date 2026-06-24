@@ -99,12 +99,12 @@ Mode     : NORMAL      -> read + transmit (switch/dim/commands)
 
 Observed pinout on the RedVision / TVMS RJ45 connectors:
 
-| RJ45 pin | Signal | Status |
-|---:|---|---|
-| 4 | CAN&nbsp;L | confirmed |
-| 5 | CAN&nbsp;H | confirmed |
-| 8 | Ground | confirmed |
-| (unknown) | 24 V supply | **unconfirmed — do not assume** |
+| RJ45 pin | Wire colour (T568B) | Signal | Status |
+|---:|---|---|---|
+| 4 | Blue | CAN&nbsp;L | confirmed |
+| 5 | Blue/White | CAN&nbsp;H | confirmed |
+| 7 | Brown/White | (unknown — candidate 24 V supply) | **unconfirmed — do not assume** |
+| 8 | Brown | Ground | confirmed |
 
 Wire **CAN H → GPIO22 side transceiver H**, **CAN L → L**, and share **ground**.
 Power the Atom from USB (or a verified 5 V source) — do **not** feed the
@@ -160,9 +160,9 @@ top-level `redarc:` block holds the CAN bus (`canbus:`), an optional time source
   `rtr=` flag) and hands it to every listener. **RTR frames are logged but not
   decoded.** Decoding is just "did this data frame match my `(DGN, source
   address)`?".
-- **Time** — `redarc: time:` creates a Home Assistant time source and wires it
-  into every Manager (for the Set Time button) unless a Manager sets its own
-  `time_id:`.
+- **Time** — a Home Assistant time source is created **automatically** and wired
+  into every Manager (enabling the Set Time button). Set `time: false` to disable
+  it — then no time source and **no Set Time button** are added.
 - **Decode helpers** — `u16_le` / `u32_le`, `rvc_dgn` / `rvc_source_address`,
   `rvc_matches`, and the `current_32_centered` / `current_display_16_centered`
   scalers described above.
@@ -194,7 +194,8 @@ redarc:
     rx_pin: GPIO19
     bit_rate: 250KBPS
     mode: NORMAL                   # or LISTENONLY for a monitor build
-  time:                            # Home Assistant time for the Set Time button
+  # Home Assistant time + Manager Set Time button are on by default.
+  # Add `time: false` to disable them.
 
   host_address: "0x22"             # source address for discovery/commands; devices inherit this
   discovery_delay: 60s
@@ -257,7 +258,7 @@ options — only the listed defaults differ.
 | `id` | optional | auto | dispatcher component id |
 | `canbus` | optional* | — | internal CAN bus — same options as ESPHome's `esp32_can` (below) |
 | `canbus_id` | optional* | — | reference an external `canbus:` instead (e.g. MCP2515, untested) |
-| `time` | optional | — | internal time — same options as ESPHome's `homeassistant` time (below) |
+| `time` | optional | enabled | internal HA time (auto-added); `time: false` disables it + the Set Time button |
 | `host_address` | optional | `0xFF` | source address for discovery/commands; devices inherit |
 | `discovery_delay` | optional | `2000ms` | delay before startup discovery request |
 | `filter_interval` | optional | `5s` | publish throttle; devices inherit |
@@ -282,9 +283,11 @@ apply and are validated by `esp32_can`; REDARC just injects friendlier defaults:
 
 A bare `canbus:` is valid — every option above has a default.
 
-**`redarc: time:` — = ESPHome `homeassistant` time.** No option is required; a bare
-`time:` works. All `homeassistant`/base `time` options apply (`timezone`, `on_time`,
-`update_interval`, …) with ESPHome's defaults; `id` is auto.
+**`redarc: time:` — = ESPHome `homeassistant` time.** Enabled automatically — you
+don't need to write `time:` at all. Set `time: false` to disable it (and the
+Manager Set Time button). When enabled, all `homeassistant`/base `time` options
+apply (`timezone`, `on_time`, `update_interval`, …) with ESPHome's defaults;
+`id` is auto.
 
 **Device sub-blocks**
 

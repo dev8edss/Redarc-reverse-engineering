@@ -213,19 +213,22 @@ async def to_code(config):
     cg.add(sel.set_parent(var))
     cg.add(var.set_charging_mode_select(sel))
 
+    # The Set Time button only exists when a time source is available (the
+    # redarc time: is enabled, or a time_id is set here). With time disabled it
+    # is not added to Home Assistant.
     if CONF_TIME_ID in config:
         t = await cg.get_variable(config[CONF_TIME_ID])
         cg.add(var.set_time_source(t))
 
-    btn = await button.new_button({
-        CONF_ID: config["set_clock_button_id"],
-        CONF_NAME: f"{p} Set Time",
-        CONF_DISABLED_BY_DEFAULT: False,
-        CONF_ICON: "mdi:clock-edit",
-        CONF_ENTITY_CATEGORY: ENTITY_CATEGORY_DIAGNOSTIC,
-    })
-    cg.add(btn.set_parent(var))
-    cg.add(var.set_set_clock_button(btn))
+        btn = await button.new_button({
+            CONF_ID: config["set_clock_button_id"],
+            CONF_NAME: f"{p} Set Time",
+            CONF_DISABLED_BY_DEFAULT: False,
+            CONF_ICON: "mdi:clock-edit",
+            CONF_ENTITY_CATEGORY: ENTITY_CATEGORY_DIAGNOSTIC,
+        })
+        cg.add(btn.set_parent(var))
+        cg.add(var.set_set_clock_button(btn))
 
     btn = await button.new_button({
         CONF_ID: config["clear_solar_history_button_id"],

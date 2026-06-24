@@ -4,7 +4,8 @@ from esphome.components import canbus
 from esphome.components.canbus import CONF_BIT_RATE, CONF_CAN_ID, CONF_USE_EXTENDED_ID
 from esphome.components.esp32_can import canbus as esp32_can
 from esphome.components.homeassistant import time as homeassistant_time
-from esphome.const import CONF_ID, CONF_RX_PIN, CONF_TX_PIN
+from esphome.const import CONF_ID, CONF_PLATFORM, CONF_RX_PIN, CONF_TX_PIN
+from esphome.core import CORE
 
 from . import (
     _battery_sensor,
@@ -125,9 +126,12 @@ def _apply_canbus_defaults(value):
 CANBUS_SCHEMA = cv.All(_apply_canbus_defaults, esp32_can.CONFIG_SCHEMA)
 
 # Likewise the Home Assistant time source (used by the Manager Set Time button)
-# can be created inside the component, reusing the homeassistant time schema.
-# Accept an empty `time:` (None) as well as `time: {}`.
+# is created inside the component, reusing the homeassistant time schema. Time is
+# enabled by default; `time: false` disables it (and the Set Time button). An
+# empty `time:` / `time: {}` is the same as the default.
 def _time_schema(value):
+    if value is False:
+        return False
     return homeassistant_time.CONFIG_SCHEMA({} if value is None else value)
 
 CONFIG_SCHEMA = cv.All(
@@ -135,7 +139,7 @@ CONFIG_SCHEMA = cv.All(
         cv.GenerateID(): cv.declare_id(RedarcCommonComponent),
         cv.Optional(CONF_CANBUS): CANBUS_SCHEMA,
         cv.Optional(CONF_CANBUS_ID): cv.use_id(canbus.CanbusComponent),
-        cv.Optional(CONF_TIME): _time_schema,
+        cv.Optional(CONF_TIME, default={}): _time_schema,
         cv.Optional(CONF_HOST_ADDRESS, default=0xFF): cv.hex_uint8_t,
         cv.Optional(CONF_DISCOVERY_DELAY, default="2000ms"): cv.positive_time_period_milliseconds,
         cv.Optional(CONF_FILTER_INTERVAL, default="5s"): cv.positive_time_period_milliseconds,
@@ -166,11 +170,20 @@ async def to_code(config):
         can = await cg.get_variable(config[CONF_CANBUS_ID])
     cg.add(var.set_canbus(can))
 
-    # Optional internal Home Assistant time source for the Manager Set Time button.
-    time_var = None
-    if CONF_TIME in config:
-        await homeassistant_time.to_code(config[CONF_TIME])
-        time_var = await cg.get_variable(config[CONF_TIME][CONF_ID])
+    # Home Assistant time source (enabled by default; `time: false` disables it
+    # and the Manager Set Time button). Created inside the component.
+    time_id = None
+    if config[CONF_TIME] is not False:
+        time_conf = config[CONF_TIME]
+        await homeassistant_time.to_code(time_conf)
+        # The homeassistant time platform's C++ sources are only copied into the
+        # build when a `time:` platform entry exists. We create the time without
+        # such an entry, so register one here so api_connection.cpp can find
+        # homeassistant_time.h (USE_HOMEASSISTANT_TIME is defined by to_code).
+        time_platform_entry = dict(time_conf)
+        time_platform_entry[CONF_PLATFORM] = "homeassistant"
+        CORE.config.setdefault("time", []).append(time_platform_entry)
+        time_id = time_conf[CONF_ID]
 
     host_address = config[CONF_HOST_ADDRESS]
     cg.add(var.set_host_address(host_address))
@@ -200,9 +213,9 @@ async def to_code(config):
     for device_config in config.get(CONF_BATTERY_SENSOR) or []:
         await _battery_sensor.to_code(_inherit(device_config, host=True, soc_history=True))
     for device_config in config.get(CONF_MANAGER) or []:
-        manager = await _manager.to_code(_inherit(device_config, host=True, solar_history=True))
-        if time_var is not None and _manager.CONF_TIME_ID not in device_config:
-            cg.add(manager.set_time_source(time_var))
+        if time_id is not None:
+            device_config.setdefault(_manager.CONF_TIME_ID, time_id)
+        await _manager.to_code(_inherit(device_config, host=True, solar_history=True))
     if config.get(CONF_REDVISION_DISPLAY):
         for device_config in config[CONF_REDVISION_DISPLAY]:
             _inherit(device_config)
