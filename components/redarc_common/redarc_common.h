@@ -46,8 +46,6 @@ class RedarcCanDispatcher {
   }
   void dispatch(uint32_t can_id, const std::vector<uint8_t> &data, bool rtr = false) {
     log_can_frame("CAN_RX", can_id, data, rtr);
-    // RTR request frames carry no real payload; log them but do not feed the
-    // decoders, whose data bytes would be meaningless/garbage.
     if (rtr) return;
     for (auto &cb : this->listeners_) cb(can_id, data);
   }
@@ -63,18 +61,31 @@ class RedarcCommonComponent : public Component {
   void set_discovery_delay_ms(uint32_t discovery_delay_ms) { this->discovery_delay_ms_ = discovery_delay_ms; }
 
   void setup() override {
-    auto &dispatcher = RedarcCanDispatcher::instance();
-    dispatcher.set_canbus(this->canbus_);
-    dispatcher.add_listener([this](uint32_t can_id, const std::vector<uint8_t> &data) {
-      this->handle_device_identity_(can_id, data);
-    });
+    RedarcCanDispatcher::instance().set_canbus(this->canbus_);
 
-    // Delay the global request until the CAN controller and the remaining
-    // external components have completed setup. Periodic 0x1F404 broadcasts
-    // are also decoded, so discovery still works in LISTENONLY mode.
-    this->set_timeout("redarc_device_discovery", this->discovery_delay_ms_, [this]() {
+    if (this->canbus_ == nullptr) {
+      ESP_LOGE(TAG, "CAN bus is unavailable; device discovery disabled");
+      return;
+    }
+
+    this->canbus_->add_callback(
+        [this](uint32_t can_id, bool extended_id, bool rtr, const std::vector<uint8_t> &data) {
+          if (!extended_id || rtr) return;
+          this->handle_device_identity_(can_id, data);
+        });
+
+    this->set_timeout("redarc_device_discovery_1", this->discovery_delay_ms_, [this]() {
       this->request_all_devices_();
     });
+    this->set_timeout("redarc_device_discovery_2", this->discovery_delay_ms_ + 3000U, [this]() {
+      this->request_all_devices_();
+    });
+  }
+
+  void dump_config() override {
+    ESP_LOGCONFIG(TAG, "Redarc common:");
+    ESP_LOGCONFIG(TAG, "  Startup device discovery: enabled");
+    ESP_LOGCONFIG(TAG, "  Request source address: 0x%02X", (unsigned) this->host_address_);
   }
 
   float get_setup_priority() const override { return setup_priority::BUS; }
@@ -92,20 +103,19 @@ class RedarcCommonComponent : public Component {
   }
 
   void request_all_devices_() {
-    if (this->canbus_ == nullptr) {
-      ESP_LOGW(TAG, "Cannot request device discovery: CAN bus is unavailable");
-      return;
-    }
+    if (this->canbus_ == nullptr) return;
 
-    // Global destination 0xFF, requester source address in the low byte.
-    // Payload 04 F4 requests DGN 0x1F404 (Device Serial Identity).
     const uint32_t can_id = 0x0F03FF00UL | this->host_address_;
     const std::vector<uint8_t> data = {0x04, 0xF4, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 
     log_can_frame("CAN_TX", can_id, data, false);
-    this->canbus_->send_data(can_id, true, false, data);
-    ESP_LOGD(TAG, "Requested DGN 0x1F404 from all devices using source address 0x%02X",
-             (unsigned) this->host_address_);
+    const auto error = this->canbus_->send_data(can_id, true, false, data);
+    if (error != canbus::ERROR_OK) {
+      ESP_LOGW(TAG, "Device discovery request failed with CAN error %u", (unsigned) error);
+    } else {
+      ESP_LOGD(TAG, "Requested DGN 0x1F404 from all devices using source address 0x%02X",
+               (unsigned) this->host_address_);
+    }
   }
 
   void handle_device_identity_(uint32_t can_id, const std::vector<uint8_t> &data) {
@@ -123,8 +133,6 @@ class RedarcCommonComponent : public Component {
         (uint16_t) data[4] | ((uint16_t) data[5] << 8);
     const uint8_t device_type = data[6];
 
-    // Include address, type and both serial parts so a spoofed device sharing
-    // an address is still logged if its factory serial differs.
     const uint64_t device_key =
         ((uint64_t) serial_prefix << 32) |
         ((uint64_t) serial_suffix << 16) |
@@ -149,7 +157,7 @@ class RedarcCommonComponent : public Component {
 
   canbus::Canbus *canbus_{nullptr};
   uint8_t host_address_{0x22};
-  uint32_t discovery_delay_ms_{1500};
+  uint32_t discovery_delay_ms_{2000};
   std::vector<uint64_t> seen_device_keys_;
 };
 
@@ -194,8 +202,6 @@ inline float current_display_16_centered(uint16_t raw) {
   return ((float) raw / 10.0f) - 1000.0f;
 }
 
-// DGN 0x1FD00 output status codes. Returns a human-readable name for the
-// non-normal states, or nullptr for 0x00 (Off), 0x01 (On) and 0xFF (no-data).
 inline const char *output_status_name(uint8_t status) {
   switch (status) {
     case 0x06: return "Fuse Blown";
@@ -207,9 +213,6 @@ inline const char *output_status_name(uint8_t status) {
   }
 }
 
-// Transmit a CAN command on the shared bus: looks up the canbus from the
-// dispatcher, null-checks it, logs at DEBUG and sends an extended-ID frame.
-// Pass rtr=true for a remote-request (no-payload) frame.
 inline void send_command(uint32_t can_id, const std::vector<uint8_t> &data, bool rtr = false) {
   auto *bus = RedarcCanDispatcher::instance().canbus();
   if (bus == nullptr) return;
@@ -217,9 +220,6 @@ inline void send_command(uint32_t can_id, const std::vector<uint8_t> &data, bool
   bus->send_data(can_id, true, rtr, data);
 }
 
-// History-clear command (DGN 0x1FCCE; actual ID 0x1BFCCE | host). D1 selects the
-// dataset: 0xD0 hourly SOC, 0xD2 daily-low SOC, 0xD4 daily-high SOC, 0xD6 solar.
-// D2 = 0xFC marker, D3-D8 = 0xFF.
 inline void send_clear_history(uint8_t host_address, uint8_t dataset) {
   const std::vector<uint8_t> data = {dataset, 0xFC, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
   send_command(0x1BFCCE00UL | host_address, data);
