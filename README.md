@@ -245,6 +245,60 @@ a distinct address.
 
 `secrets.yaml` must provide `wifi_ssid`, `wifi_password`, `api_pass`, `ota_pass`.
 
+### Configuration reference
+
+Where a block reuses an ESPHome platform, its options **are** that platform's
+options — only the listed defaults differ.
+
+**Top-level `redarc:`**
+
+| Option | Req/Opt | Default | Notes |
+|---|---|---|---|
+| `id` | optional | auto | dispatcher component id |
+| `canbus` | optional* | — | internal CAN bus — same options as ESPHome's `esp32_can` (below) |
+| `canbus_id` | optional* | — | reference an external `canbus:` instead (e.g. MCP2515, untested) |
+| `time` | optional | — | internal time — same options as ESPHome's `homeassistant` time (below) |
+| `host_address` | optional | `0xFF` | source address for discovery/commands; devices inherit |
+| `discovery_delay` | optional | `2000ms` | delay before startup discovery request |
+| `filter_interval` | optional | `5s` | publish throttle; devices inherit |
+| `history_poll_interval` | optional | `60s` | SOC + solar poll; inherited (`0s` disables) |
+| `transition_length` | optional | `0s` | Rogue light transition; inherited |
+| `battery_sensor` / `manager` / `redvision_display` / `tvms_rogue` / `tvms_1280` | optional | — | single entry or list per device |
+
+\*Exactly one of `canbus` / `canbus_id` is required.
+
+**`redarc: canbus:` — = ESPHome `esp32_can` platform.** All `esp32_can` options
+apply and are validated by `esp32_can`; REDARC just injects friendlier defaults:
+
+| Option | Req/Opt | Default | Same as ESPHome? |
+|---|---|---|---|
+| `tx_pin` | optional | `GPIO22` | yes (esp32_can; default added) |
+| `rx_pin` | optional | `GPIO19` | yes (esp32_can; default added) |
+| `bit_rate` | optional | `250KBPS` | yes — esp32_can's native validation |
+| `can_id` | optional | `0x7FE` | esp32_can normally requires it; defaulted |
+| `use_extended_id` | optional | `true` | esp32_can default is `false`; defaulted |
+| `mode`, `rx_queue_len`, … | optional | esp32_can's (e.g. `rx_queue_len: 64`) | yes — whatever your esp32_can supports |
+| `id` | optional | auto | yes |
+
+A bare `canbus:` is valid — every option above has a default.
+
+**`redarc: time:` — = ESPHome `homeassistant` time.** No option is required; a bare
+`time:` works. All `homeassistant`/base `time` options apply (`timezone`, `on_time`,
+`update_interval`, …) with ESPHome's defaults; `id` is auto.
+
+**Device sub-blocks**
+
+| Block | `source_address` default | Other |
+|---|---|---|
+| `battery_sensor` | `0x08` | `soc_history_poll_interval` inherits `history_poll_interval` |
+| `manager` | `0x01` | `solar_history_poll_interval` inherits; `battery_sensor_id`, `time_id` optional |
+| `redvision_display` | `0x20` | read-only (no `host_address`) |
+| `tvms_rogue` | `0x30` | `true_off_threshold` default `1.5`; `transition_length` inherits |
+| `tvms_1280` | `0x24` | — |
+
+Every device block: `id` optional/auto, `source_address` optional with the default
+above, `host_address` + `filter_interval` inherited from the top level.
+
 ---
 
 ## 5. What each component exposes, and how it is found

@@ -1,10 +1,10 @@
 import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome.components import canbus
-from esphome.components.canbus import CONF_CAN_ID, CONF_USE_EXTENDED_ID
+from esphome.components.canbus import CONF_BIT_RATE, CONF_CAN_ID, CONF_USE_EXTENDED_ID
 from esphome.components.esp32_can import canbus as esp32_can
 from esphome.components.homeassistant import time as homeassistant_time
-from esphome.const import CONF_ID
+from esphome.const import CONF_ID, CONF_RX_PIN, CONF_TX_PIN
 
 from . import (
     _battery_sensor,
@@ -85,15 +85,44 @@ ns = cg.esphome_ns.namespace("redarc_common")
 RedarcCommonComponent = ns.class_("RedarcCommonComponent", cg.Component)
 
 # The CAN bus is set up inside the component instead of a top-level canbus:
-# block, reusing esp32_can's own platform schema (so every option — including
-# bit_rate, mode, rx_queue_len — matches ESPHome exactly). Only the REDARC bus
-# constants get friendly defaults; bit_rate keeps esp32_can's own validation.
-# For an SPI transceiver such as mcp2515, declare a normal top-level canbus:
-# block instead and point `canbus_id:` at it (see the README).
-CANBUS_SCHEMA = esp32_can.CONFIG_SCHEMA.extend({
-    cv.Optional(CONF_CAN_ID, default=0x7FE): cv.int_range(min=0, max=0x1FFFFFFF),
-    cv.Optional(CONF_USE_EXTENDED_ID, default=True): cv.boolean,
-})
+# block, reusing esp32_can's own platform schema (so every option — bit_rate,
+# mode, rx_queue_len, … — matches ESPHome exactly and is validated by esp32_can).
+# We supply REDARC-friendly defaults by injecting them as raw input before
+# esp32_can validates, rather than overriding its validators (which is version-
+# fragile). Defaults are only injected for keys the installed esp32_can has, so
+# this works across ESPHome versions. For an SPI transceiver such as mcp2515,
+# declare a normal top-level canbus: block and point `canbus_id:` at it instead.
+_CANBUS_DEFAULTS = {
+    CONF_TX_PIN: "GPIO22",
+    CONF_RX_PIN: "GPIO19",
+    CONF_BIT_RATE: "250KBPS",
+    CONF_CAN_ID: 0x7FE,
+    CONF_USE_EXTENDED_ID: True,
+    "rx_queue_len": 64,
+}
+try:
+    _ESP32_CAN_KEYS = {
+        marker.schema
+        for marker in esp32_can.CONFIG_SCHEMA.schema
+        if isinstance(getattr(marker, "schema", None), str)
+    }
+except (AttributeError, TypeError):
+    # Fall back to the keys present in every esp32_can version (skip rx_queue_len,
+    # which is newer) if the schema can't be introspected.
+    _ESP32_CAN_KEYS = {
+        CONF_TX_PIN, CONF_RX_PIN, CONF_BIT_RATE, CONF_CAN_ID, CONF_USE_EXTENDED_ID,
+    }
+
+
+def _apply_canbus_defaults(value):
+    value = dict(value or {})
+    for key, default in _CANBUS_DEFAULTS.items():
+        if key in _ESP32_CAN_KEYS:
+            value.setdefault(key, default)
+    return value
+
+
+CANBUS_SCHEMA = cv.All(_apply_canbus_defaults, esp32_can.CONFIG_SCHEMA)
 
 # Likewise the Home Assistant time source (used by the Manager Set Time button)
 # can be created inside the component, reusing the homeassistant time schema.
@@ -107,7 +136,7 @@ CONFIG_SCHEMA = cv.All(
         cv.Optional(CONF_CANBUS): CANBUS_SCHEMA,
         cv.Optional(CONF_CANBUS_ID): cv.use_id(canbus.CanbusComponent),
         cv.Optional(CONF_TIME): _time_schema,
-        cv.Optional(CONF_HOST_ADDRESS, default=0x22): cv.hex_uint8_t,
+        cv.Optional(CONF_HOST_ADDRESS, default=0xFF): cv.hex_uint8_t,
         cv.Optional(CONF_DISCOVERY_DELAY, default="2000ms"): cv.positive_time_period_milliseconds,
         cv.Optional(CONF_FILTER_INTERVAL, default="5s"): cv.positive_time_period_milliseconds,
         cv.Optional(CONF_HISTORY_POLL_INTERVAL, default="60s"): zero_or_positive_time_period_milliseconds,
