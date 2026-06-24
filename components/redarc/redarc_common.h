@@ -76,7 +76,7 @@ class RedarcCommonComponent : public Component {
     // Forget previously-seen devices so this scan re-prints the full list to the
     // logs (discovery otherwise de-duplicates and would log nothing).
     this->seen_device_keys_.clear();
-    this->request_all_devices_();
+    this->start_discovery_burst_(DISCOVERY_BURST_ATTEMPTS);
   }
 
   void setup() override {
@@ -97,11 +97,11 @@ class RedarcCommonComponent : public Component {
           this->handle_device_identity_(rvc_id, data);
         });
 
-    this->set_timeout("redarc_device_discovery_1", this->discovery_delay_ms_, [this]() {
-      this->request_all_devices_();
-    });
-    this->set_timeout("redarc_device_discovery_2", this->discovery_delay_ms_ + 3000U, [this]() {
-      this->request_all_devices_();
+    // A single request can be missed by slow-booting devices or under bus
+    // contention, so fire a burst of requests; the de-dup means each device is
+    // still logged only once.
+    this->set_timeout("redarc_device_discovery", this->discovery_delay_ms_, [this]() {
+      this->start_discovery_burst_(DISCOVERY_BURST_ATTEMPTS);
     });
 
 #if defined(USE_API) && defined(USE_API_CLIENT_CONNECTED_TRIGGER)
@@ -127,6 +127,18 @@ class RedarcCommonComponent : public Component {
   float get_setup_priority() const override { return setup_priority::BUS; }
 
  protected:
+  // A discovery "burst" is several spaced requests so every device answers at
+  // least one (de-dup keeps each logged once).
+  static const uint8_t DISCOVERY_BURST_ATTEMPTS = 5;
+  static const uint32_t DISCOVERY_BURST_INTERVAL_MS = 1500;
+
+  void start_discovery_burst_(uint8_t attempts) {
+    this->request_all_devices_();
+    if (attempts <= 1) return;
+    this->set_timeout("redarc_discovery_burst", DISCOVERY_BURST_INTERVAL_MS,
+                      [this, attempts]() { this->start_discovery_burst_(attempts - 1); });
+  }
+
   static const char *device_type_name_(uint8_t device_type) {
     switch (device_type) {
       case 0x01: return "Manager30";
