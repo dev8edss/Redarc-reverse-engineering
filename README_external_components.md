@@ -1,17 +1,19 @@
 # Redarc / RedVision ESPHome External Components v86
 
-This package splits the RedVision / TVMS CAN bridge into ESPHome external components so the main YAML can stay mostly declarative. The YAML still owns the CAN bus and dispatches every extended CAN frame to the component hubs; each component then handles only the frames for its source device or command group.
+This package ships the RedVision / TVMS CAN bridge as a **single** ESPHome external component, `redarc`, so the main YAML can stay mostly declarative. The YAML still owns the CAN bus and dispatches every extended CAN frame to the shared dispatcher; each nested device sub-block then handles only the frames for its source device or command group.
 
-## Components
+## Component and its device sub-blocks
 
-| Component | Purpose |
+The one `redarc:` component holds the shared bus/dispatcher settings plus a nested sub-block per device:
+
+| Sub-block | Purpose |
 |---|---|
-| `redarc_common` | Shared CAN byte helpers, source-address helpers, and current/voltage decoding helpers. |
+| (top level) | `canbus_id`, `host_address`, `discovery_delay`; shared CAN byte/decode helpers and startup device discovery. |
 | `tvms_rogue` | TVMS Rogue dimmable output lights, direct set-level and OFF commands, output level feedback, physical input/button binary sensors, input voltage, candidate input current, and tank sensors. |
 | `tvms_1280` | TVMS1280 relay output switches, inverter switch, output feedback from RedVision/display changes, tank sensors, temperature sensors, supply voltage, voltage-input diagnostic candidates, and notes for the 3 unused digital inputs. |
-| `manager30` | Manager30 output current, battery voltage, source-derived device current, solar current/voltage/power, solar Wh/yield, AC input current/voltage, charging mode select, and charging stage text. |
+| `manager` | Manager30 output current, battery voltage, source-derived device current, solar current/voltage/power, solar Wh/yield, AC input current/voltage, charging mode select, and charging stage text. |
 | `battery_sensor` | Battery shunt current, voltage, SOC, and temperature. |
-| `redvision_display` | RedVision display/rebroadcast current values for display/source comparison. |
+| `redvision_display` | RedVision display/rebroadcast current values for display/source comparison (list — one entry per display). |
 
 ## ESPHome 2026.5 compatibility notes
 
@@ -42,12 +44,7 @@ external_components:
       url: https://github.com/dev8edss/Redarc-reverse-engineering
       ref: main
     components:
-      - redarc_common
-      - tvms_rogue
-      - tvms_1280
-      - manager30
-      - battery_sensor
-      - redvision_display
+      - redarc
 ```
 
 During active development, add `refresh: 0s` temporarily so ESPHome re-checks the git source every validation:
@@ -60,12 +57,7 @@ external_components:
       ref: main
     refresh: 0s
     components:
-      - redarc_common
-      - tvms_rogue
-      - tvms_1280
-      - manager30
-      - battery_sensor
-      - redvision_display
+      - redarc
 ```
 
 After the component has stabilised, remove `refresh: 0s` or use a gentler value such as `5min`.

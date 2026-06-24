@@ -9,10 +9,6 @@ from esphome.const import (
     STATE_CLASS_MEASUREMENT,
 )
 
-CODEOWNERS = ["@dev8edss"]
-AUTO_LOAD = ["button", "number", "select", "sensor", "text_sensor", "redarc_common"]
-MULTI_CONF = False
-
 CONF_SOURCE_ADDRESS = "source_address"
 CONF_HOST_ADDRESS = "host_address"
 CONF_FILTER_INTERVAL = "filter_interval"
@@ -41,12 +37,12 @@ _SC_MAP = {
 _text_sensor_ns = cg.esphome_ns.namespace("text_sensor")
 _TextSensorClass = _text_sensor_ns.class_("TextSensor")
 
-CONFIG_SCHEMA = cv.Schema({
+SCHEMA = cv.Schema({
     cv.GenerateID(): cv.declare_id(BatterySensorComponent),
     cv.Optional(CONF_SOURCE_ADDRESS, default=0x08): cv.hex_uint8_t,
-    cv.Optional(CONF_HOST_ADDRESS, default=0x20): cv.hex_uint8_t,
-    cv.Optional(CONF_FILTER_INTERVAL, default="5s"): cv.positive_time_period_milliseconds,
-    cv.Optional(CONF_SOC_HISTORY_POLL_INTERVAL, default="60s"): zero_or_positive_time_period_milliseconds,
+    cv.Optional(CONF_HOST_ADDRESS): cv.hex_uint8_t,
+    cv.Optional(CONF_FILTER_INTERVAL): cv.positive_time_period_milliseconds,
+    cv.Optional(CONF_SOC_HISTORY_POLL_INTERVAL): zero_or_positive_time_period_milliseconds,
     cv.GenerateID("current_id"): cv.declare_id(_SensorClass),
     cv.GenerateID("voltage_id"): cv.declare_id(_SensorClass),
     cv.GenerateID("temperature_id"): cv.declare_id(_SensorClass),
@@ -227,3 +223,5 @@ async def to_code(config):
     ts = await _make_text_sensor(config["soc_daily_range_history_id"], f"{p} SOC Daily Range History",
                                  entity_category=ENTITY_CATEGORY_DIAGNOSTIC)
     cg.add(var.set_soc_daily_range_history_text_sensor(ts))
+
+    return var

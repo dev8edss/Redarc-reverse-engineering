@@ -2,7 +2,7 @@
 #include "esphome/core/component.h"
 #include "esphome/core/log.h"
 #include "esphome/components/sensor/sensor.h"
-#include "esphome/components/redarc_common/redarc_common.h"
+#include "esphome/components/redarc/redarc_common.h"
 #include <vector>
 
 namespace esphome {

@@ -8,7 +8,7 @@
 #include "esphome/components/sensor/sensor.h"
 #include "esphome/components/switch/switch.h"
 #include "esphome/components/text_sensor/text_sensor.h"
-#include "esphome/components/redarc_common/redarc_common.h"
+#include "esphome/components/redarc/redarc_common.h"
 #include <array>
 #include <cmath>
 #include <string>

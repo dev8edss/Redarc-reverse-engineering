@@ -125,12 +125,14 @@ unless you are the physical end of the bus.
 RedVision_TVMS_Atom_lite_Cais3050g.yaml                    <- the device config you flash
 packages/base.yaml                                         <- shared infra (esp32, wifi, api, canbus)
 components/
-  redarc_common/            <- CAN dispatcher, address claim, decode helpers (no entities)
-  redarc_manager/           <- Manager30  (0x01)
-  redarc_battery_sensor/    <- Battery     (0x08)
-  redarc_redvision_display/ <- Display(s)  (0x20 / 0x21)
-  redarc_tvms_rogue/        <- TVMS Rogue  (0x30)
-  redarc_tvms_1280/         <- TVMS1280    (0x24)
+  redarc/                   <- single component for the whole bridge:
+    redarc_common.h         <- CAN dispatcher, address claim, decode helpers (no entities)
+    __init__.py             <- top-level `redarc:` schema + device orchestration
+    _manager.* / manager.*          <- Manager30  (0x01)
+    _battery_sensor.* / battery_sensor.*  <- Battery (0x08)
+    _redvision_display.* / redvision_display.*  <- Display(s) (0x20 / 0x21)
+    _tvms_rogue.* / tvms_rogue.*    <- TVMS Rogue (0x30)
+    _tvms_1280.* / tvms_1280.*      <- TVMS1280   (0x24)
 RedVision_TVMS_Dashboard.yaml                              <- example Home Assistant Lovelace dashboard
 RedVision_TVMS_components.dbc                              <- byte-level signal database (component-derived)
 ```
@@ -173,25 +175,29 @@ canbus:
   `rvc_matches`, and the `current_32_centered` / `current_display_16_centered`
   scalers described above.
 
-Each **device component** (`redarc_manager`, `redarc_tvms_rogue`, …) is a normal
-ESPHome external component. Its Python `__init__.py` declares a config schema and
-**auto-generates the entity IDs/names** (you don't list every sensor in YAML — you
-just give the block an `id:` prefix and a `source_address:`). Its C++ registers a
-dispatcher listener, parses the frames for its address, and publishes to the
-entities; for controllable devices it also builds the outbound command frames.
+Everything ships as **one** ESPHome external component, `redarc`. The single
+top-level `redarc:` block holds the shared bus/dispatcher settings plus one
+nested sub-block per device (`manager:`, `battery_sensor:`, `redvision_display:`,
+`tvms_rogue:`, `tvms_1280:`). Each device sub-schema **auto-generates the entity
+IDs/names** (you don't list every sensor in YAML — you just give the sub-block an
+`id:` prefix and a `source_address:`). Per device, the C++ registers a dispatcher
+listener, parses the frames for its address, and publishes to the entities; for
+controllable devices it also builds the outbound command frames. The C++ keeps
+its per-device namespaces (`redarc_manager`, `redarc_tvms_1280`, …); only the
+ESPHome component folder/key is unified to `redarc`.
 
-`external_components:` in `base.yaml` pulls these from GitHub (the `ref:`
-controls which branch — `main` for stable). Clearing the ESPHome external-
-component cache is required if a schema change seems to be ignored.
+`external_components:` in `base.yaml` pulls the `redarc` component from GitHub
+(the `ref:` controls which branch — `main` for stable). Clearing the ESPHome
+external-component cache is required if a schema change seems to be ignored.
 
 ---
 
 ## 4. Configuring the device
 
-In the top YAML, set the basics and then enable only the blocks for hardware you
-own (delete the rest). The `id:` you give a block becomes the **entity name
-prefix** (e.g. `id: Manager30` → "Manager30 Output Current"); `source_address:`
-must match the device on your bus.
+In the top YAML, set the basics, then under the single `redarc:` block enable only
+the device sub-blocks for hardware you own (delete the rest). The `id:` you give a
+sub-block becomes the **entity name prefix** (e.g. `id: Manager30` → "Manager30
+Output Current"); `source_address:` must match the device on your bus.
 
 ```yaml
 substitutions:
@@ -202,26 +208,54 @@ substitutions:
   host_address: "0x22"             # this ESP32's address on the bus
   history_poll_interval: 60s       # how often to request SOC/solar history (0 = off)
 
-redarc_battery_sensor:
-  id: Battery
-  source_address: 0x08
-  host_address: ${host_address}
-  soc_history_poll_interval: ${history_poll_interval}
+redarc:
+  canbus_id: rv_can                # the canbus: id from base.yaml
+  host_address: ${host_address}    # source address for discovery/commands; devices inherit this
+  discovery_delay: 60s
+  filter_interval: ${sensor_average_interval}   # publish throttle; all devices inherit
+  history_poll_interval: ${history_poll_interval}  # SOC + solar poll; inherited (0s = off)
 
-redarc_manager:
-  id: Manager30
-  source_address: 0x01
-  host_address: ${host_address}
-  battery_sensor_id: Battery       # lets the Manager compute device current
-  solar_history_poll_interval: ${history_poll_interval}
+  # Every device is a list — one `- ` entry per physical device.
+  battery_sensor:
+    - { id: Battery, source_address: 0x08 }
 
-redarc_redvision_display:          # MULTI_CONF: list every display you have
-  - { id: Redvision1, source_address: 0x20 }
-  - { id: Redvision2, source_address: 0x21 }
+  manager:
+    - { id: Manager30, source_address: 0x01, battery_sensor_id: Battery }  # battery_sensor_id lets the Manager compute device current
 
-redarc_tvms_rogue: { id: TVMS_Rogue, source_address: 0x30, host_address: ${host_address} }
-redarc_tvms_1280:  { id: TVMS1280,   source_address: 0x24, host_address: ${host_address} }
+  redvision_display:
+    - { id: Redvision1, source_address: 0x20 }
+    - { id: Redvision2, source_address: 0x21 }
+
+  tvms_rogue:
+    - { id: TVMS_Rogue, source_address: 0x30 }
+
+  tvms_1280:
+    - { id: TVMS1280, source_address: 0x24 }
 ```
+
+Devices inherit the top-level `filter_interval` (all devices), `host_address`
+(command-sending devices), `history_poll_interval` (the battery
+`soc_history_poll_interval` and manager `solar_history_poll_interval`), and
+`transition_length` (the TVMS Rogue light transition). Set any of these inside a
+device sub-block only when it needs to differ from the shared value.
+
+Every device sub-block is **optional**, and each accepts either a single entry or a
+list — so you can run several of the same device type (e.g. two `tvms_1280`). Every
+device's `source_address` is optional with a sensible default (battery `0x08`,
+manager `0x01`, display `0x20`, Rogue `0x30`, TVMS1280 `0x24`), so a single device
+of each type needs no `source_address` at all. When you add a **second or further**
+device of any type, give the extra ones a distinct `source_address`, since they
+would otherwise collide on the default:
+
+```yaml
+  tvms_1280:
+    - { id: TVMS1280_A }              # uses the 0x24 default
+    - { id: TVMS1280_B, source_address: 0x25 }
+```
+
+Config validation **rejects a duplicate `source_address`** across any two devices
+(two devices on one address would alias on the bus), so each device must resolve to
+a distinct address.
 
 `secrets.yaml` must provide `wifi_ssid`, `wifi_password`, `api_pass`, `ota_pass`.
 
@@ -233,7 +267,7 @@ This is the "where do the entities come from" map. Entity names are prefixed by
 the block `id` (shown here with the example ids). Items tagged *(diagnostic)* are
 placed in Home Assistant's diagnostic category.
 
-### Manager30 — `redarc_manager` (source `0x01`)
+### Manager30 — `redarc: manager` (source `0x01`)
 
 Listens to the manager's status frames and publishes:
 
@@ -262,7 +296,7 @@ Writable entities (the two **selects**) build a command frame from the
 > 4 pages × 3 days = **12 days** (today + −1..−11) — feeding both the Solar
 > Energy total and the Solar Day -1..-11 History text sensor.
 
-### Battery — `redarc_battery_sensor` (source `0x08`)
+### Battery — `redarc: battery_sensor` (source `0x08`)
 
 | Entity | Type | From | Notes |
 |---|---|---|---|
@@ -284,7 +318,7 @@ sensors** are populated from history pages the battery returns after the
 component's RTR poll (see below); the daily low and high are combined into the
 single `low-high` Range sensor.
 
-### RedVision displays — `redarc_redvision_display` (sources `0x20`, `0x21`)
+### RedVision displays — `redarc: redvision_display` (sources `0x20`, `0x21`)
 
 `MULTI_CONF`: list one block per physical display. They share three sensors
 (created once) fed from whichever display rebroadcasts them:
@@ -296,7 +330,7 @@ single `low-high` Range sensor.
 These are the display's own 16-bit rebroadcast values — handy as a cross-check
 against the Manager/Battery source readings.
 
-### TVMS Rogue — `redarc_tvms_rogue` (source `0x30`)
+### TVMS Rogue — `redarc: tvms_rogue` (source `0x30`)
 
 The dimmable-lighting module.
 
@@ -316,7 +350,7 @@ plus a release frame, and holds the requested value until feedback reaches it.
 CAN "on" turns an output to 100 %; the hardware button can recall a remembered
 brightness (the CAN "recall remembered brightness" command is still unknown).
 
-### TVMS1280 — `redarc_tvms_1280` (source `0x24`)
+### TVMS1280 — `redarc: tvms_1280` (source `0x24`)
 
 The relay / inverter module.
 

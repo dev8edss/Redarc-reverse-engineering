@@ -35,44 +35,44 @@ packages:
     files: [packages/base.yaml]
     refresh: 0s
 
-# Include only the devices present on your bus.
-# Remove any block for devices you don't have.
-# id becomes the entity name prefix — no spaces, use underscores.
+# All REDARC devices live under the single `redarc:` component.
+# Include only the devices present on your bus — remove any sub-block for
+# devices you don't have. Each device `id` becomes the entity name prefix
+# (no spaces, use underscores).
 
-redarc_battery_sensor:
-  id: Battery
-  source_address: 0x08
+redarc:
+  canbus_id: rv_can
   host_address: ${host_address}
+  discovery_delay: 60s
+  # Inherited by every device unless overridden in its sub-block.
   filter_interval: ${sensor_average_interval}
-  soc_history_poll_interval: ${history_poll_interval}
+  # Inherited by the battery SOC poll and manager solar poll (0s = disable).
+  history_poll_interval: ${history_poll_interval}
+  # Light transition time inherited by the TVMS Rogue outputs.
+  transition_length: ${rogue_transition_length}
 
-redarc_manager:
-  id: Manager30
-  source_address: 0x01
-  host_address: ${host_address}
-  filter_interval: ${sensor_average_interval}
-  solar_history_poll_interval: ${history_poll_interval}
-  battery_sensor_id: Battery
-  time_id: ha_time
+  # Every device is a list, so adding a second of the same type is just another
+  # `- ` entry (give the extra one a distinct source_address).
+  battery_sensor:
+    - id: Battery
+      source_address: 0x08
 
-# Multiple redvision displays are supported — add entries as needed.
-redarc_redvision_display:
-  - id: Redvision1
-    source_address: 0x20
-    filter_interval: ${sensor_average_interval}
-  - id: Redvision2
-    source_address: 0x21
-    filter_interval: ${sensor_average_interval}
+  manager:
+    - id: Manager30
+      source_address: 0x01
+      battery_sensor_id: Battery
+      time_id: ha_time
 
-redarc_tvms_rogue:
-  id: TVMS_Rogue
-  source_address: 0x30
-  host_address: ${host_address}
-  filter_interval: ${sensor_average_interval}
-  default_transition_length: ${rogue_transition_length}
+  redvision_display:
+    - id: Redvision1
+      source_address: 0x20
+    - id: Redvision2
+      source_address: 0x21
 
-redarc_tvms_1280:
-  id: TVMS1280
-  source_address: 0x24
-  host_address: ${host_address}
-  filter_interval: ${sensor_average_interval}
+  tvms_rogue:
+    - id: TVMS_Rogue
+      source_address: 0x30
+
+  tvms_1280:
+    - id: TVMS1280
+      source_address: 0x24

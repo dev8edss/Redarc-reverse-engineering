@@ -9,10 +9,6 @@ from esphome.const import (
     STATE_CLASS_MEASUREMENT,
 )
 
-CODEOWNERS = ["@dev8edss"]
-AUTO_LOAD = ["sensor", "redarc_common"]
-MULTI_CONF = True
-
 CONF_SOURCE_ADDRESS = "source_address"
 CONF_FILTER_INTERVAL = "filter_interval"
 
@@ -26,12 +22,11 @@ _SC_MAP = {
     "measurement": _StateClass.STATE_CLASS_MEASUREMENT,
     "total_increasing": _StateClass.STATE_CLASS_TOTAL_INCREASING,
 }
-_shared_current_sensors = {}
 
-CONFIG_SCHEMA = cv.Schema({
+SCHEMA = cv.Schema({
     cv.GenerateID(): cv.declare_id(RedvisionDisplayComponent),
-    cv.Required(CONF_SOURCE_ADDRESS): cv.hex_uint8_t,
-    cv.Optional(CONF_FILTER_INTERVAL, default="5s"): cv.positive_time_period_milliseconds,
+    cv.Optional(CONF_SOURCE_ADDRESS, default=0x20): cv.hex_uint8_t,
+    cv.Optional(CONF_FILTER_INTERVAL): cv.positive_time_period_milliseconds,
     cv.GenerateID("batt_current_id"): cv.declare_id(_SensorClass),
     cv.GenerateID("device_current_id"): cv.declare_id(_SensorClass),
     cv.GenerateID("mgr_output_current_id"): cv.declare_id(_SensorClass),
@@ -59,28 +54,32 @@ async def _make_sensor(config_id, name, unit=None, device_class=None,
     return await sensor.new_sensor(cfg)
 
 
-async def to_code(config):
-    var = cg.new_Pvariable(config[CONF_ID])
-    await cg.register_component(var, config)
-    cg.add(var.set_source_address(config[CONF_SOURCE_ADDRESS]))
-    cg.add(var.set_filter_interval_ms(config[CONF_FILTER_INTERVAL]))
+async def to_code(configs):
+    # The three "display" current sensors are shared across all display
+    # instances; create them once from the first config and reuse them.
+    shared = {}
+    for config in configs:
+        var = cg.new_Pvariable(config[CONF_ID])
+        await cg.register_component(var, config)
+        cg.add(var.set_source_address(config[CONF_SOURCE_ADDRESS]))
+        cg.add(var.set_filter_interval_ms(config[CONF_FILTER_INTERVAL]))
 
-    if not _shared_current_sensors:
-        s = await _make_sensor(config["batt_current_id"], "Redvision Battery Current Display",
-                               unit="A", device_class="current",
-                               state_class=STATE_CLASS_MEASUREMENT, decimals=1)
-        _shared_current_sensors["batt_current"] = s
+        if not shared:
+            s = await _make_sensor(config["batt_current_id"], "Redvision Battery Current Display",
+                                   unit="A", device_class="current",
+                                   state_class=STATE_CLASS_MEASUREMENT, decimals=1)
+            shared["batt_current"] = s
 
-        s = await _make_sensor(config["device_current_id"], "Redvision Device Current Display",
-                               unit="A", device_class="current",
-                               state_class=STATE_CLASS_MEASUREMENT, decimals=1)
-        _shared_current_sensors["device_current"] = s
+            s = await _make_sensor(config["device_current_id"], "Redvision Device Current Display",
+                                   unit="A", device_class="current",
+                                   state_class=STATE_CLASS_MEASUREMENT, decimals=1)
+            shared["device_current"] = s
 
-        s = await _make_sensor(config["mgr_output_current_id"], "Redvision Manager Output Current Display",
-                               unit="A", device_class="current",
-                               state_class=STATE_CLASS_MEASUREMENT, decimals=1)
-        _shared_current_sensors["mgr_output_current"] = s
+            s = await _make_sensor(config["mgr_output_current_id"], "Redvision Manager Output Current Display",
+                                   unit="A", device_class="current",
+                                   state_class=STATE_CLASS_MEASUREMENT, decimals=1)
+            shared["mgr_output_current"] = s
 
-    cg.add(var.set_battery_current_display_sensor(_shared_current_sensors["batt_current"]))
-    cg.add(var.set_device_current_display_sensor(_shared_current_sensors["device_current"]))
-    cg.add(var.set_manager_output_current_display_sensor(_shared_current_sensors["mgr_output_current"]))
+        cg.add(var.set_battery_current_display_sensor(shared["batt_current"]))
+        cg.add(var.set_device_current_display_sensor(shared["device_current"]))
+        cg.add(var.set_manager_output_current_display_sensor(shared["mgr_output_current"]))

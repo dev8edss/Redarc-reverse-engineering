@@ -34,14 +34,11 @@ except AttributeError:
     _switch_ns = cg.esphome_ns.namespace("switch_")
     _SWITCH_RESTORE_MODE_OFF = _switch_ns.enum("SwitchRestoreMode", is_class=True).SWITCH_RESTORE_DEFAULT_OFF
 
-CODEOWNERS = ["@dev8edss"]
-AUTO_LOAD = ["binary_sensor", "light", "sensor", "switch", "text_sensor", "redarc_common"]
-MULTI_CONF = False
-
 CONF_SOURCE_ADDRESS = "source_address"
 CONF_HOST_ADDRESS = "host_address"
 CONF_FILTER_INTERVAL = "filter_interval"
 CONF_TRUE_OFF_THRESHOLD = "true_off_threshold"
+CONF_TRANSITION_LENGTH = "transition_length"
 
 tvms_rogue_ns = cg.esphome_ns.namespace("redarc_tvms_rogue")
 TVMSRogueComponent = tvms_rogue_ns.class_("TVMSRogueComponent", cg.Component)
@@ -75,14 +72,14 @@ _AUTO_IDS[cv.GenerateID("input_current_id")] = cv.declare_id(_SensorClass)
 _AUTO_IDS[cv.GenerateID("master_id")] = cv.declare_id(TVMSRogueSwitch)
 _AUTO_IDS[cv.GenerateID("output_status_id")] = cv.declare_id(_TSClass)
 
-CONFIG_SCHEMA = cv.Schema(
+SCHEMA = cv.Schema(
     {
         cv.GenerateID(): cv.declare_id(TVMSRogueComponent),
         cv.Optional(CONF_SOURCE_ADDRESS, default=0x30): cv.hex_uint8_t,
-        cv.Optional(CONF_HOST_ADDRESS, default=0x20): cv.hex_uint8_t,
-        cv.Optional(CONF_FILTER_INTERVAL, default="5s"): cv.positive_time_period_milliseconds,
+        cv.Optional(CONF_HOST_ADDRESS): cv.hex_uint8_t,
+        cv.Optional(CONF_FILTER_INTERVAL): cv.positive_time_period_milliseconds,
         cv.Optional(CONF_TRUE_OFF_THRESHOLD, default=1.5): cv.float_range(min=0.0, max=10.0),
-        cv.Optional(CONF_DEFAULT_TRANSITION_LENGTH, default="0s"): cv.positive_time_period_milliseconds,
+        cv.Optional(CONF_TRANSITION_LENGTH): cv.positive_time_period_milliseconds,
         **_AUTO_IDS,
     }
 ).extend(cv.COMPONENT_SCHEMA)
@@ -194,10 +191,12 @@ async def to_code(config):
             CONF_ID: config[f"light_state_{i}"],
             CONF_NAME: f"{p} Output {i}",
             CONF_GAMMA_CORRECT: 1.0,
-            CONF_DEFAULT_TRANSITION_LENGTH: config[CONF_DEFAULT_TRANSITION_LENGTH],
+            CONF_DEFAULT_TRANSITION_LENGTH: config[CONF_TRANSITION_LENGTH],
             CONF_FLASH_TRANSITION_LENGTH: 250,
             CONF_DISABLED_BY_DEFAULT: False,
             CONF_RESTORE_MODE: _RESTORE_MODE_OFF,
             CONF_EFFECTS: [],
         }
         await light.register_light(light_out, light_cfg)
+
+    return var

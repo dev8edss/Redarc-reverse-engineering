@@ -21,10 +21,6 @@ except AttributeError:
     _switch_ns = cg.esphome_ns.namespace("switch_")
     _SWITCH_RESTORE_MODE_OFF = _switch_ns.enum("SwitchRestoreMode", is_class=True).SWITCH_RESTORE_DEFAULT_OFF
 
-CODEOWNERS = ["@dev8edss"]
-AUTO_LOAD = ["binary_sensor", "sensor", "switch", "text_sensor", "redarc_common"]
-MULTI_CONF = False
-
 CONF_SOURCE_ADDRESS = "source_address"
 CONF_HOST_ADDRESS = "host_address"
 CONF_FILTER_INTERVAL = "filter_interval"
@@ -60,11 +56,11 @@ _AUTO_IDS[cv.GenerateID("inverter_id")] = cv.declare_id(TVMS1280Switch)
 _AUTO_IDS[cv.GenerateID("master_id")] = cv.declare_id(TVMS1280Switch)
 _AUTO_IDS[cv.GenerateID("output_status_id")] = cv.declare_id(_TSClass)
 
-CONFIG_SCHEMA = cv.Schema({
+SCHEMA = cv.Schema({
     cv.GenerateID(): cv.declare_id(TVMS1280Component),
     cv.Optional(CONF_SOURCE_ADDRESS, default=0x24): cv.hex_uint8_t,
-    cv.Optional(CONF_HOST_ADDRESS, default=0x20): cv.hex_uint8_t,
-    cv.Optional(CONF_FILTER_INTERVAL, default="5s"): cv.positive_time_period_milliseconds,
+    cv.Optional(CONF_HOST_ADDRESS): cv.hex_uint8_t,
+    cv.Optional(CONF_FILTER_INTERVAL): cv.positive_time_period_milliseconds,
     **_AUTO_IDS,
 }).extend(cv.COMPONENT_SCHEMA)
 
@@ -197,3 +193,5 @@ async def to_code(config):
     }
     await switch.register_switch(master, master_cfg)
     cg.add(var.register_master_switch(master))
+
+    return var

@@ -9,9 +9,7 @@ from esphome.const import (
     STATE_CLASS_MEASUREMENT,
 )
 
-CODEOWNERS = ["@dev8edss"]
-AUTO_LOAD = ["button", "select", "sensor", "text_sensor", "redarc_common"]
-MULTI_CONF = False
+from ._battery_sensor import BatterySensorComponent as _BatterySensorComponent
 
 CONF_SOURCE_ADDRESS = "source_address"
 CONF_HOST_ADDRESS = "host_address"
@@ -33,9 +31,6 @@ ChargingModeSelect = manager30_ns.class_("ChargingModeSelect", select.Select)
 Manager30SetClockButton = manager30_ns.class_("Manager30SetClockButton", button.Button)
 Manager30ClearSolarHistoryButton = manager30_ns.class_("Manager30ClearSolarHistoryButton", button.Button)
 
-_battery_sensor_ns = cg.esphome_ns.namespace("redarc_battery_sensor")
-_BatterySensorComponent = _battery_sensor_ns.class_("BatterySensorComponent", cg.Component)
-
 _sensor_ns = cg.esphome_ns.namespace("sensor")
 _SensorClass = _sensor_ns.class_("Sensor")
 _StateClass = _sensor_ns.enum("StateClass")
@@ -47,12 +42,12 @@ _SC_MAP = {
 _text_sensor_ns = cg.esphome_ns.namespace("text_sensor")
 _TextSensorClass = _text_sensor_ns.class_("TextSensor")
 
-CONFIG_SCHEMA = cv.Schema({
+SCHEMA = cv.Schema({
     cv.GenerateID(): cv.declare_id(Manager30Component),
     cv.Optional(CONF_SOURCE_ADDRESS, default=0x01): cv.hex_uint8_t,
-    cv.Optional(CONF_HOST_ADDRESS, default=0x20): cv.hex_uint8_t,
-    cv.Optional(CONF_FILTER_INTERVAL, default="5s"): cv.positive_time_period_milliseconds,
-    cv.Optional(CONF_SOLAR_HISTORY_POLL_INTERVAL, default="60s"): zero_or_positive_time_period_milliseconds,
+    cv.Optional(CONF_HOST_ADDRESS): cv.hex_uint8_t,
+    cv.Optional(CONF_FILTER_INTERVAL): cv.positive_time_period_milliseconds,
+    cv.Optional(CONF_SOLAR_HISTORY_POLL_INTERVAL): zero_or_positive_time_period_milliseconds,
     cv.Optional(CONF_BATTERY_SENSOR): cv.use_id(_BatterySensorComponent),
     cv.Optional(CONF_TIME_ID): cv.use_id(time.RealTimeClock),
     cv.GenerateID("set_clock_button_id"): cv.declare_id(Manager30SetClockButton),
@@ -241,3 +236,5 @@ async def to_code(config):
     })
     cg.add(btn.set_parent(var))
     cg.add(var.set_clear_solar_history_button(btn))
+
+    return var
