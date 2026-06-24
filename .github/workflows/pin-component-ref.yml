@@ -1,8 +1,10 @@
-name: Pin component ref on main
+name: Normalize main YAML
 
-# Whenever main is updated (e.g. after pushing/merging dev into main), make sure
-# any YAML that pulls the `redarc` external component does so from the `main`
-# branch rather than `dev`. dev keeps `ref: dev`; main is always forced to `main`.
+# Whenever main is updated (e.g. after pushing/merging dev into main), force the
+# stable-branch conventions in every YAML:
+#   * external_components `ref:` is pinned to `main` (dev keeps `ref: dev`).
+#   * the `logger:` block is reduced to `level: INFO` + `baud_rate: 0`, dropping
+#     the DEBUG level and the canbus log override (dev keeps DEBUG + the override).
 
 on:
   push:
@@ -23,27 +25,35 @@ jobs:
         with:
           ref: main
 
-      - name: Force external_components ref to main
+      - name: Force stable conventions (ref + logger) on main
         run: |
           python - <<'PY'
           import re
           import pathlib
 
-          # Rewrite the ref directly under our external_components git source in
-          # every YAML file; unrelated ref: keys are left untouched.
-          pattern = re.compile(
+          # Rewrite the ref directly under our external_components git source;
+          # unrelated ref: keys are left untouched.
+          ref_pattern = re.compile(
               r"(url: https://github\.com/dev8edss/Redarc-reverse-engineering\s*\n\s*ref:\s*)\S+"
           )
+          # Collapse the whole logger: block (its indented lines) to the canonical
+          # INFO form. Stops at the first blank / non-indented line.
+          logger_pattern = re.compile(
+              r"(?m)^logger:[^\n]*\n(?:[ \t]+\S[^\n]*\n)+"
+          )
+          logger_block = "logger:\n  level: INFO\n  baud_rate: 0\n"
+
           changed = False
           for path in pathlib.Path(".").rglob("*.yaml"):
               text = path.read_text()
-              new = pattern.sub(r"\1main", text)
+              new = ref_pattern.sub(r"\1main", text)
+              new = logger_pattern.sub(logger_block, new)
               if new != text:
                   path.write_text(new)
-                  print(f"Updated external_components ref to 'main' in {path}")
+                  print(f"Normalized {path}")
                   changed = True
           if not changed:
-              print("ref already 'main' everywhere; nothing to do")
+              print("already normalized; nothing to do")
           PY
 
       - name: Commit and push if changed
@@ -52,8 +62,8 @@ jobs:
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git add -A
-            git commit -m "ci: pin external_components ref to main [skip ci]"
+            git commit -m "ci: normalize main YAML (ref + logger) [skip ci]"
             git push origin main
           else
-            echo "already pinned to main"
+            echo "already normalized"
           fi
