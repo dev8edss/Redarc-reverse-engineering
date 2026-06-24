@@ -153,7 +153,8 @@ top-level `redarc:` block holds the CAN bus (`canbus:`), an optional time source
   options are exactly ESPHome's `esp32_can` platform options). The component
   subscribes to the bus in `setup()` and dispatches every frame itself, so **no
   YAML `on_frame:` automation is needed**. (You can instead point `canbus_id:` at
-  an externally-declared `canbus:` if you prefer.)
+  an externally-declared `canbus:` — e.g. an **MCP2515**, which is **untested**;
+  see [README_external_components.md](README_external_components.md).)
 - **`RedarcCanDispatcher`** — a singleton. Each device registers a listener in
   `setup()`; the component's bus callback logs each frame (at DEBUG, with an
   `rtr=` flag) and hands it to every listener. **RTR frames are logged but not

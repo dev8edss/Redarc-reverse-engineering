@@ -95,11 +95,16 @@ passive monitoring builds where nothing is transmitted.
 
 ### Other transceivers (MCP2515, etc.)
 
+> ⚠️ **MCP2515 is untested.** The project is developed and validated only on the
+> M5Stack Atom CAN base (`esp32_can`). The `canbus_id:` route below is expected to
+> work because the bridge is platform-agnostic, but it has not been verified on
+> real MCP2515 hardware — treat it as a starting point and confirm on your bus.
+
 The internal `redarc: canbus:` block builds an **`esp32_can`** interface (the
 M5Stack Atom CAN base). For an SPI transceiver like **MCP2515** — or any other
 ESPHome canbus platform — declare a normal top-level `canbus:` block and point
 `redarc: canbus_id:` at it (exactly one of `canbus`/`canbus_id` is required). The
-dispatcher, discovery and all commands are platform-agnostic, so this works
+dispatcher, discovery and all commands are platform-agnostic, so this should work
 unchanged:
 
 ```yaml

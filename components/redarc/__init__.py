@@ -1,7 +1,7 @@
 import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome.components import canbus
-from esphome.components.canbus import CONF_BIT_RATE, CONF_CAN_ID, CONF_USE_EXTENDED_ID
+from esphome.components.canbus import CONF_CAN_ID, CONF_USE_EXTENDED_ID
 from esphome.components.esp32_can import canbus as esp32_can
 from esphome.components.homeassistant import time as homeassistant_time
 from esphome.const import CONF_ID
@@ -85,14 +85,14 @@ ns = cg.esphome_ns.namespace("redarc_common")
 RedarcCommonComponent = ns.class_("RedarcCommonComponent", cg.Component)
 
 # The CAN bus is set up inside the component instead of a top-level canbus:
-# block, reusing esp32_can's own platform schema (so every option matches
-# ESPHome exactly) with REDARC-friendly defaults for the bus constants.
+# block, reusing esp32_can's own platform schema (so every option — including
+# bit_rate, mode, rx_queue_len — matches ESPHome exactly). Only the REDARC bus
+# constants get friendly defaults; bit_rate keeps esp32_can's own validation.
 # For an SPI transceiver such as mcp2515, declare a normal top-level canbus:
 # block instead and point `canbus_id:` at it (see the README).
 CANBUS_SCHEMA = esp32_can.CONFIG_SCHEMA.extend({
     cv.Optional(CONF_CAN_ID, default=0x7FE): cv.int_range(min=0, max=0x1FFFFFFF),
     cv.Optional(CONF_USE_EXTENDED_ID, default=True): cv.boolean,
-    cv.Optional(CONF_BIT_RATE, default="250KBPS"): cv.enum(esp32_can.CAN_SPEEDS, upper=True),
 })
 
 # Likewise the Home Assistant time source (used by the Manager Set Time button)
