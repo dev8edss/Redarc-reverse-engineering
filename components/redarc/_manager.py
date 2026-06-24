@@ -59,6 +59,7 @@ SCHEMA = cv.Schema({
     cv.GenerateID("solar_voltage_id"): cv.declare_id(_SensorClass),
     cv.GenerateID("solar_power_id"): cv.declare_id(_SensorClass),
     cv.GenerateID("solar_energy_id"): cv.declare_id(_SensorClass),
+    cv.GenerateID("solar_today_id"): cv.declare_id(_SensorClass),
     cv.GenerateID("solar_day_history_id"): cv.declare_id(_TextSensorClass),
     cv.GenerateID("ac_input_current_id"): cv.declare_id(_SensorClass),
     cv.GenerateID("ac_input_voltage_id"): cv.declare_id(_SensorClass),
@@ -162,10 +163,15 @@ async def to_code(config):
                            state_class=STATE_CLASS_MEASUREMENT, decimals=1)
     cg.add(var.set_solar_power_sensor(s))
 
-    s = await _make_sensor(config["solar_energy_id"], f"{p} Solar Energy",
+    s = await _make_sensor(config["solar_energy_id"], f"{p} Solar Energy Total",
                            unit="Wh", device_class="energy",
                            state_class=STATE_CLASS_MEASUREMENT, decimals=0)
     cg.add(var.set_solar_energy_sensor(s))
+
+    s = await _make_sensor(config["solar_today_id"], f"{p} Solar Energy Today",
+                           unit="Wh", device_class="energy",
+                           state_class=STATE_CLASS_MEASUREMENT, decimals=0)
+    cg.add(var.set_solar_today_sensor(s))
 
     ts = await _make_text_sensor(config["solar_day_history_id"], f"{p} Solar Day 1-12 History",
                                  entity_category=ENTITY_CATEGORY_DIAGNOSTIC)

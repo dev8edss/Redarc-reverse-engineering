@@ -263,6 +263,10 @@ void Manager30Component::publish_solar_daily_energy_(uint8_t day, uint16_t wh) {
 }
 
 void Manager30Component::publish_solar_energy_total_() {
+  // Day 0 is today; publish it on its own sensor as soon as it is known.
+  if (this->solar_today_sensor_ != nullptr && this->solar_daily_known_[0])
+    this->solar_today_sensor_->publish_state((float) this->solar_daily_wh_[0]);
+
   if (this->solar_energy_sensor_ == nullptr) return;
   uint32_t total = 0;
   bool any = false;
