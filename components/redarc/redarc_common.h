@@ -5,9 +5,14 @@
 #include <functional>
 #include <vector>
 #include "esphome/core/component.h"
+#include "esphome/core/automation.h"
+#include "esphome/core/defines.h"
 #include "esphome/core/hal.h"
 #include "esphome/core/log.h"
 #include "esphome/components/canbus/canbus.h"
+#ifdef USE_API
+#include "esphome/components/api/api_server.h"
+#endif
 
 namespace esphome {
 namespace redarc_common {
@@ -98,6 +103,19 @@ class RedarcCommonComponent : public Component {
     this->set_timeout("redarc_device_discovery_2", this->discovery_delay_ms_ + 3000U, [this]() {
       this->request_all_devices_();
     });
+
+#if defined(USE_API) && defined(USE_API_CLIENT_CONNECTED_TRIGGER)
+    // Re-scan whenever an API client connects (incl. the dashboard log viewer),
+    // so the device list prints into the logs you just opened. The macro is
+    // enabled from our codegen, so no on_client_connected: YAML is needed.
+    // Debounced in trigger_discovery(). Leaks intentionally — lives forever.
+    if (api::global_api_server != nullptr) {
+      auto *automation =
+          new Automation<std::string, std::string>(api::global_api_server->get_client_connected_trigger());
+      automation->add_action(new LambdaAction<std::string, std::string>(
+          [this](const std::string &, const std::string &) { this->trigger_discovery(); }));
+    }
+#endif
   }
 
   void dump_config() override {

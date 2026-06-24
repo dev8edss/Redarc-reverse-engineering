@@ -35,11 +35,6 @@ logger:
 api:
   encryption:
     key: !secret api_pass
-  # Re-scan for REDARC devices whenever an API client connects (incl. the log
-  # viewer), so the device list prints into the logs you just opened. The scan is
-  # debounced in the component; needs NORMAL CAN mode to transmit.
-  on_client_connected:
-    - lambda: 'id(redarc_bridge)->trigger_discovery();'
 
 ota:                                        
   - platform: esphome
@@ -63,7 +58,6 @@ external_components:  # [required] pulls the `redarc` component from GitHub
 # The whole bridge is the single `redarc:` component. Include only the device
 # sub-blocks for hardware on your bus; delete the rest.
 redarc:
-  id: redarc_bridge                          # so api: on_client_connected can call trigger_discovery()
   # CAN interface — one of `canbus:` (built-in esp32_can) or `canbus_id:` (an
   # external canbus, e.g. mcp2515) is required. An empty `canbus:` uses the
   # defaults: tx_pin GPIO22, rx_pin GPIO19, bit_rate 250KBPS, can_id 0x7FE,

@@ -160,6 +160,14 @@ async def to_code(config):
     var = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(var, config)
 
+    # Compile in ESPHome's api on-client-connected trigger so the component can
+    # re-scan for devices when any API client connects (incl. the dashboard log
+    # viewer), without the user adding an `on_client_connected:` automation. The
+    # trigger member and the code that fires it both sit behind this macro; the
+    # component attaches an action to get_client_connected_trigger() in setup().
+    if "api" in CORE.config:
+        cg.add_define("USE_API_CLIENT_CONNECTED_TRIGGER")
+
     # CAN bus: either build the esp32_can interface from the nested `canbus:`
     # block, or reference an externally-declared one (e.g. mcp2515) via
     # `canbus_id:`.
