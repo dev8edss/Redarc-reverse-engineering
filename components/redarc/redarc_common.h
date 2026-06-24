@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <cstdio>
+#include <cstring>
 #include <functional>
 #include <vector>
 #include "esphome/core/component.h"
@@ -158,6 +159,17 @@ class RedarcCommonComponent : public Component {
               [](const DiscoveredDevice &a, const DiscoveredDevice &b) {
                 return a.source_address < b.source_address;
               });
+
+    // Width the Device Type column to the longest name so the columns line up.
+    size_t type_w = sizeof("Device Type") - 1;
+    for (auto &d : this->devices_) {
+      const char *name = device_type_name_(d.device_type);
+      const size_t len = (name != nullptr) ? std::strlen(name) : sizeof("Unknown (0xFF)") - 1;
+      if (len > type_w) type_w = len;
+    }
+
+    ESP_LOGI(TAG, "Discovered devices:");
+    ESP_LOGI(TAG, "  %-*s  %-10s  %s", (int) type_w, "Device Type", "Address", "Serial No");
     for (auto &d : this->devices_) {
       const char *name = device_type_name_(d.device_type);
       char type_buf[24];
@@ -165,8 +177,10 @@ class RedarcCommonComponent : public Component {
         std::snprintf(type_buf, sizeof(type_buf), "Unknown (0x%02X)", (unsigned) d.device_type);
         name = type_buf;
       }
-      ESP_LOGI(TAG, "Device Type: %s, Address: %u (0x%02X), Serial No: %010lu-%04u", name,
-               (unsigned) d.source_address, (unsigned) d.source_address,
+      char addr_buf[16];
+      std::snprintf(addr_buf, sizeof(addr_buf), "%u (0x%02X)", (unsigned) d.source_address,
+                    (unsigned) d.source_address);
+      ESP_LOGI(TAG, "  %-*s  %-10s  %010lu-%04u", (int) type_w, name, addr_buf,
                (unsigned long) d.serial_prefix, (unsigned) d.serial_suffix);
     }
   }
