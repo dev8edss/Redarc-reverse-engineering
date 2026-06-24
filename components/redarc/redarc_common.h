@@ -93,10 +93,13 @@ class RedarcCommonComponent : public Component {
     // Dispatch every received frame to the device listeners directly from the
     // component, so no YAML on_frame: automation is needed on the CAN bus.
     this->canbus_->add_callback(
-        [this](uint32_t can_id, bool extended_id, bool rtr, const std::vector<uint8_t> &data) {
+        // extended_id is intentionally ignored: some drivers report it false for
+        // valid 29-bit REDARC frames, which still decode fine via the masked
+        // can_id — so gating on it hid most devices from discovery.
+        [this](uint32_t can_id, bool /*extended_id*/, bool rtr, const std::vector<uint8_t> &data) {
           const uint32_t rvc_id = can_id & 0x1FFFFFFFUL;
           RedarcCanDispatcher::instance().dispatch(rvc_id, data, rtr);
-          if (!extended_id || rtr) return;
+          if (rtr) return;
           this->note_bus_address_(rvc_id);
           this->handle_device_identity_(rvc_id, data);
         });
