@@ -190,7 +190,12 @@ class RedarcCommonComponent : public Component {
   void request_all_devices_() {
     if (this->canbus_ == nullptr) return;
 
-    const uint32_t can_id = 0x0F03FF00UL | this->host_address_;
+    // Request-only responders (displays, TVMS1280, Rogue) ignore a request from
+    // the null address 0xFF, so fall back to the standard diagnostic/request
+    // address 0xFA when host_address isn't a real claimed address. (Manager and
+    // battery self-announce regardless, which is why they show up either way.)
+    const uint8_t requester = (this->host_address_ == 0xFF) ? 0xFA : this->host_address_;
+    const uint32_t can_id = 0x0F03FF00UL | requester;
     const std::vector<uint8_t> data = {0x04, 0xF4, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 
     log_can_frame("CAN_TX", can_id, data, false);
@@ -198,8 +203,7 @@ class RedarcCommonComponent : public Component {
     if (error != canbus::ERROR_OK) {
       ESP_LOGW(TAG, "Device discovery request failed with CAN error %u", (unsigned) error);
     } else {
-      ESP_LOGD(TAG, "Requested DGN 0x1F404 from all devices using source address 0x%02X",
-               (unsigned) this->host_address_);
+      ESP_LOGD(TAG, "Requested DGN 0x1F404 from all devices as source address 0x%02X", (unsigned) requester);
     }
   }
 
