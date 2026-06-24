@@ -106,10 +106,14 @@ base. Power the Atom from **USB** (or a proper regulated 5 V supply).
        - { id: TVMS1280, source_address: 0x24 }
    ```
 
-Each device already has a sensible default address (battery `0x08`, manager
-`0x01`, display `0x20`, Rogue `0x30`, TVMS1280 `0x24`), so a single device of each
-type needs no `source_address` at all. Only set it when you run **two of the same
-type** — give the second one a different address. Two devices can't share an
+Each device has a sensible default address (battery `0x08`, manager `0x01`,
+display `0x20`, Rogue `0x30`, TVMS1280 `0x24`), so the defaults will often work as-is
+and you can leave `source_address` out entirely.
+
+If a device uses a different address, you can find it on the **RedVision display**,
+where it's shown in **decimal** — convert that number to hex for the config (for
+example, `48` in decimal becomes `0x30`). **Two devices can't share the same
+address**, so if you run two of the same type, the second one must have its own
 address.
 
 ### Handy settings
