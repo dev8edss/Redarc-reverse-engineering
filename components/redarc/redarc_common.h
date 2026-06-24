@@ -178,7 +178,7 @@ class RedarcCommonComponent : public Component {
         name = type_buf;
       }
       char addr_buf[16];
-      std::snprintf(addr_buf, sizeof(addr_buf), "%u (0x%02X)", (unsigned) d.source_address,
+      std::snprintf(addr_buf, sizeof(addr_buf), "%3u (0x%02X)", (unsigned) d.source_address,
                     (unsigned) d.source_address);
       ESP_LOGI(TAG, "  %-*s  %-10s  %010lu-%04u", (int) type_w, name, addr_buf,
                (unsigned long) d.serial_prefix, (unsigned) d.serial_suffix);
