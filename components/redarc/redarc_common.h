@@ -154,6 +154,10 @@ class RedarcCommonComponent : public Component {
   }
 
   void log_discovered_devices_() {
+    std::sort(this->devices_.begin(), this->devices_.end(),
+              [](const DiscoveredDevice &a, const DiscoveredDevice &b) {
+                return a.source_address < b.source_address;
+              });
     for (auto &d : this->devices_) {
       const char *name = device_type_name_(d.device_type);
       char type_buf[24];
