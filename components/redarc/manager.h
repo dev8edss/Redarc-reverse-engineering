@@ -70,6 +70,7 @@ class Manager30Component : public Component {
   void set_solar_voltage_sensor(sensor::Sensor *s) { this->solar_voltage_sensor_ = s; }
   void set_solar_power_sensor(sensor::Sensor *s) { this->solar_power_sensor_ = s; }
   void set_solar_energy_sensor(sensor::Sensor *s) { this->solar_energy_sensor_ = s; }
+  void set_solar_today_sensor(sensor::Sensor *s) { this->solar_today_sensor_ = s; }
   void set_solar_day_history_text_sensor(text_sensor::TextSensor *s) { this->solar_day_history_text_sensor_ = s; }
   void set_solar_history_poll_interval_ms(uint32_t ms) { this->solar_history_poll_interval_ms_ = ms; }
   void set_ac_input_current_sensor(sensor::Sensor *s) { this->ac_input_current_sensor_ = s; }
@@ -117,6 +118,7 @@ class Manager30Component : public Component {
   sensor::Sensor *solar_voltage_sensor_{nullptr};
   sensor::Sensor *solar_power_sensor_{nullptr};
   sensor::Sensor *solar_energy_sensor_{nullptr};
+  sensor::Sensor *solar_today_sensor_{nullptr};
   std::array<uint16_t, 12> solar_daily_wh_{};
   std::array<bool, 12> solar_daily_known_{};
   text_sensor::TextSensor *solar_day_history_text_sensor_{nullptr};

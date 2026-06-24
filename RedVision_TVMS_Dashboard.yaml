@@ -264,8 +264,12 @@ cards:
           yellow: 0
           red: 0
       - type: entity
-        name: Solar Energy
-        entity: sensor.redvision_can_bridge_manager30_solar_energy
+        name: Solar Today
+        entity: sensor.redvision_can_bridge_manager30_solar_energy_today
+        icon: mdi:solar-power
+      - type: entity
+        name: Solar Energy Total
+        entity: sensor.redvision_can_bridge_manager30_solar_energy_total
         icon: mdi:solar-power
       - type: entity
         name: Solar Voltage
@@ -281,8 +285,10 @@ cards:
     entities:
       - entity: sensor.redvision_can_bridge_manager30_solar_power
         name: Solar W
-      - entity: sensor.redvision_can_bridge_manager30_solar_energy
-        name: Solar Wh
+      - entity: sensor.redvision_can_bridge_manager30_solar_energy_today
+        name: Solar Wh Today
+      - entity: sensor.redvision_can_bridge_manager30_solar_energy_total
+        name: Solar Wh Total
       - entity: sensor.redvision_can_bridge_manager30_solar_voltage
         name: Solar V
       - entity: sensor.redvision_can_bridge_manager30_solar_current
