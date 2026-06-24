@@ -27,10 +27,7 @@ logger:
   # UART logging is disabled (baud_rate 0) so DEBUG can't overflow the ESP-IDF UART
   # ringbuffer; logs still stream over the API. View them in the ESPHome dashboard.
   baud_rate: 0                               
-  logs:                                      
-    # Silence the built-in canbus frame log — redarc_common already logs every
-    # frame with id/dgn/sa/rtr/data at DEBUG, so this one is redundant noise.
-    canbus: INFO
+
 
 api:                                        
   encryption:
