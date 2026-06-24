@@ -1,550 +1,213 @@
 # RedVision / TVMS CAN Bridge
 
-An ESP32 / ESPHome firmware that bridges a **REDARC RedVision / TVMS** RV power
-system onto **Home Assistant** over CAN. It passively decodes the live bus
-traffic (battery, charger/manager, solar, tanks, temperatures, lighting) and,
-in `NORMAL` mode, can transmit commands to switch and dim the TVMS outputs — all
-exposed as native Home Assistant entities.
+Bring your **REDARC RedVision / TVMS** RV power system into **Home Assistant**.
 
-The decode is reverse-engineered from captured bus traffic. The byte-level
-findings live in the companion DBC file
-[`RedVision_TVMS_components.dbc`](RedVision_TVMS_components.dbc) — the signals
-for exactly what the components decode and transmit; this README is the
-human-readable summary plus a build/wiring guide.
+This is firmware for a small ESP32 board that plugs into your REDARC CAN bus. It
+reads everything the system is doing — battery, charger, solar, water tanks,
+temperatures and lighting — and shows it in Home Assistant as normal sensors and
+switches. It can also send commands back to switch and dim your TVMS outputs.
 
-> **Status legend** (used throughout): `CONFIRMED` = validated against capture,
-> safe to rely on. `PARTLY CONFIRMED` = purpose known, some bytes unknown.
-> `DIAGNOSTIC / CANDIDATE` = exposed for testing, not yet locked in.
+Everything it reports was worked out by listening to the real bus traffic. If you
+want the technical detail behind the decoding, see
+[PROTOCOL.md](PROTOCOL.md) and the
+[`RedVision_TVMS_components.dbc`](RedVision_TVMS_components.dbc) file.
 
 ---
 
-## 1. The REDARC protocol in brief
+## What you need
 
-The bus is **250 kbit/s** CAN using **29-bit extended IDs** in a J1939 / RV-C
-style layout. Every ID is treated as three fields:
-
-```text
-29-bit CAN ID  =  Priority   +   DGN (message group)   +   Source Address
-                  (top bits)     (PGN-style middle)        (low 8 bits)
-```
-
-Example — `0x13F10208`:
-
-```text
-DGN (group)    = 0x1F102   ((id >> 8) & 0x1FFFF)
-Source Address = 0x08      (id & 0xFF)  -> Battery Sensor
-```
-
-The firmware always keys off the **full 29-bit ID**, then matches on
-`(DGN, source address)` so it can tell, e.g., the Manager's status from the
-display's rebroadcast of the same numbers.
-
-### Who is on the bus (source addresses)
-
-| Addr | Device | Role |
-|---:|---|---|
-| `0x01` | Manager30 | Battery manager / charger / solar MPPT |
-| `0x08` | Battery Sensor | Shunt / BMS (current, voltage, temp, SOC) |
-| `0x20` | RedVision display 1 | Screen; also the source of most button commands |
-| `0x21` | RedVision display 2 | Second screen / status |
-| `0x24` | TVMS1280 | 10 relay outputs + inverter, tanks, temps, voltage inputs |
-| `0x30` | TVMS Rogue | 10 dimmable outputs, hardware buttons, tanks, input V/A |
-| `0x22` | **This ESP32 bridge** | Our own address, used as the source of command/poll frames (configurable) |
-| `0xFA` | Diagnostic / request tool | Readout & history-request traffic |
-
-### Recurring decode patterns
-
-- **Source-node currents** are clean 32-bit values centred on 1,000,000:
-  `Current_A = raw / 1000 - 1000` (so `1,020,000` = +20 A, `990,000` = -10 A).
-- **Display rebroadcast currents** are 16-bit, centred on 10,000:
-  `Display_A = raw / 10 - 1000`.
-- **Status frames are multiplexed**: byte `D1` is a *page / item index* and the
-  remaining bytes mean different things per page (e.g. TVMS1280 `0x1BFD0224`
-  carries tanks, temps and voltages on different `D1` values).
-- **Commands** are short frames sent *from a display address* to the target
-  hardware (e.g. `0x0F00FF20` from display `0x20`), with `D1` selecting the
-  command and later bytes the value.
-
-A full byte-by-byte signal table is in [Section 6](#6-signal-reference). The DBC
-is the source of truth for scaling and confirmation status.
+- **[M5Stack Atom Lite](https://shop.m5stack.com/products/atom-lite-esp32-development-kit)**
+  (ESP32) + **[M5Stack Atom CAN base](https://shop.m5stack.com/products/atom-can-kit-ca-is3050g)**
+  (CA-IS3050G).
+- A way to connect to your REDARC bus (the system uses standard RJ45 / network
+  cables — see wiring below).
+- Home Assistant with the ESPHome add-on.
 
 ---
 
-## 2. Hardware and wiring
+## Wiring
 
-### Board
+The bridge talks to REDARC over CAN. On the M5Stack Atom CAN base:
 
-```text
-M5Stack Atom Lite (ESP32-PICO)
-  + M5Stack Atom CAN base (CA-IS3050G transceiver)
-```
-
-### CAN pins
-
-| Function | GPIO |
+| Signal | Pin |
 |---|---|
 | CAN TX | `GPIO22` |
 | CAN RX | `GPIO19` |
 
-### Bus settings
+REDARC carries the bus on the RJ45 (network-style) connectors. Measured pinout:
 
-```text
-Bit rate : 250 kbit/s   (250KBPS)
-Frames   : extended 29-bit IDs
-Mode     : NORMAL      -> read + transmit (switch/dim/commands)
-           LISTENONLY  -> passive monitor only (no TX, cannot disturb the bus)
-```
+| RJ45 pin | Wire (T568B) | Signal |
+|---:|---|---|
+| 4 | Blue | CAN&nbsp;L |
+| 5 | Blue/White | CAN&nbsp;H |
+| 6 | Green | 12–30 V (power, exact purpose unknown) |
+| 7 | Brown/White | 12–30 V (power, exact purpose unknown) |
+| 8 | Brown | Ground |
 
-### Connecting to the RedVision / TVMS bus (RJ45)
+Connect **CAN H**, **CAN L** and **Ground** between the RJ45 and the Atom's CAN
+base. Power the Atom from **USB** (or a proper regulated 5 V supply).
 
-Observed pinout on the RedVision / TVMS RJ45 connectors:
-
-| RJ45 pin | Wire colour (T568B) | Signal | Status |
-|---:|---|---|---|
-| 4 | Blue | CAN&nbsp;L | confirmed |
-| 5 | Blue/White | CAN&nbsp;H | confirmed |
-| 6 | Green | 12–30 V observed | voltage depends on the devices connected; exact function is unknown |
-| 7 | Brown/White | 12–30 V observed | voltage depends on the devices connected; exact function is unknown |
-| 8 | Brown | Ground | confirmed |
-
-Pins 6 and 7 have both been observed carrying supply voltage, with measurements
-ranging from approximately 12 V to 30 V depending on which REDARC devices are
-connected. The reason for the two separate powered pins, and whether they are
-independent rails, switched feeds, or connected internally by some devices, is
-not yet understood.
-
-Do **not** assume pins 6 and 7 are interchangeable or connect them together.
-Measure each pin relative to pin 8 on the actual system before using either one
-to power custom hardware.
-
-Wire **CAN H → GPIO22 side transceiver H**, **CAN L → L**, and share **ground**.
-Power the Atom from USB or a verified regulated 5 V source. Do not connect either
-12–30 V RJ45 pin directly to the Atom. A correctly terminated bus already has
-its 120 Ω end resistors; the Atom CAN base is a stub, so don't add termination
-unless you are the physical end of the bus.
-
-> Start with `can_mode: LISTENONLY` to confirm you see traffic safely, then
-> switch to `NORMAL` once you want control.
+> **Safety:**
+> - Don't connect the 12–30 V RJ45 pins (6 and 7) to the Atom — power it over USB.
+> - Don't assume pins 6 and 7 are the same or join them together. Measure each
+>   against pin 8 before using either to power anything.
+> - A correctly wired REDARC bus already has its end resistors. The Atom is a
+>   "stub" off the bus, so don't add termination unless you're at the very end.
 
 ---
 
-## 3. ESPHome application layout
+## Set it up
 
-### File map
+1. **Install the config.** Flash
+   [`RedVision_TVMS_Atom_lite_Cais3050g.yaml`](RedVision_TVMS_Atom_lite_Cais3050g.yaml)
+   through ESPHome. It pulls in the `redarc` component automatically from GitHub.
 
-```text
-RedVision_TVMS_Atom_lite_Cais3050g.yaml                    <- the single self-contained config you flash
-components/
-  redarc/                   <- single component for the whole bridge:
-    redarc_common.h         <- CAN dispatcher, address claim, decode helpers (no entities)
-    __init__.py             <- top-level `redarc:` schema (canbus + time + devices)
-    _manager.* / manager.*          <- Manager30  (0x01)
-    _battery_sensor.* / battery_sensor.*  <- Battery (0x08)
-    _redvision_display.* / redvision_display.*  <- Display(s) (0x20 / 0x21)
-    _tvms_rogue.* / tvms_rogue.*    <- TVMS Rogue (0x30)
-    _tvms_1280.* / tvms_1280.*      <- TVMS1280   (0x24)
-RedVision_TVMS_Dashboard.yaml                              <- example Home Assistant Lovelace dashboard
-RedVision_TVMS_components.dbc                              <- byte-level signal database (component-derived)
-```
+2. **Add your secrets.** Your `secrets.yaml` must provide `wifi_ssid`,
+   `wifi_password`, `api_pass` and `ota_pass`.
 
-There is **no separate `base.yaml`** — the device YAML is self-contained: the
-standard ESPHome blocks (`esphome:`, `esp32:`, `logger:`, `api:`, `ota:`, `wifi:`),
-an `external_components:` pull of `redarc`, and a single `redarc:` block. The CAN
-bus and Home Assistant time source live **inside** `redarc:` (no top-level
-`canbus:`/`time:` blocks).
+3. **Start safe, then enable control.** Begin in **listen-only** mode to confirm
+   you can see the bus without touching it, then switch to **normal** mode when
+   you want switching and dimming:
 
-### How the components fit together
+   ```yaml
+       mode: LISTENONLY   # safe monitor: read only
+       # mode: NORMAL     # read + control (switch / dim / commands)
+   ```
 
-Everything ships as **one** ESPHome external component, `redarc`. The single
-top-level `redarc:` block holds the CAN bus (`canbus:`), an optional time source
-(`time:`), the shared dispatcher settings, and one nested sub-block per device
-(`manager:`, `battery_sensor:`, `redvision_display:`, `tvms_rogue:`, `tvms_1280:`).
+4. **Choose your devices.** In the config, keep only the device blocks for the
+   hardware you actually have and delete the rest. The `id:` you give a block
+   becomes the name prefix in Home Assistant (e.g. `id: Manager30` →
+   "Manager30 Output Current").
 
-- **CAN bus** — `redarc: canbus:` builds an `esp32_can` interface internally (its
-  options are exactly ESPHome's `esp32_can` platform options). The component
-  subscribes to the bus in `setup()` and dispatches every frame itself, so **no
-  YAML `on_frame:` automation is needed**. (You can instead point `canbus_id:` at
-  an externally-declared `canbus:` — e.g. an **MCP2515**, which is **untested**;
-  see [README_external_components.md](README_external_components.md).)
-- **`RedarcCanDispatcher`** — a singleton. Each device registers a listener in
-  `setup()`; the component's bus callback logs each frame (at DEBUG, with an
-  `rtr=` flag) and hands it to every listener. **RTR frames are logged but not
-  decoded.** Decoding is just "did this data frame match my `(DGN, source
-  address)`?".
-- **Time** — a Home Assistant time source is created **automatically** and wired
-  into every Manager (enabling the Set Time button). Set `time: false` to disable
-  it — then no time source and **no Set Time button** are added. The first build
-  after enabling time pulls a new source file into the project, so do a **clean
-  build** ("Clean Build Files") that first time — an incremental build can miss it
-  and fail to link (`undefined reference to … HomeassistantTime`).
-- **Decode helpers** — `u16_le` / `u32_le`, `rvc_dgn` / `rvc_source_address`,
-  `rvc_matches`, and the `current_32_centered` / `current_display_16_centered`
-  scalers described above.
+   ```yaml
+   redarc:
+     canbus:
+       tx_pin: GPIO22
+       rx_pin: GPIO19
+       bit_rate: 250KBPS
+       mode: LISTENONLY            # switch to NORMAL for control
 
-Each device sub-schema **auto-generates the entity IDs/names** (you don't list
-every sensor in YAML — just give the sub-block an `id:` prefix and a
-`source_address:`). The C++ keeps its per-device namespaces (`redarc_manager`,
-`redarc_tvms_1280`, …); only the ESPHome component folder/key is unified to
-`redarc`.
+     host_address: "0x22"          # this bridge's address on the bus
 
-`external_components:` pulls the `redarc` component from GitHub (the `ref:`
-controls which branch — `main` for stable). Clearing the ESPHome external-
-component cache is required if a schema change seems to be ignored.
+     battery_sensor:
+       - { id: Battery, source_address: 0x08 }
 
----
+     manager:
+       - { id: Manager30, source_address: 0x01, battery_sensor_id: Battery }
 
-## 4. Configuring the device
+     redvision_display:
+       - { id: Redvision1, source_address: 0x20 }
+       - { id: Redvision2, source_address: 0x21 }
 
-In the top YAML, set the basics, then under the single `redarc:` block enable only
-the device sub-blocks for hardware you own (delete the rest). The `id:` you give a
-sub-block becomes the **entity name prefix** (e.g. `id: Manager30` → "Manager30
-Output Current"); `source_address:` must match the device on your bus.
+     tvms_rogue:
+       - { id: TVMS_Rogue, source_address: 0x30 }
 
-```yaml
-redarc:
-  # CAN bus, built inside the component (same options as ESPHome's esp32_can).
-  canbus:
-    tx_pin: GPIO22
-    rx_pin: GPIO19
-    bit_rate: 250KBPS
-    mode: NORMAL                   # or LISTENONLY for a monitor build
-  # Home Assistant time + Manager Set Time button are on by default.
-  # Add `time: false` to disable them.
+     tvms_1280:
+       - { id: TVMS1280, source_address: 0x24 }
+   ```
 
-  host_address: "0x22"             # source address for discovery/commands; devices inherit this
-  discovery_delay: 60s
-  filter_interval: 5s              # publish throttle; all devices inherit
-  history_poll_interval: 60s       # SOC + solar poll; inherited (0s = off)
+Each device already has a sensible default address (battery `0x08`, manager
+`0x01`, display `0x20`, Rogue `0x30`, TVMS1280 `0x24`), so a single device of each
+type needs no `source_address` at all. Only set it when you run **two of the same
+type** — give the second one a different address. Two devices can't share an
+address.
 
-  # Every device is a list — one `- ` entry per physical device.
-  battery_sensor:
-    - { id: Battery, source_address: 0x08 }
+### Handy settings
 
-  manager:
-    - { id: Manager30, source_address: 0x01, battery_sensor_id: Battery }  # battery_sensor_id lets the Manager compute device current
+These live on the `redarc:` block and apply to every device (override inside a
+device block only if it needs to differ):
 
-  redvision_display:
-    - { id: Redvision1, source_address: 0x20 }
-    - { id: Redvision2, source_address: 0x21 }
-
-  tvms_rogue:
-    - { id: TVMS_Rogue, source_address: 0x30 }
-
-  tvms_1280:
-    - { id: TVMS1280, source_address: 0x24 }
-```
-
-Devices inherit the top-level `filter_interval` (all devices), `host_address`
-(command-sending devices), `history_poll_interval` (the battery
-`soc_history_poll_interval` and manager `solar_history_poll_interval`), and
-`transition_length` (the TVMS Rogue light transition). Set any of these inside a
-device sub-block only when it needs to differ from the shared value.
-
-Every device sub-block is **optional**, and each accepts either a single entry or a
-list — so you can run several of the same device type (e.g. two `tvms_1280`). Every
-device's `source_address` is optional with a sensible default (battery `0x08`,
-manager `0x01`, display `0x20`, Rogue `0x30`, TVMS1280 `0x24`), so a single device
-of each type needs no `source_address` at all. When you add a **second or further**
-device of any type, give the extra ones a distinct `source_address`, since they
-would otherwise collide on the default:
-
-```yaml
-  tvms_1280:
-    - { id: TVMS1280_A }              # uses the 0x24 default
-    - { id: TVMS1280_B, source_address: 0x25 }
-```
-
-Config validation **rejects a duplicate `source_address`** across any two devices
-(two devices on one address would alias on the bus), so each device must resolve to
-a distinct address.
-
-`secrets.yaml` must provide `wifi_ssid`, `wifi_password`, `api_pass`, `ota_pass`.
-
-### Configuration reference
-
-Where a block reuses an ESPHome platform, its options **are** that platform's
-options — only the listed defaults differ.
-
-**Top-level `redarc:`**
-
-| Option | Req/Opt | Default | Notes |
-|---|---|---|---|
-| `id` | optional | auto | dispatcher component id |
-| `canbus` | optional* | — | internal CAN bus — same options as ESPHome's `esp32_can` (below) |
-| `canbus_id` | optional* | — | reference an external `canbus:` instead (e.g. MCP2515, untested) |
-| `time` | optional | enabled | internal HA time (auto-added); `time: false` disables it + the Set Time button |
-| `host_address` | optional | `0xFF` | source address for discovery/commands; devices inherit |
-| `discovery_delay` | optional | `2000ms` | delay before startup discovery request |
-| `filter_interval` | optional | `5s` | publish throttle; devices inherit |
-| `history_poll_interval` | optional | `60s` | SOC + solar poll; inherited (`0s` disables) |
-| `transition_length` | optional | `0s` | Rogue light transition; inherited |
-| `battery_sensor` / `manager` / `redvision_display` / `tvms_rogue` / `tvms_1280` | optional | — | single entry or list per device |
-
-\*Exactly one of `canbus` / `canbus_id` is required.
-
-**`redarc: canbus:` — = ESPHome `esp32_can` platform.** All `esp32_can` options
-apply and are validated by `esp32_can`; REDARC just injects friendlier defaults:
-
-| Option | Req/Opt | Default | Same as ESPHome? |
-|---|---|---|---|
-| `tx_pin` | optional | `GPIO22` | yes (esp32_can; default added) |
-| `rx_pin` | optional | `GPIO19` | yes (esp32_can; default added) |
-| `bit_rate` | optional | `250KBPS` | yes — esp32_can's native validation |
-| `can_id` | optional | `0x7FE` | esp32_can normally requires it; defaulted |
-| `use_extended_id` | optional | `true` | esp32_can default is `false`; defaulted |
-| `mode`, `rx_queue_len`, … | optional | esp32_can's (e.g. `rx_queue_len: 64`) | yes — whatever your esp32_can supports |
-| `id` | optional | auto | yes |
-
-A bare `canbus:` is valid — every option above has a default.
-
-**`redarc: time:` — = ESPHome `homeassistant` time.** Enabled automatically — you
-don't need to write `time:` at all. Set `time: false` to disable it (and the
-Manager Set Time button). When enabled, all `homeassistant`/base `time` options
-apply (`timezone`, `on_time`, `update_interval`, …) with ESPHome's defaults;
-`id` is auto.
-
-**Device sub-blocks**
-
-| Block | `source_address` default | Other |
+| Setting | Default | What it does |
 |---|---|---|
-| `battery_sensor` | `0x08` | `soc_history_poll_interval` inherits `history_poll_interval` |
-| `manager` | `0x01` | `solar_history_poll_interval` inherits; `battery_sensor_id`, `time_id` optional |
-| `redvision_display` | `0x20` | read-only (no `host_address`) |
-| `tvms_rogue` | `0x30` | `true_off_threshold` default `1.5`; `transition_length` inherits |
-| `tvms_1280` | `0x24` | — |
+| `host_address` | `0xFF` | This bridge's address; used when sending commands |
+| `filter_interval` | `5s` | How often values are published (throttle) |
+| `history_poll_interval` | `60s` | How often battery SOC / solar history is fetched (`0s` = off) |
+| `time` | on | Adds a Home Assistant clock + the Manager's "Set Time" button. Use `time: false` to turn off |
 
-Every device block: `id` optional/auto, `source_address` optional with the default
-above, `host_address` + `filter_interval` inherited from the top level.
-
----
-
-## 5. What each component exposes, and how it is found
-
-This is the "where do the entities come from" map. Entity names are prefixed by
-the block `id` (shown here with the example ids). Items tagged *(diagnostic)* are
-placed in Home Assistant's diagnostic category.
-
-### Manager30 — `redarc: manager` (source `0x01`)
-
-Listens to the manager's status frames and publishes:
-
-| Entity | Type | From frame (DGN) | Notes |
-|---|---|---|---|
-| Output Current | sensor A | `0x1F20A` | 32-bit centred current |
-| Battery Voltage | sensor V | `0x1F20A` | D5-D6 × 0.001 |
-| Device Current | sensor A | derived | `Output − Battery` (needs `battery_sensor_id`) |
-| Solar Current / Voltage / Power | sensors A/V/W | `0x1F208` | power = I × V (computed) |
-| **Solar Energy** | sensor Wh | `0x1FCD6` | total of the 12 daily Wh buckets (today + −1..−11) |
-| Solar Day 1-12 History | text *(diagnostic)* | `0x1FCD6` | CSV of 12 days' Wh — today first, then the previous 11 (255 = unknown) |
-| AC Input Current | sensor A | `0x1F204` | D1-D4 centred (raw/1000 − 1000), 0.001 A resolution |
-| AC Input Voltage | sensor V | `0x1F204` | D5-D6 |
-| Vehicle Input Current / Voltage | sensors A/V | `0x1F206` | D1-D4 current (centred), D5-D6 voltage × 0.001 |
-| Vehicle Input Trigger | **select** | `0x1F206` / cmd | Auto/12V/24V/Ignition/On (writable) |
-| Charging Mode | **select** | `0x1F108` / cmd | Touring / Storage (writable) |
-| Charging Stage | text | `0x1F200` | Not Charging / Desulphation / Soft-start / Boost / Absorption / Battery Test / Equalize / Float / Maintenance |
-| CAN Date / Time / Date Time | text | `0x1F304` | bus clock |
-
-Writable entities (the two **selects**) build a command frame from the
-`host_address` and send it via the shared bus.
-
-> Note: the Manager polls its own solar history with an RTR request to
-> `0x0FFCD6 ··` every `solar_history_poll_interval` (default 60 s; set `0s` to
-> disable). The Manager answers on `0x03FCD601` with paged 16-bit Wh buckets —
-> 4 pages × 3 days = **12 days** (today + −1..−11) — feeding both the Solar
-> Energy total and the Solar Day 1-12 History text sensor.
-
-### Battery — `redarc: battery_sensor` (source `0x08`)
-
-| Entity | Type | From | Notes |
-|---|---|---|---|
-| Current / Voltage / Temperature | sensors | `0x1F102` | core shunt data |
-| SOC | sensor % | `0x1F104` | state of charge (force-updated) |
-| Battery Type | **select** | `0x1F100` / cmd | Gel/AGM/LeadAcid/Calcium/Lithium |
-| Configured Capacity | **number** | `0x1F100` / cmd `0x12` | Ah, writable |
-| Max Charge Current | **number** | `0x1F100` / cmd `0x14` | A, writable |
-| Low SOC Alarm | **number** | `0x1F10A` / cmd `0x41` | %, writable |
-| Low Voltage Alarm | **number** | `0x1F10A` / cmd `0x42` | V, writable |
-| Last SOC Calibration Target | sensor *(diagnostic)* | `0x...` | last calibrate value |
-| SOC Hourly History | text *(diagnostic)* | `0x13FCD0` pages | CSV of the last 24 h of SOC % |
-| SOC Daily Range History | text *(diagnostic)* | `0x13FCD2`/`0x13FCD4` pages | CSV of daily `low-high` SOC % pairs |
-| **Calibrate SOC Full** | **button** | cmd `0x15` | press to send "SOC = 100%" |
-
-The **numbers/selects/button** are the "inputs": each writes a config command
-addressed from `host_address` to the battery. The two **SOC-history text
-sensors** are populated from history pages the battery returns after the
-component's RTR poll (see below); the daily low and high are combined into the
-single `low-high` Range sensor.
-
-### RedVision displays — `redarc: redvision_display` (sources `0x20`, `0x21`)
-
-`MULTI_CONF`: list one block per physical display. They share three sensors
-(created once) fed from whichever display rebroadcasts them:
-
-- Redvision Battery Current Display (A)
-- Redvision Device Current Display (A)
-- Redvision Manager Output Current Display (A)
-
-These are the display's own 16-bit rebroadcast values — handy as a cross-check
-against the Manager/Battery source readings.
-
-### TVMS Rogue — `redarc: tvms_rogue` (source `0x30`)
-
-The dimmable-lighting module.
-
-| Entity | Type | From / to | Notes |
-|---|---|---|---|
-| Output 1–10 | **light** (dimmable) | cmd `0x0F0030` / dim `0x0F0530`; level fb `0x1FD12` | channels `0x0C`–`0x15` |
-| Output 1–10 Level | sensor % *(diagnostic)* | `0x1FD12` | real hardware brightness during ramps |
-| Input Button 1–8 | binary *(diagnostic)* | `0x1FD00` | physical wall-button state |
-| Master | **switch** | channel `0x0B` | module master |
-| Tank 1 / Tank 2 | sensors % | `0x1FD02` (D1=`0x09`) | analog tank levels |
-| Input Voltage / Current | sensors V/A | `0x1FD02` (D1=`0x16`) | D2-D3 voltage, D4-D5 current, raw × 0.001 |
-| Output Status | text *(diagnostic)* | `0x1FD00` | non-normal output states (`0x06` fuse blown, `0x0A` over temp, `0x14`/`0x15` off/on override, `0xF8` unconfigured) |
-
-Dimming uses a **timed hold/ramp**: HA sets a target brightness, the component
-decides up vs down from the latest `0x1FD12` feedback, sends timed hold pulses
-plus a release frame, and holds the requested value until feedback reaches it.
-CAN "on" turns an output to 100 %; the hardware button can recall a remembered
-brightness (the CAN "recall remembered brightness" command is still unknown).
-
-### TVMS1280 — `redarc: tvms_1280` (source `0x24`)
-
-The relay / inverter module.
-
-| Entity | Type | From / to | Notes |
-|---|---|---|---|
-| Output 1–10 | **switch** | cmd `0x0F0024` / fb `0x1FD00` | channels `0x04`–`0x0D` |
-| Inverter | **switch** | channel `0x0E` | inverter output |
-| Master | **switch** | channel `0x0F` | module master |
-| Output Status | text *(diagnostic)* | `0x1FD00` | non-normal output states (`0x06` fuse blown, `0x0A` over temp, `0x14`/`0x15` off/on override, `0xF8` unconfigured) |
-| Digital Input 1–3 | binary *(diagnostic)* | `0x1FD00` candidate | hardware inputs `0x01`–`0x03` |
-| Temperature 1 / 2 | sensors °C | `0x1FD02` (D1=`0x14`/`0x11`) | raw − 100 |
-| Voltage Input 1 / 2 | sensors V | `0x1FD02` (D1=`0x11`) | items `0x11`/`0x12`, mV/1000 |
-| Tank 1–6 | sensors % | `0x1FD02` (D1=`0x14`/`0x17`/`0x1A`) | multiplexed by page |
-
-TVMS1280 has **no** Rogue-style dimming; its outputs are on/off switches and its
-authoritative state comes from the `0x1BFD0024` feedback frame. The `0x1FD00`
-state byte carries a **status code** per output: `0x00`/`0x01` off/on, `0x06`
-fuse blown, `0x0A` output over temp, `0x14`/`0x15` off/on override, `0xF8`
-unconfigured. Off/On and the override variants drive the switch state (so an
-overridden output still shows the right on/off); every non-normal code (the
-`0x06`/`0x0A` faults and `0xF8` unconfigured) is summarised in the **Output
-Status** text sensor. (ESPHome cannot mark an individual switch/light entity
-unavailable at runtime, so unconfigured outputs are reported there rather than
-disabled.)
-
-### History polling (RTR requests)
-
-Instead of a manual replay button, the Battery and Manager components poll for
-history themselves at a configurable interval (`soc_history_poll_interval` /
-`solar_history_poll_interval`, default 60 s, `0s` disables). Each poll sends an
-**RTR** (remote-request) frame — extended ID, DLC 8, **no payload** — and the
-source node answers with its paged history:
-
-| Request (RTR) | Answer | Feeds |
-|---|---|---|
-| `0x0FFCD0··` | `0x13FCD008` pages | SOC Hourly History |
-| `0x0FFCD2··` | `0x13FCD208` pages | SOC daily low → Daily Range History |
-| `0x0FFCD4··` | `0x13FCD408` pages | SOC daily high → Daily Range History |
-| `0x0FFCD6··` | `0x03FCD601` pages | Solar Energy + Solar Day 1-12 History |
-
-The `··` low byte is our `host_address`. The raw replies (and the RTR requests,
-tagged `rtr=1`) appear in the DEBUG CAN log, so this also doubles as a way to
-re-fetch history on demand without opening the physical screen.
+> Using an external CAN board (like an MCP2515) instead of the M5Stack base is
+> possible but **untested** — see
+> [README_external_components.md](README_external_components.md).
 
 ---
 
-## 6. Signal reference
+## What you get in Home Assistant
 
-### Command frames (sent from a display address)
+Entity names are prefixed with the `id:` you gave each block. Items marked
+*(diagnostic)* show up under Home Assistant's diagnostic section.
 
-```text
-TVMS1280 output : 0x0F002420   CB 00 FF <ch> <00|01> 00 00 00     (ch 0x04..0x0E)
-Rogue on/off    : 0x0F003020   CB 00 FF <ch> <00|01> 00 00 00     (ch 0x0C..0x15)
-Rogue dim       : 0x0F053020   <ch> 01 <dir> 05 00 FF FF FF        (dir 01=down,64=up,FF=release)
-Charging mode   : 0x0F00FF20   43 00 FF FF <00|01> 00 00 00        (00=Touring,01=Storage)
-```
+### Manager30 (charger / solar)
 
-### Feedback frames
+| Entity | What it is |
+|---|---|
+| Output Current, Battery Voltage | Manager's main output |
+| Device Current | Output minus battery (needs `battery_sensor_id`) |
+| Solar Current / Voltage / Power | Live solar input |
+| Solar Energy Today / Solar Energy Total | Today's and 12-day total solar generation (Wh) |
+| Solar Day 1-12 History *(diagnostic)* | Last 12 days of daily solar Wh |
+| AC Input Current / Voltage | Mains charger input |
+| Vehicle Input Current / Voltage | DC / vehicle input |
+| Vehicle Input Trigger | Auto / 12V / 24V / Ignition / On (**changeable**) |
+| Charging Mode | Touring / Storage (**changeable**) |
+| Charging Stage | e.g. Boost, Absorption, Float, Maintenance |
+| CAN Date / Time | The system clock |
 
-```text
-TVMS1280 out fb : 0x1BFD0024   <base> <s0..s6>     (00=off,01=on,06=fuse-blown,0A=over-temp,14/15=off/on-override,F8=unconfigured,FF=ignore)
-Rogue level fb  : 0x1BFD1230   <base> <l0..l6>     (% per channel)
-Rogue buttons   : 0x1BFD0030   <base> <b1..b7>     (00=inactive,01=active; D1=0x08 D2 = button 8)
-```
+### Battery
 
-### Signal table (full)
+| Entity | What it is |
+|---|---|
+| Current / Voltage / Temperature | Core shunt readings |
+| SOC | State of charge (%) |
+| Battery Type | Gel / AGM / Lead Acid / Calcium / Lithium (**changeable**) |
+| Configured Capacity, Max Charge Current | Battery settings (**changeable**) |
+| Low SOC Alarm, Low Voltage Alarm | Alarm thresholds (**changeable**) |
+| SOC Hourly History *(diagnostic)* | Last 24 h of SOC |
+| SOC Daily Range History *(diagnostic)* | Daily low–high SOC |
+| Calibrate SOC Full | Button: tell the battery "I'm at 100%" |
 
-| Device | CAN ID | DGN | MUX | Signal | Bytes | Decode | Status |
-|---|---:|---:|---:|---|---|---|---|
-| Manager30 `0x01` | `0x03F20A01` | `0x1F20A` | — | Output Current A | D1-D4 | raw/1000−1000 | CONFIRMED |
-| Manager30 `0x01` | `0x03F20A01` | `0x1F20A` | — | Battery Voltage | D5-D6 | raw×0.001 V | CONFIRMED |
-| Manager30 `0x01` | `0x03F20401` | `0x1F204` | — | AC Input Current A | D1-D4 | raw/1000−1000 (LE) | CONFIRMED |
-| Manager30 `0x01` | `0x03F20401` | `0x1F204` | — | AC Input Voltage | D5-D6 | raw V (LE) | CONFIRMED |
-| Manager30 `0x01` | `0x03F20401` | `0x1F204` | — | DC Input Voltage Raw | D7-D8 | signed raw | UNCONFIRMED |
-| Manager30 `0x01` | `0x03F20801` | `0x1F208` | — | Solar Current A | D1-D4 | raw/1000−1000 | CONFIRMED (verify DBC export) |
-| Manager30 `0x01` | `0x03F20801` | `0x1F208` | — | Solar Voltage | D5-D6 | raw×0.001 V | CONFIRMED |
-| Manager30 `0x01` | `0x03F20801` | `0x1F208` | — | Solar Power W | derived | I × V | DERIVED |
-| Manager30 `0x01` | `0x03FCD601` | `0x1FCD6` | D1 page | Solar Energy Wh (per-day buckets) | D2-D7 | 16-bit LE Wh per day slot | CONFIRMED |
-| Manager30 `0x01` | `0x03F10801` | `0x1F108` | — | Charging Mode | D1 bit0 | 0=Touring,1=Storage (preferred mode source) | CONFIRMED |
-| Manager30 `0x01` | `0x03F20001` | `0x1F200` | — | Charging Stage + Mode | D1 | stage = D1 & 0xFE: 0x00 Not Charging, 0x10 Desulphation, 0x20 Soft-start, 0x30 Boost, 0x40 Absorption, 0x50 Battery Test, 0x60 Equalize, 0x70 Float, 0x80 Maintenance. D1 bit0 = mode (0=Touring, 1=Storage), used as a fallback when `0x1F108` has not been seen | CONFIRMED |
-| Manager30 `0x01` | `0x03F20601` | `0x1F206` | — | Vehicle Input Current A | D1-D4 | raw/1000−1000 | CONFIRMED |
-| Manager30 `0x01` | `0x03F20601` | `0x1F206` | — | Vehicle Input Voltage | D5-D6 | raw×0.001 V | CONFIRMED |
-| Manager30 `0x01` | `0x03F20601` | `0x1F206` | — | Vehicle Input Trigger | D8 | 0 Auto, 1 12V, 2 24V, 3 Ignition, 5 On | CONFIRMED |
-| Battery `0x08` | `0x13F10208` | `0x1F102` | — | Current A | D1-D4 | raw/1000−1000 | CONFIRMED |
-| Battery `0x08` | `0x13F10208` | `0x1F102` | — | Voltage | D5-D6 | raw×0.001 V | CONFIRMED |
-| Battery `0x08` | `0x13F10208` | `0x1F102` | — | Temperature | D7 | raw−60 | CONFIRMED |
-| Battery `0x08` | `0x13F10408` | `0x1F104` | — | SOC % | D1 | raw % | CONFIRMED |
-| RedVision `0x20` | `0x13F28020` | `0x1F280` | — | Battery Current Display A | D1-D2 | raw/10−1000 | CONFIRMED |
-| RedVision `0x20` | `0x13F28020` | `0x1F280` | — | Device Current Display A | D5-D6 | raw/10−1000 | CONFIRMED |
-| RedVision `0x21` | `0x13F28221` | `0x1F282` | — | Manager Output Current Display A | D7-D8 | raw/10−1000 | CONFIRMED |
-| RedVision disp | `0x13F28220` | `0x1F282` | — | Vehicle Current Display A | D3-D4 | raw/10−1000 | CONFIRMED |
-| RedVision disp | `0x13F28420` | `0x1F284` | — | Vehicle Voltage Display | D3-D4 | raw×0.1 V | CONFIRMED |
-| TVMS Rogue `0x30` | `0x1BFD0230` | `0x1FD02` | D1=`0x09` | Water Tank 1 % | D2 | raw % | CONFIRMED |
-| TVMS Rogue `0x30` | `0x1BFD0230` | `0x1FD02` | D1=`0x09` | Water Tank 2 % | D3 | raw % | CONFIRMED |
-| TVMS Rogue `0x30` | `0x1BFD1230` | `0x1FD12` | D1 base | Output Level +0..6 | D2-D8 | raw % | CONFIRMED |
-| TVMS Rogue `0x30` | `0x1BFD0030` | `0x1FD00` | D1 base | Input Button 1..8 | D2-D8 | 0=inactive,1=active | CONFIRMED |
-| TVMS Rogue `0x30` | `0x1BFD1430` | `0x1FD14` | D1 base | Output Dim Activity +0..6 | D2-D8 | activity only, not input state | CONFIRMED |
-| TVMS Rogue `0x30` | `0x1BFD0230` | `0x1FD02` | D1=`0x16` | Input Voltage | D2-D3 | uint16 LE × 0.001 V | CONFIRMED |
-| TVMS Rogue `0x30` | `0x1BFD0230` | `0x1FD02` | D1=`0x16` | Input Current | D4-D5 | uint16 LE × 0.001 A | CONFIRMED |
-| TVMS1280 `0x24` | `0x1BFD0024` | `0x1FD00` | D1 base | Output Status +0..6 | D2-D8 | 00=off,01=on,06=fuse-blown,0A=over-temp,14/15=off/on-override,F8=unconfigured,FF=ignore | CONFIRMED |
-| TVMS1280 `0x24` | `0x1BFD0224` | `0x1FD02` | D1=`0x14` | Temperature 1 °C | D2 | raw−100 | CONFIRMED |
-| TVMS1280 `0x24` | `0x1BFD0224` | `0x1FD02` | D1=`0x11` | Temperature 2 °C | D6 | raw−100 | CONFIRMED |
-| TVMS1280 `0x24` | `0x1BFD0224` | `0x1FD02` | D1=`0x14` | Tank 1 % | D4 | raw % | CONFIRMED |
-| TVMS1280 `0x24` | `0x1BFD0224` | `0x1FD02` | D1=`0x14` | Tank 2 % | D6 | raw % | CONFIRMED |
-| TVMS1280 `0x24` | `0x1BFD0224` | `0x1FD02` | D1=`0x17` | Tank 3 % | D2 | raw % | CONFIRMED |
-| TVMS1280 `0x24` | `0x1BFD0224` | `0x1FD02` | D1=`0x17` | Tank 4 % | D4 | raw % | CONFIRMED |
-| TVMS1280 `0x24` | `0x1BFD0224` | `0x1FD02` | D1=`0x17` | Tank 5 % | D6 | raw % | CONFIRMED |
-| TVMS1280 `0x24` | `0x1BFD0224` | `0x1FD02` | D1=`0x1A` | Tank 6 % | D2 | raw % | CONFIRMED |
-| TVMS1280 `0x24` | `0x1BFD0224` | `0x1FD02` | D1=`0x11` | Voltage Input 1 | D2-D3 | uint16 LE mV/1000 | CONFIRMED (item `0x11`) |
-| TVMS1280 `0x24` | `0x1BFD0224` | `0x1FD02` | D1=`0x11` | Voltage Input 2 | D4-D5 | uint16 LE mV/1000 | CONFIRMED (item `0x12`) |
-| TVMS1280 `0x24` | `0x1BFD0024` | `0x1FD00` | D1 base | Digital Inputs 1–3 | ch `0x01`-`0x03` | 0=off,1=on | CANDIDATE |
+### RedVision displays
 
-> **Solar Energy note:** the DBC also documents a single 32-bit `Solar_Energy_Wh`
-> on `D2-D5` of page `0x00`. That is a low-value special case; the firmware uses
-> the **per-day 16-bit bucket** layout — `D1` is the page index and `D2-D7` are
-> three days' Wh, so 4 pages cover **12 days** (page 0 = today/−1/−2 … page 3 =
-> −9/−10/−11). It sums all known buckets into Solar Energy and publishes days
-> −1..−11 to the history text sensor. The pages are requested with an **RTR**
-> frame to `0x0FFCD6··` (`··` = our `host_address`); the Manager answers on
-> `0x03FCD601`.
+The screens rebroadcast a few readings, handy as a cross-check:
+
+- Battery Current, Device Current, Manager Output Current (as shown on the display)
+
+### TVMS Rogue (dimmable lighting)
+
+| Entity | What it is |
+|---|---|
+| Output 1–10 | Dimmable **lights** |
+| Output 1–10 Level *(diagnostic)* | Real hardware brightness |
+| Input Button 1–8 *(diagnostic)* | Physical wall-button state |
+| Master | Module master **switch** |
+| Tank 1 / Tank 2 | Water tank levels |
+| Input Voltage / Current | Module input |
+| Output Status *(diagnostic)* | Reports faults (fuse blown, over temp, etc.) |
+
+### TVMS1280 (relays / inverter)
+
+| Entity | What it is |
+|---|---|
+| Output 1–10 | On/off **switches** |
+| Inverter, Master | Inverter and module master **switches** |
+| Temperature 1 / 2 | Module temperatures |
+| Voltage Input 1 / 2 | Voltage inputs |
+| Tank 1–6 | Water tank levels |
+| Digital Input 1–3 *(diagnostic)* | Hardware inputs |
+| Output Status *(diagnostic)* | Reports faults (fuse blown, over temp, etc.) |
 
 ---
 
-## 7. Notes & gotchas
+## Troubleshooting
 
-- **Control needs `NORMAL` mode.** A `LISTENONLY` build cannot transmit
-  (switch/dim/config) or send the history-poll RTR requests, but is the safe way
-  to first verify the bus.
-- **Stale component cache.** If ESPHome rejects new YAML keys after a component
-  change, clear `/data/external_components/*` and rebuild (or "Clean Build Files"
-  in the ESPHome dashboard) — the loaded schema is stale.
-- **Dashboard history charts need ApexCharts.** The SOC/solar history bar charts
-  in the example dashboard use the HACS **ApexCharts Card** (`custom:apexcharts-card`)
-  to plot the CSV history text sensors; install it or those cards error.
-- **Entity renames.** Home Assistant entity IDs can drift from the ESPHome names
-  if you rename them in the HA UI.
-- **RJ45 pins 6 and 7 are not fully understood.** Both can carry approximately 12–30 V depending on the connected devices; measure them separately and do not connect either directly to the Atom.
-- **Confirmation policy:** `CONFIRMED` decodes should not be changed unless a new
-  capture disproves them; `CANDIDATE` / `DIAGNOSTIC` entities exist for testing
-  and still need one-at-a-time toggle confirmation before being locked in.
+- **No control / can't switch anything.** You're in `LISTENONLY` mode. Switch to
+  `NORMAL` to send commands.
+- **ESPHome rejects new settings after an update.** The cached component is stale
+  — run **"Clean Build Files"** in the ESPHome dashboard and rebuild.
+- **"Set Time" added but the build fails to link.** The first build after
+  enabling the clock pulls in a new file — do a **clean build** that one time.
+- **History charts on the example dashboard are empty / error.** They need the
+  **ApexCharts Card** from HACS. Install it.
+- **Entity names look different in Home Assistant.** HA remembers any entity you
+  rename in its own UI, which can drift from the names here.
+
+The example Home Assistant dashboard is in
+[`RedVision_TVMS_Dashboard.yaml`](RedVision_TVMS_Dashboard.yaml).
