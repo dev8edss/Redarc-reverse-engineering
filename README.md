@@ -103,12 +103,23 @@ Observed pinout on the RedVision / TVMS RJ45 connectors:
 |---:|---|---|---|
 | 4 | Blue | CAN&nbsp;L | confirmed |
 | 5 | Blue/White | CAN&nbsp;H | confirmed |
-| 7 | Brown/White | (unknown — candidate 24 V supply) | **unconfirmed — do not assume** |
+| 6 | Green | 12–30 V observed | voltage depends on the devices connected; exact function is unknown |
+| 7 | Brown/White | 12–30 V observed | voltage depends on the devices connected; exact function is unknown |
 | 8 | Brown | Ground | confirmed |
 
+Pins 6 and 7 have both been observed carrying supply voltage, with measurements
+ranging from approximately 12 V to 30 V depending on which REDARC devices are
+connected. The reason for the two separate powered pins, and whether they are
+independent rails, switched feeds, or connected internally by some devices, is
+not yet understood.
+
+Do **not** assume pins 6 and 7 are interchangeable or connect them together.
+Measure each pin relative to pin 8 on the actual system before using either one
+to power custom hardware.
+
 Wire **CAN H → GPIO22 side transceiver H**, **CAN L → L**, and share **ground**.
-Power the Atom from USB (or a verified 5 V source) — do **not** feed the
-unconfirmed RJ45 24 V pin into the Atom. A correctly terminated bus already has
+Power the Atom from USB or a verified regulated 5 V source. Do not connect either
+12–30 V RJ45 pin directly to the Atom. A correctly terminated bus already has
 its 120 Ω end resistors; the Atom CAN base is a stub, so don't add termination
 unless you are the physical end of the bus.
 
