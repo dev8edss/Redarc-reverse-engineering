@@ -156,13 +156,14 @@ class RedarcCommonComponent : public Component {
   void log_discovered_devices_() {
     for (auto &d : this->devices_) {
       const char *name = device_type_name_(d.device_type);
-      if (name != nullptr) {
-        ESP_LOGI(TAG, "Device Type: %s", name);
-      } else {
-        ESP_LOGI(TAG, "Device Type: Unknown (0x%02X)", (unsigned) d.device_type);
+      char type_buf[24];
+      if (name == nullptr) {
+        std::snprintf(type_buf, sizeof(type_buf), "Unknown (0x%02X)", (unsigned) d.device_type);
+        name = type_buf;
       }
-      ESP_LOGI(TAG, "Address: %u (0x%02X)", (unsigned) d.source_address, (unsigned) d.source_address);
-      ESP_LOGI(TAG, "Serial No: %010lu-%04u", (unsigned long) d.serial_prefix, (unsigned) d.serial_suffix);
+      ESP_LOGI(TAG, "Device Type: %s, Address: %u (0x%02X), Serial No: %010lu-%04u", name,
+               (unsigned) d.source_address, (unsigned) d.source_address,
+               (unsigned long) d.serial_prefix, (unsigned) d.serial_suffix);
     }
   }
 
