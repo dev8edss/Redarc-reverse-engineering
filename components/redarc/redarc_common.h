@@ -5,8 +5,14 @@
 #include <functional>
 #include <vector>
 #include "esphome/core/component.h"
+#include "esphome/core/automation.h"
+#include "esphome/core/base_automation.h"
+#include "esphome/core/defines.h"
 #include "esphome/core/log.h"
 #include "esphome/components/canbus/canbus.h"
+#ifdef USE_API
+#include "esphome/components/api/api_server.h"
+#endif
 
 namespace esphome {
 namespace redarc_common {
@@ -68,8 +74,8 @@ class RedarcCommonComponent : public Component {
     }
 
     // Dispatch every received frame to the device listeners directly from the
-    // component (no YAML on_frame: automation needed), and passively watch for
-    // device-identity frames to discover what's on the bus.
+    // component (no YAML on_frame: automation needed), and passively collect
+    // device-identity frames so the bus can be enumerated.
     this->canbus_->add_callback(
         [this](uint32_t can_id, bool /*extended_id*/, bool rtr, const std::vector<uint8_t> &data) {
           const uint32_t id = can_id & 0x1FFFFFFFUL;
@@ -77,6 +83,18 @@ class RedarcCommonComponent : public Component {
           if (rtr) return;
           this->handle_device_identity_(id, data);
         });
+
+#if defined(USE_API) && defined(USE_API_CLIENT_CONNECTED_TRIGGER)
+    // Print the discovered-device list once whenever an API client (e.g. the
+    // dashboard log viewer) connects. The macro is enabled from our codegen, so
+    // no on_client_connected: YAML is needed. Leaks intentionally — lives forever.
+    if (api::global_api_server != nullptr) {
+      auto *automation =
+          new Automation<std::string, std::string>(api::global_api_server->get_client_connected_trigger());
+      automation->add_action(new LambdaAction<std::string, std::string>(
+          [this](const std::string &, const std::string &) { this->on_logger_connected_(); }));
+    }
+#endif
   }
 
   void dump_config() override {
@@ -87,6 +105,13 @@ class RedarcCommonComponent : public Component {
   float get_setup_priority() const override { return setup_priority::BUS; }
 
  protected:
+  struct DiscoveredDevice {
+    uint8_t source_address;
+    uint8_t device_type;
+    uint32_t serial_prefix;
+    uint16_t serial_suffix;
+  };
+
   // DeviceType codes carried in D7 of DGN 0x1F404 (per the REDARC DBC).
   static const char *device_type_name_(uint8_t device_type) {
     switch (device_type) {
@@ -100,36 +125,50 @@ class RedarcCommonComponent : public Component {
   }
 
   // Passive device discovery. Every REDARC device broadcasts a DGN 0x1F404
-  // identity frame every couple of seconds, so the whole bus is discovered just
-  // by listening — no request is sent. Each device is logged once.
+  // identity frame every couple of seconds, so the whole bus is enumerated just
+  // by listening — no request is sent. Devices are collected silently here and
+  // printed once when a logger connects (see on_logger_connected_()).
   // Layout: D1-D4 serial prefix (uint32 LE), D5-D6 serial suffix (uint16 LE),
   // D7 device type, D8 subtype/family.
   void handle_device_identity_(uint32_t id, const std::vector<uint8_t> &data) {
     if ((((id >> 8) & 0x1FFFFUL) != 0x1F404UL) || data.size() < 8) return;
 
     const uint8_t source_address = (uint8_t) (id & 0xFFU);
-    if (std::find(this->seen_addresses_.begin(), this->seen_addresses_.end(), source_address) !=
-        this->seen_addresses_.end()) {
-      return;
+    for (auto &d : this->devices_)
+      if (d.source_address == source_address) return;  // already known
+
+    DiscoveredDevice dev;
+    dev.source_address = source_address;
+    dev.serial_prefix = ((uint32_t) data[0]) | ((uint32_t) data[1] << 8) |
+                        ((uint32_t) data[2] << 16) | ((uint32_t) data[3] << 24);
+    dev.serial_suffix = (uint16_t) data[4] | ((uint16_t) data[5] << 8);
+    dev.device_type = data[6];
+    this->devices_.push_back(dev);
+  }
+
+  // Print the discovered devices once. A short delay (re-scheduled on each
+  // connect, so it fires only once) lets the list fill in and the log stream
+  // settle before we print.
+  void on_logger_connected_() {
+    this->set_timeout("redarc_discovery_print", 3000, [this]() { this->log_discovered_devices_(); });
+  }
+
+  void log_discovered_devices_() {
+    for (auto &d : this->devices_) {
+      const char *name = device_type_name_(d.device_type);
+      if (name != nullptr) {
+        ESP_LOGI(TAG, "Device Type: %s", name);
+      } else {
+        ESP_LOGI(TAG, "Device Type: Unknown (0x%02X)", (unsigned) d.device_type);
+      }
+      ESP_LOGI(TAG, "Address: %u (0x%02X)", (unsigned) d.source_address, (unsigned) d.source_address);
+      ESP_LOGI(TAG, "Serial No: %010lu-%04u", (unsigned long) d.serial_prefix, (unsigned) d.serial_suffix);
     }
-    this->seen_addresses_.push_back(source_address);
-
-    const uint32_t serial_prefix = ((uint32_t) data[0]) | ((uint32_t) data[1] << 8) |
-                                   ((uint32_t) data[2] << 16) | ((uint32_t) data[3] << 24);
-    const uint16_t serial_suffix = (uint16_t) data[4] | ((uint16_t) data[5] << 8);
-    const uint8_t device_type = data[6];
-    const uint8_t device_subtype = data[7];
-    const char *name = device_type_name_(device_type);
-
-    ESP_LOGI(TAG, "Discovered %s at 0x%02X  serial %010lu-%04u  (type 0x%02X subtype 0x%02X)",
-             name != nullptr ? name : "Unknown device", (unsigned) source_address,
-             (unsigned long) serial_prefix, (unsigned) serial_suffix,
-             (unsigned) device_type, (unsigned) device_subtype);
   }
 
   canbus::Canbus *canbus_{nullptr};
   uint8_t host_address_{0x22};
-  std::vector<uint8_t> seen_addresses_;
+  std::vector<DiscoveredDevice> devices_;
 };
 
 inline uint16_t u16_le(const std::vector<uint8_t> &data, uint8_t i) {
