@@ -324,7 +324,7 @@ Listens to the manager's status frames and publishes:
 | Device Current | sensor A | derived | `Output − Battery` (needs `battery_sensor_id`) |
 | Solar Current / Voltage / Power | sensors A/V/W | `0x1F208` | power = I × V (computed) |
 | **Solar Energy** | sensor Wh | `0x1FCD6` | total of the 12 daily Wh buckets (today + −1..−11) |
-| Solar Day -1..-11 History | text *(diagnostic)* | `0x1FCD6` | CSV of the previous 11 days' Wh (255 = unknown) |
+| Solar Day 1-12 History | text *(diagnostic)* | `0x1FCD6` | CSV of 12 days' Wh — today first, then the previous 11 (255 = unknown) |
 | AC Input Current | sensor A | `0x1F204` | D1-D4 centred (raw/1000 − 1000), 0.001 A resolution |
 | AC Input Voltage | sensor V | `0x1F204` | D5-D6 |
 | Vehicle Input Current / Voltage | sensors A/V | `0x1F206` | D1-D4 current (centred), D5-D6 voltage × 0.001 |
@@ -340,7 +340,7 @@ Writable entities (the two **selects**) build a command frame from the
 > `0x0FFCD6 ··` every `solar_history_poll_interval` (default 60 s; set `0s` to
 > disable). The Manager answers on `0x03FCD601` with paged 16-bit Wh buckets —
 > 4 pages × 3 days = **12 days** (today + −1..−11) — feeding both the Solar
-> Energy total and the Solar Day -1..-11 History text sensor.
+> Energy total and the Solar Day 1-12 History text sensor.
 
 ### Battery — `redarc: battery_sensor` (source `0x08`)
 
@@ -435,7 +435,7 @@ source node answers with its paged history:
 | `0x0FFCD0··` | `0x13FCD008` pages | SOC Hourly History |
 | `0x0FFCD2··` | `0x13FCD208` pages | SOC daily low → Daily Range History |
 | `0x0FFCD4··` | `0x13FCD408` pages | SOC daily high → Daily Range History |
-| `0x0FFCD6··` | `0x03FCD601` pages | Solar Energy + Solar Day -1..-11 History |
+| `0x0FFCD6··` | `0x03FCD601` pages | Solar Energy + Solar Day 1-12 History |
 
 The `··` low byte is our `host_address`. The raw replies (and the RTR requests,
 tagged `rtr=1`) appear in the DEBUG CAN log, so this also doubles as a way to

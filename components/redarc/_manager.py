@@ -167,7 +167,7 @@ async def to_code(config):
                            state_class=STATE_CLASS_MEASUREMENT, decimals=0)
     cg.add(var.set_solar_energy_sensor(s))
 
-    ts = await _make_text_sensor(config["solar_day_history_id"], f"{p} Solar Day -1..-11 History",
+    ts = await _make_text_sensor(config["solar_day_history_id"], f"{p} Solar Day 1-12 History",
                                  entity_category=ENTITY_CATEGORY_DIAGNOSTIC)
     cg.add(var.set_solar_day_history_text_sensor(ts))
 

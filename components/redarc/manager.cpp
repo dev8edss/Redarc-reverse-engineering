@@ -84,7 +84,7 @@ void Manager30Component::dump_config() {
   LOG_BUTTON("  ", "Set Time", this->set_clock_button_);
   LOG_BUTTON("  ", "Delete Solar History", this->clear_solar_history_button_);
   ESP_LOGCONFIG(TAG, "  Solar history poll interval: %u ms", (unsigned) this->solar_history_poll_interval_ms_);
-  LOG_TEXT_SENSOR("  ", "Solar Day -1..-11 History", this->solar_day_history_text_sensor_);
+  LOG_TEXT_SENSOR("  ", "Solar Day 1-12 History", this->solar_day_history_text_sensor_);
 }
 
 void Manager30Component::send_vehicle_input_trigger(uint16_t raw_value) {
@@ -278,13 +278,14 @@ void Manager30Component::publish_solar_energy_total_() {
 void Manager30Component::publish_solar_day_history_() {
   if (this->solar_day_history_text_sensor_ == nullptr) return;
 
-  // Previous 11 days (day -1..-11), CSV in Wh; 255 marks an unknown slot.
+  // Today (day 0) plus the previous 11 days = 12 values, CSV in Wh; 255 marks an
+  // unknown slot. Index 0 is today, index 11 is 11 days ago.
   char buffer[96];
   size_t used = 0;
   buffer[0] = '\0';
-  for (uint8_t day = 1; day <= 11; day++) {
+  for (uint8_t day = 0; day <= 11; day++) {
     const unsigned value = this->solar_daily_known_[day] ? (unsigned) this->solar_daily_wh_[day] : 255U;
-    const int written = std::snprintf(buffer + used, sizeof(buffer) - used, day == 1 ? "%u" : ",%u", value);
+    const int written = std::snprintf(buffer + used, sizeof(buffer) - used, day == 0 ? "%u" : ",%u", value);
     if (written <= 0) break;
     used += (size_t) written;
     if (used >= sizeof(buffer)) {
