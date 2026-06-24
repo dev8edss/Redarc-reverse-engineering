@@ -19,18 +19,9 @@ esp32:
   framework:
     type: esp-idf
 
-logger:                                      
-  # DEBUG so the redarc component logs in detail (the dispatcher logs every CAN
-  # frame). A per-tag `logs:` entry can only make a tag LESS verbose than the
-  # global level, so redarc DEBUG requires the global level to be DEBUG.
-  level: DEBUG                               
-  # UART logging is disabled (baud_rate 0) so DEBUG can't overflow the ESP-IDF UART
-  # ringbuffer; logs still stream over the API. View them in the ESPHome dashboard.
-  baud_rate: 0                               
-  logs:                                      
-    # Silence the built-in canbus frame log — redarc_common already logs every
-    # frame with id/dgn/sa/rtr/data at DEBUG, so this one is redundant noise.
-    canbus: INFO
+logger:
+  level: INFO
+  baud_rate: 0
 
 api:                                        
   encryption:
@@ -50,7 +41,7 @@ external_components:  # [required] pulls the `redarc` component from GitHub
   - source:
       type: git
       url: https://github.com/dev8edss/Redarc-reverse-engineering
-      ref: dev        # branch: `main` for stable, `dev` for latest
+      ref: main        # branch: `main` for stable, `dev` for latest
     refresh: 0s
     components:
       - redarc
