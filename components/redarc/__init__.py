@@ -85,8 +85,10 @@ ns = cg.esphome_ns.namespace("redarc_common")
 RedarcCommonComponent = ns.class_("RedarcCommonComponent", cg.Component)
 
 # The CAN bus is set up inside the component instead of a top-level canbus:
-# block. The schema reuses esp32_can's own platform schema (so every option
-# matches ESPHome exactly), with REDARC-friendly defaults for the bus constants.
+# block, reusing esp32_can's own platform schema (so every option matches
+# ESPHome exactly) with REDARC-friendly defaults for the bus constants.
+# For an SPI transceiver such as mcp2515, declare a normal top-level canbus:
+# block instead and point `canbus_id:` at it (see the README).
 CANBUS_SCHEMA = esp32_can.CONFIG_SCHEMA.extend({
     cv.Optional(CONF_CAN_ID, default=0x7FE): cv.int_range(min=0, max=0x1FFFFFFF),
     cv.Optional(CONF_USE_EXTENDED_ID, default=True): cv.boolean,
@@ -126,7 +128,8 @@ async def to_code(config):
     await cg.register_component(var, config)
 
     # CAN bus: either build the esp32_can interface from the nested `canbus:`
-    # block, or reference an externally-declared one via `canbus_id:`.
+    # block, or reference an externally-declared one (e.g. mcp2515) via
+    # `canbus_id:`.
     if CONF_CANBUS in config:
         await esp32_can.to_code(config[CONF_CANBUS])
         can = await cg.get_variable(config[CONF_CANBUS][CONF_ID])

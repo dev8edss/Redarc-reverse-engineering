@@ -93,9 +93,38 @@ to the device listeners itself, so no `on_frame:` lambda is needed. `can_id`
 defaults to `0x7FE` and `use_extended_id` to `true`. Use `LISTENONLY` only for
 passive monitoring builds where nothing is transmitted.
 
-To reference an externally-declared `canbus:` instead of the internal one, omit
-`redarc: canbus:` and set `redarc: canbus_id: <id>` (exactly one of the two is
-required).
+### Other transceivers (MCP2515, etc.)
+
+The internal `redarc: canbus:` block builds an **`esp32_can`** interface (the
+M5Stack Atom CAN base). For an SPI transceiver like **MCP2515** — or any other
+ESPHome canbus platform — declare a normal top-level `canbus:` block and point
+`redarc: canbus_id:` at it (exactly one of `canbus`/`canbus_id` is required). The
+dispatcher, discovery and all commands are platform-agnostic, so this works
+unchanged:
+
+```yaml
+spi:
+  clk_pin: GPIO18
+  mosi_pin: GPIO23
+  miso_pin: GPIO19
+
+canbus:
+  - platform: mcp2515
+    id: rv_can
+    cs_pin: GPIO5
+    can_id: 0x7FE
+    use_extended_id: true
+    bit_rate: 250KBPS
+
+redarc:
+  canbus_id: rv_can      # use the external bus instead of redarc: canbus:
+  # ... time:, host_address:, devices ...
+```
+
+MCP2515 is intentionally **not** absorbed into `redarc: canbus:`: it is an SPI
+device, so its driver can only build alongside an `spi:` bus, and forcing SPI into
+every (pin-only `esp32_can`) build is not possible without breaking those builds.
+`esp32_can` absorbs cleanly because it needs only two GPIO pins.
 
 ## TVMS Rogue
 
