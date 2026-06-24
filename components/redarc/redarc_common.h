@@ -5,13 +5,9 @@
 #include <functional>
 #include <vector>
 #include "esphome/core/component.h"
-#include "esphome/core/defines.h"
 #include "esphome/core/hal.h"
 #include "esphome/core/log.h"
 #include "esphome/components/canbus/canbus.h"
-#ifdef USE_API
-#include "esphome/components/api/api_server.h"
-#endif
 
 namespace esphome {
 namespace redarc_common {
@@ -72,6 +68,9 @@ class RedarcCommonComponent : public Component {
     const uint32_t now = millis();
     if (this->last_discovery_ms_ != 0 && now - this->last_discovery_ms_ < 10000U) return;
     this->last_discovery_ms_ = now;
+    // Forget previously-seen devices so this scan re-prints the full list to the
+    // logs (discovery otherwise de-duplicates and would log nothing).
+    this->seen_device_keys_.clear();
     this->request_all_devices_();
   }
 
@@ -99,16 +98,6 @@ class RedarcCommonComponent : public Component {
     this->set_timeout("redarc_device_discovery_2", this->discovery_delay_ms_ + 3000U, [this]() {
       this->request_all_devices_();
     });
-
-#ifdef USE_API
-    // Re-scan whenever an API client connects (incl. the dashboard log viewer),
-    // so the device list prints into the logs you just opened. Debounced in
-    // trigger_discovery(). No YAML automation needed.
-    if (api::global_api_server != nullptr) {
-      api::global_api_server->add_on_client_connected_callback(
-          [this](const std::string &, const std::string &) { this->trigger_discovery(); });
-    }
-#endif
   }
 
   void dump_config() override {
@@ -180,7 +169,7 @@ class RedarcCommonComponent : public Component {
     } else {
       ESP_LOGI(TAG, "Device Type: Unknown (0x%02X)", (unsigned) device_type);
     }
-    ESP_LOGI(TAG, "Address: %u", (unsigned) source_address);
+    ESP_LOGI(TAG, "Address: %u (0x%02X)", (unsigned) source_address, (unsigned) source_address);
     ESP_LOGI(TAG, "Serial No: %010lu-%04u", (unsigned long) serial_prefix, (unsigned) serial_suffix);
   }
 
