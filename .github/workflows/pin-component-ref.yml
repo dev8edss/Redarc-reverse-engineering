@@ -1,0 +1,58 @@
+name: Pin component ref on main
+
+# Whenever main is updated (e.g. after pushing/merging dev into main), make sure
+# packages/base.yaml pulls the `redarc` external component from the `main` branch
+# rather than `dev`. dev keeps `ref: dev`; main is always forced back to `ref: main`.
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pin-component-ref
+  cancel-in-progress: false
+
+jobs:
+  pin-ref:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Force external_components ref to main
+        run: |
+          python - <<'PY'
+          import re
+          import pathlib
+
+          path = pathlib.Path("packages/base.yaml")
+          text = path.read_text()
+          # Only the ref directly under our external_components git source is
+          # rewritten, so any unrelated ref: keys are left untouched.
+          new = re.sub(
+              r"(url: https://github\.com/dev8edss/Redarc-reverse-engineering\s*\n\s*ref:\s*)\S+",
+              r"\1main",
+              text,
+          )
+          if new != text:
+              path.write_text(new)
+              print("Updated external_components ref to 'main'")
+          else:
+              print("ref already 'main'; nothing to do")
+          PY
+
+      - name: Commit and push if changed
+        run: |
+          if [ -n "$(git status --porcelain packages/base.yaml)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add packages/base.yaml
+            git commit -m "ci: pin external_components ref to main [skip ci]"
+            git push origin main
+          else
+            echo "base.yaml already pinned to main"
+          fi
