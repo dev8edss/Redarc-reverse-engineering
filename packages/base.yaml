@@ -52,7 +52,7 @@ canbus:
     id: rv_can
     tx_pin: ${can_tx_pin}
     rx_pin: ${can_rx_pin}
-    can_id: 0x22
+    can_id: 0x7FE
     use_extended_id: true
     bit_rate: ${can_bit_rate}
     mode: ${can_mode}
