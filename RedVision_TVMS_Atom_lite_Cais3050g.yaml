@@ -23,7 +23,7 @@ logger:
   level: INFO
   baud_rate: 0
 
-api:                                        
+api:
   encryption:
     key: !secret api_pass
 
@@ -56,7 +56,6 @@ redarc:
   canbus:
 
   # [optional] host_address: "0xFF"           # this ESP32's source address for commands (default 0xFF)
-  # [optional] discovery_delay: 2000ms        # delay before the startup device-discovery request
   # [optional] filter_interval: 5s            # publish throttle, inherited by all devices
   # [optional] history_poll_interval: 60s     # SOC + solar history poll (0s disables), inherited
   # [optional] transition_length: 0s          # TVMS Rogue light fade time, inherited

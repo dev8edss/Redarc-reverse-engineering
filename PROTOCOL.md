@@ -90,6 +90,52 @@ The `··` low byte is our `host_address`. The raw replies (and the RTR requests
 tagged `rtr=1`) appear in the DEBUG CAN log, so this doubles as a way to
 re-fetch history on demand without opening the physical screen.
 
+### Device discovery & device-info DGNs
+
+**Presence discovery is passive.** Every device transmits a `0x1F404` identity
+frame roughly once per second on its own, so the bus can be enumerated just by
+listening — no request needed (it works in `LISTENONLY`). The firmware's
+`handle_device_identity_()` keys on DGN `0x1F404`; `D1-D4` are the serial prefix
+(LE), `D5-D6` the serial suffix (LE), and `D7` the device-type code:
+
+| `0x1F404` frame | Source | Type (`D7`) |
+|---|---|---|
+| `0x03F40401` | Manager30 | `0x01` |
+| `0x1BF40408` | Battery Sensor | `0x03` |
+| `0x1BF40420` | RedVision Display 1 | `0x0C` |
+| `0x1BF40421` | RedVision Display 2 | `0x0C` |
+| `0x1BF40424` | TVMS1280 | `0x0E` |
+| `0x1BF40430` | TVMS Rogue | `0x16` |
+
+**Directed info requests.** After discovery, the diagnostic tool reads device
+metadata with a directed PGN request `0x0F03<dest>FA` (dest = target source
+address, requester `0xFA`). Payload `D1-D2` is the requested DGN, little-endian
+(`05 F4` → `0x1F405`). These are **device info**, not presence:
+
+| Requested DGN | Purpose | Response notes |
+|---|---|---|
+| `0x1F405` | Unique identifier | e.g. `1BF40524` |
+| `0x1F400` | Firmware / hardware version | — |
+| `0x1F402` | Manufacturing / build date | — |
+| `0x1F403` | Product name | segmented ASCII: `D1` = segment index, `D2-D8` = chars (`FF` pad), e.g. reassembles to `RedVision Display` |
+
+**TVMS configuration groups** (requested the same way once a TVMS is identified):
+
+| Requested DGN | Observed content |
+|---|---|
+| `0x1FD04` | Channel / output names (e.g. Starlink, Pump, Inverter, Master switch) |
+| `0x1FD06` | Channel configuration data |
+| `0x1FD0A` | Channel option / state flags |
+| `0x1FD0C` / `0x1FD0E` / `0x1FD10` | Additional configuration |
+
+**Block-transfer transport** (for larger config dumps): a request `0x0E86<dest>FA`
+makes the device stream data frames on `0x0281FA<sa>`, ending each block with
+`0x0284FA<sa>` (block length / checksum / completion). Used per device:
+`0E8620FA`→`0281FA20`/`0284FA20`, and likewise for `0x21`/`0x24`/`0x30`.
+
+> For ESPHome, listening for `0x1F404` is the presence mechanism; everything
+> above it is device-info / configuration discovery.
+
 ---
 
 ## 3. Command frames (sent from a display address)
