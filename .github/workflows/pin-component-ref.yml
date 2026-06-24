@@ -1,8 +1,8 @@
 name: Pin component ref on main
 
 # Whenever main is updated (e.g. after pushing/merging dev into main), make sure
-# packages/base.yaml pulls the `redarc` external component from the `main` branch
-# rather than `dev`. dev keeps `ref: dev`; main is always forced back to `ref: main`.
+# any YAML that pulls the `redarc` external component does so from the `main`
+# branch rather than `dev`. dev keeps `ref: dev`; main is always forced to `main`.
 
 on:
   push:
@@ -29,30 +29,31 @@ jobs:
           import re
           import pathlib
 
-          path = pathlib.Path("packages/base.yaml")
-          text = path.read_text()
-          # Only the ref directly under our external_components git source is
-          # rewritten, so any unrelated ref: keys are left untouched.
-          new = re.sub(
-              r"(url: https://github\.com/dev8edss/Redarc-reverse-engineering\s*\n\s*ref:\s*)\S+",
-              r"\1main",
-              text,
+          # Rewrite the ref directly under our external_components git source in
+          # every YAML file; unrelated ref: keys are left untouched.
+          pattern = re.compile(
+              r"(url: https://github\.com/dev8edss/Redarc-reverse-engineering\s*\n\s*ref:\s*)\S+"
           )
-          if new != text:
-              path.write_text(new)
-              print("Updated external_components ref to 'main'")
-          else:
-              print("ref already 'main'; nothing to do")
+          changed = False
+          for path in pathlib.Path(".").rglob("*.yaml"):
+              text = path.read_text()
+              new = pattern.sub(r"\1main", text)
+              if new != text:
+                  path.write_text(new)
+                  print(f"Updated external_components ref to 'main' in {path}")
+                  changed = True
+          if not changed:
+              print("ref already 'main' everywhere; nothing to do")
           PY
 
       - name: Commit and push if changed
         run: |
-          if [ -n "$(git status --porcelain packages/base.yaml)" ]; then
+          if [ -n "$(git status --porcelain)" ]; then
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add packages/base.yaml
+            git add -A
             git commit -m "ci: pin external_components ref to main [skip ci]"
             git push origin main
           else
-            echo "base.yaml already pinned to main"
+            echo "already pinned to main"
           fi

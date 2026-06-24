@@ -293,7 +293,7 @@ cards:
       title: Solar — Daily Generation (Wh)
     graph_span: 12d
     series:
-      - entity: sensor.redvision_can_bridge_manager30_solar_day_1_11_history
+      - entity: sensor.redvision_can_bridge_manager30_solar_day_1_12_history
         name: Wh
         type: column
         data_generator: |
@@ -304,7 +304,7 @@ cards:
           return vals
             .map((v, i) => {
               const n = parseInt(v, 10);
-              return [base.getTime() - (i + 1) * day, (isNaN(n) || n === 255) ? null : n];
+              return [base.getTime() - i * day, (isNaN(n) || n === 255) ? null : n];
             })
             .sort((a, b) => a[0] - b[0]);
 

@@ -68,10 +68,14 @@ class RedarcCommonComponent : public Component {
       return;
     }
 
+    // Dispatch every received frame to the device listeners directly from the
+    // component, so no YAML on_frame: automation is needed on the CAN bus.
     this->canbus_->add_callback(
         [this](uint32_t can_id, bool extended_id, bool rtr, const std::vector<uint8_t> &data) {
+          const uint32_t rvc_id = can_id & 0x1FFFFFFFUL;
+          RedarcCanDispatcher::instance().dispatch(rvc_id, data, rtr);
           if (!extended_id || rtr) return;
-          this->handle_device_identity_(can_id, data);
+          this->handle_device_identity_(rvc_id, data);
         });
 
     this->set_timeout("redarc_device_discovery_1", this->discovery_delay_ms_, [this]() {
