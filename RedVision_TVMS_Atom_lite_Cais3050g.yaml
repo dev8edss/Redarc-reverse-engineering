@@ -32,7 +32,7 @@ logger:
     # frame with id/dgn/sa/rtr/data at DEBUG, so this one is redundant noise.
     canbus: INFO
 
-api:                                        
+api:
   encryption:
     key: !secret api_pass
 

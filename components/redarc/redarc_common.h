@@ -5,8 +5,13 @@
 #include <functional>
 #include <vector>
 #include "esphome/core/component.h"
+#include "esphome/core/defines.h"
+#include "esphome/core/hal.h"
 #include "esphome/core/log.h"
 #include "esphome/components/canbus/canbus.h"
+#ifdef USE_API
+#include "esphome/components/api/api_server.h"
+#endif
 
 namespace esphome {
 namespace redarc_common {
@@ -60,6 +65,16 @@ class RedarcCommonComponent : public Component {
   void set_host_address(uint8_t host_address) { this->host_address_ = host_address; }
   void set_discovery_delay_ms(uint32_t discovery_delay_ms) { this->discovery_delay_ms_ = discovery_delay_ms; }
 
+  // Re-run device discovery on demand (e.g. from api: on_client_connected:, so a
+  // scan prints to the logs right after a viewer connects). Debounced so repeated
+  // client connects/reconnects don't spam the bus.
+  void trigger_discovery() {
+    const uint32_t now = millis();
+    if (this->last_discovery_ms_ != 0 && now - this->last_discovery_ms_ < 10000U) return;
+    this->last_discovery_ms_ = now;
+    this->request_all_devices_();
+  }
+
   void setup() override {
     RedarcCanDispatcher::instance().set_canbus(this->canbus_);
 
@@ -84,6 +99,16 @@ class RedarcCommonComponent : public Component {
     this->set_timeout("redarc_device_discovery_2", this->discovery_delay_ms_ + 3000U, [this]() {
       this->request_all_devices_();
     });
+
+#ifdef USE_API
+    // Re-scan whenever an API client connects (incl. the dashboard log viewer),
+    // so the device list prints into the logs you just opened. Debounced in
+    // trigger_discovery(). No YAML automation needed.
+    if (api::global_api_server != nullptr) {
+      api::global_api_server->add_on_client_connected_callback(
+          [this](const std::string &, const std::string &) { this->trigger_discovery(); });
+    }
+#endif
   }
 
   void dump_config() override {
@@ -162,6 +187,7 @@ class RedarcCommonComponent : public Component {
   canbus::Canbus *canbus_{nullptr};
   uint8_t host_address_{0x22};
   uint32_t discovery_delay_ms_{2000};
+  uint32_t last_discovery_ms_{0};
   std::vector<uint64_t> seen_device_keys_;
 };
 
