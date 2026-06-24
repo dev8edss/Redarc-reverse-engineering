@@ -87,23 +87,30 @@ base. Power the Atom from **USB** (or a proper regulated 5 V supply).
        bit_rate: 250KBPS
        mode: LISTENONLY            # switch to NORMAL for control
 
-     host_address: "0x22"          # this bridge's address on the bus
+     host_address: "0xFF"          # this bridge's address on the bus
 
      battery_sensor:
-       - { id: Battery, source_address: 0x08 }
+       - id: Battery
+         source_address: 0x08
 
      manager:
-       - { id: Manager30, source_address: 0x01, battery_sensor_id: Battery }
+       - id: Manager30
+         source_address: 0x01
+         battery_sensor_id: Battery
 
      redvision_display:
-       - { id: Redvision1, source_address: 0x20 }
-       - { id: Redvision2, source_address: 0x21 }
+       - id: Redvision1
+         source_address: 0x20
+       - id: Redvision2
+         source_address: 0x21
 
      tvms_rogue:
-       - { id: TVMS_Rogue, source_address: 0x30 }
+       - id: TVMS_Rogue
+         source_address: 0x30
 
      tvms_1280:
-       - { id: TVMS1280, source_address: 0x24 }
+       - id: TVMS1280
+         source_address: 0x24
    ```
 
 Each device has a sensible default address (battery `0x08`, manager `0x01`,
@@ -204,10 +211,6 @@ The screens rebroadcast a few readings, handy as a cross-check:
 
 - **No control / can't switch anything.** You're in `LISTENONLY` mode. Switch to
   `NORMAL` to send commands.
-- **ESPHome rejects new settings after an update.** The cached component is stale
-  — run **"Clean Build Files"** in the ESPHome dashboard and rebuild.
-- **"Set Time" added but the build fails to link.** The first build after
-  enabling the clock pulls in a new file — do a **clean build** that one time.
 - **History charts on the example dashboard are empty / error.** They need the
   **ApexCharts Card** from HACS. Install it.
 - **Entity names look different in Home Assistant.** HA remembers any entity you
