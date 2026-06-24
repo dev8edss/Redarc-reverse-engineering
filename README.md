@@ -162,7 +162,10 @@ top-level `redarc:` block holds the CAN bus (`canbus:`), an optional time source
   address)`?".
 - **Time** — a Home Assistant time source is created **automatically** and wired
   into every Manager (enabling the Set Time button). Set `time: false` to disable
-  it — then no time source and **no Set Time button** are added.
+  it — then no time source and **no Set Time button** are added. The first build
+  after enabling time pulls a new source file into the project, so do a **clean
+  build** ("Clean Build Files") that first time — an incremental build can miss it
+  and fail to link (`undefined reference to … HomeassistantTime`).
 - **Decode helpers** — `u16_le` / `u32_le`, `rvc_dgn` / `rvc_source_address`,
   `rvc_matches`, and the `current_32_centered` / `current_display_16_centered`
   scalers described above.
