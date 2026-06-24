@@ -3,8 +3,6 @@
 #include <cstdint>
 #include <cstdio>
 #include <functional>
-#include <string>
-#include <utility>
 #include <vector>
 #include "esphome/core/component.h"
 #include "esphome/core/automation.h"
@@ -81,7 +79,6 @@ class RedarcCommonComponent : public Component {
     // addresses re-print as each device's next frame arrives (within seconds).
     this->seen_device_keys_.clear();
     this->seen_addresses_.clear();
-    this->product_name_accum_.clear();
     this->start_discovery_burst_(DISCOVERY_BURST_ATTEMPTS);
   }
 
@@ -105,7 +102,6 @@ class RedarcCommonComponent : public Component {
           if (rtr) return;
           this->note_bus_address_(rvc_id);
           this->handle_device_identity_(rvc_id, data);
-          this->handle_product_name_(rvc_id, data);
         });
 
     // A single request can be missed by slow-booting devices or under bus
@@ -246,51 +242,6 @@ class RedarcCommonComponent : public Component {
     }
     ESP_LOGI(TAG, "Address: %u (0x%02X)", (unsigned) source_address, (unsigned) source_address);
     ESP_LOGI(TAG, "Serial No: %010lu-%04u", (unsigned long) serial_prefix, (unsigned) serial_suffix);
-
-    // Ask the newly-found device for its product name (DGN 0x1F403). Needs NORMAL
-    // mode to transmit; the reply is reassembled in handle_product_name_().
-    this->request_product_name_(source_address);
-  }
-
-  // Directed PGN request 0x0F03<dest><requester> asking a device for its product
-  // name (DGN 0x1F403, little-endian in D1-D2).
-  void request_product_name_(uint8_t dest) {
-    if (this->canbus_ == nullptr) return;
-    const uint8_t requester = (this->host_address_ == 0xFF) ? 0xFA : this->host_address_;
-    const uint32_t can_id = 0x0F030000UL | ((uint32_t) dest << 8) | requester;
-    const std::vector<uint8_t> data = {0x03, 0xF4, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-    log_can_frame("CAN_TX", can_id, data, false);
-    this->canbus_->send_data(can_id, true, false, data);
-  }
-
-  // Reassemble the segmented-ASCII product name (DGN 0x1F403). D1 is the segment
-  // index (0-based, in order), D2-D8 are chars with 0xFF as pad/terminator.
-  void handle_product_name_(uint32_t can_id, const std::vector<uint8_t> &data) {
-    const uint32_t id = can_id & 0x1FFFFFFFUL;
-    const uint32_t dgn = (id >> 8) & 0x1FFFFUL;
-    if (dgn != 0x1F403UL || data.size() < 8) return;
-    const uint8_t source_address = (uint8_t) (id & 0xFFU);
-
-    std::string *buf = nullptr;
-    for (auto &entry : this->product_name_accum_)
-      if (entry.first == source_address) { buf = &entry.second; break; }
-    if (buf == nullptr) {
-      this->product_name_accum_.emplace_back(source_address, std::string());
-      buf = &this->product_name_accum_.back().second;
-    }
-    if (data[0] == 0x00) buf->clear();  // first segment restarts the name
-
-    bool complete = false;
-    for (uint8_t i = 1; i < 8; i++) {
-      if (data[i] == 0xFF) { complete = true; break; }
-      if (buf->size() < 48) buf->push_back((char) data[i]);
-    }
-    if (complete) {
-      ESP_LOGI(TAG, "Product: %s at %u (0x%02X)", buf->c_str(), (unsigned) source_address,
-               (unsigned) source_address);
-      for (auto it = this->product_name_accum_.begin(); it != this->product_name_accum_.end(); ++it)
-        if (it->first == source_address) { this->product_name_accum_.erase(it); break; }
-    }
   }
 
   canbus::Canbus *canbus_{nullptr};
@@ -299,7 +250,6 @@ class RedarcCommonComponent : public Component {
   uint32_t last_discovery_ms_{0};
   std::vector<uint64_t> seen_device_keys_;
   std::vector<uint8_t> seen_addresses_;
-  std::vector<std::pair<uint8_t, std::string>> product_name_accum_;
 };
 
 inline uint16_t u16_le(const std::vector<uint8_t> &data, uint8_t i) {
