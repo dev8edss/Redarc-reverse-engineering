@@ -36,7 +36,6 @@ CONF_CANBUS = "canbus"
 CONF_CANBUS_ID = "canbus_id"
 CONF_TIME = "time"
 CONF_HOST_ADDRESS = "host_address"
-CONF_DISCOVERY_DELAY = "discovery_delay"
 CONF_FILTER_INTERVAL = "filter_interval"
 CONF_HISTORY_POLL_INTERVAL = "history_poll_interval"
 CONF_TRANSITION_LENGTH = "transition_length"
@@ -141,7 +140,6 @@ CONFIG_SCHEMA = cv.All(
         cv.Optional(CONF_CANBUS_ID): cv.use_id(canbus.CanbusComponent),
         cv.Optional(CONF_TIME, default={}): _time_schema,
         cv.Optional(CONF_HOST_ADDRESS, default=0xFF): cv.hex_uint8_t,
-        cv.Optional(CONF_DISCOVERY_DELAY, default="2000ms"): cv.positive_time_period_milliseconds,
         cv.Optional(CONF_FILTER_INTERVAL, default="5s"): cv.positive_time_period_milliseconds,
         cv.Optional(CONF_HISTORY_POLL_INTERVAL, default="60s"): zero_or_positive_time_period_milliseconds,
         cv.Optional(CONF_TRANSITION_LENGTH, default="0s"): cv.positive_time_period_milliseconds,
@@ -159,14 +157,6 @@ CONFIG_SCHEMA = cv.All(
 async def to_code(config):
     var = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(var, config)
-
-    # Compile in ESPHome's api on-client-connected trigger so the component can
-    # re-scan for devices when any API client connects (incl. the dashboard log
-    # viewer), without the user adding an `on_client_connected:` automation. The
-    # trigger member and the code that fires it both sit behind this macro; the
-    # component attaches an action to get_client_connected_trigger() in setup().
-    if "api" in CORE.config:
-        cg.add_define("USE_API_CLIENT_CONNECTED_TRIGGER")
 
     # CAN bus: either build the esp32_can interface from the nested `canbus:`
     # block, or reference an externally-declared one (e.g. mcp2515) via
@@ -195,7 +185,6 @@ async def to_code(config):
 
     host_address = config[CONF_HOST_ADDRESS]
     cg.add(var.set_host_address(host_address))
-    cg.add(var.set_discovery_delay_ms(config[CONF_DISCOVERY_DELAY]))
 
     filter_interval = config[CONF_FILTER_INTERVAL]
     history_poll = config[CONF_HISTORY_POLL_INTERVAL]

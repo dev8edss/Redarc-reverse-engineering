@@ -5,15 +5,8 @@
 #include <functional>
 #include <vector>
 #include "esphome/core/component.h"
-#include "esphome/core/automation.h"
-#include "esphome/core/base_automation.h"
-#include "esphome/core/defines.h"
-#include "esphome/core/hal.h"
 #include "esphome/core/log.h"
 #include "esphome/components/canbus/canbus.h"
-#ifdef USE_API
-#include "esphome/components/api/api_server.h"
-#endif
 
 namespace esphome {
 namespace redarc_common {
@@ -65,190 +58,77 @@ class RedarcCommonComponent : public Component {
  public:
   void set_canbus(canbus::Canbus *canbus) { this->canbus_ = canbus; }
   void set_host_address(uint8_t host_address) { this->host_address_ = host_address; }
-  void set_discovery_delay_ms(uint32_t discovery_delay_ms) { this->discovery_delay_ms_ = discovery_delay_ms; }
-
-  // Re-run device discovery on demand (e.g. from api: on_client_connected:, so a
-  // scan prints to the logs right after a viewer connects). Debounced so repeated
-  // client connects/reconnects don't spam the bus.
-  void trigger_discovery() {
-    const uint32_t now = millis();
-    if (this->last_discovery_ms_ != 0 && now - this->last_discovery_ms_ < 10000U) return;
-    this->last_discovery_ms_ = now;
-    // Forget previously-seen devices so this scan re-prints the full list to the
-    // logs (discovery otherwise de-duplicates and would log nothing). The bus
-    // addresses re-print as each device's next frame arrives (within seconds).
-    this->seen_device_keys_.clear();
-    this->seen_addresses_.clear();
-    this->start_discovery_burst_(DISCOVERY_BURST_ATTEMPTS);
-  }
 
   void setup() override {
     RedarcCanDispatcher::instance().set_canbus(this->canbus_);
 
     if (this->canbus_ == nullptr) {
-      ESP_LOGE(TAG, "CAN bus is unavailable; device discovery disabled");
+      ESP_LOGE(TAG, "CAN bus is unavailable");
       return;
     }
 
     // Dispatch every received frame to the device listeners directly from the
-    // component, so no YAML on_frame: automation is needed on the CAN bus.
+    // component (no YAML on_frame: automation needed), and passively watch for
+    // device-identity frames to discover what's on the bus.
     this->canbus_->add_callback(
-        // extended_id is intentionally ignored: some drivers report it false for
-        // valid 29-bit REDARC frames, which still decode fine via the masked
-        // can_id — so gating on it hid most devices from discovery.
         [this](uint32_t can_id, bool /*extended_id*/, bool rtr, const std::vector<uint8_t> &data) {
-          const uint32_t rvc_id = can_id & 0x1FFFFFFFUL;
-          RedarcCanDispatcher::instance().dispatch(rvc_id, data, rtr);
+          const uint32_t id = can_id & 0x1FFFFFFFUL;
+          RedarcCanDispatcher::instance().dispatch(id, data, rtr);
           if (rtr) return;
-          this->note_bus_address_(rvc_id);
-          this->handle_device_identity_(rvc_id, data);
+          this->handle_device_identity_(id, data);
         });
-
-    // A single request can be missed by slow-booting devices or under bus
-    // contention, so fire a burst of requests; the de-dup means each device is
-    // still logged only once.
-    this->set_timeout("redarc_device_discovery", this->discovery_delay_ms_, [this]() {
-      this->start_discovery_burst_(DISCOVERY_BURST_ATTEMPTS);
-    });
-
-#if defined(USE_API) && defined(USE_API_CLIENT_CONNECTED_TRIGGER)
-    // Re-scan whenever an API client connects (incl. the dashboard log viewer),
-    // so the device list prints into the logs you just opened. The macro is
-    // enabled from our codegen, so no on_client_connected: YAML is needed.
-    // Debounced in trigger_discovery(). Leaks intentionally — lives forever.
-    if (api::global_api_server != nullptr) {
-      auto *automation =
-          new Automation<std::string, std::string>(api::global_api_server->get_client_connected_trigger());
-      automation->add_action(new LambdaAction<std::string, std::string>(
-          [this](const std::string &, const std::string &) { this->trigger_discovery(); }));
-    }
-#endif
   }
 
   void dump_config() override {
     ESP_LOGCONFIG(TAG, "Redarc common:");
-    ESP_LOGCONFIG(TAG, "  Startup device discovery: enabled");
-    ESP_LOGCONFIG(TAG, "  Request source address: 0x%02X", (unsigned) this->host_address_);
+    ESP_LOGCONFIG(TAG, "  Passive device discovery (DGN 0x1F404): enabled");
   }
 
   float get_setup_priority() const override { return setup_priority::BUS; }
 
  protected:
-  // A discovery "burst" is several spaced requests so every device answers at
-  // least one (de-dup keeps each logged once).
-  static const uint8_t DISCOVERY_BURST_ATTEMPTS = 5;
-  static const uint32_t DISCOVERY_BURST_INTERVAL_MS = 1500;
-
-  void start_discovery_burst_(uint8_t attempts) {
-    this->request_all_devices_();
-    if (attempts <= 1) return;
-    this->set_timeout("redarc_discovery_burst", DISCOVERY_BURST_INTERVAL_MS,
-                      [this, attempts]() { this->start_discovery_burst_(attempts - 1); });
-  }
-
+  // DeviceType codes carried in D7 of DGN 0x1F404 (per the REDARC DBC).
   static const char *device_type_name_(uint8_t device_type) {
     switch (device_type) {
-      case 0x01: return "Manager30";
-      case 0x03: return "BMS Battery Sensor";
-      case 0x0C: return "RedVision Display";
-      case 0x0E: return "TVMS 1280";
-      case 0x16: return "TVMS Rouge";
+      case 1: return "Manager30";
+      case 3: return "BMS Battery Sensor";
+      case 12: return "RedVision Display";
+      case 14: return "TVMS1280";
+      case 22: return "TVMS Rogue";
       default: return nullptr;
     }
   }
 
-  // Friendly name for a device's source address. Only some devices answer the
-  // 0x1F404 identity request, so we also name devices by the address they
-  // transmit on (the standard REDARC defaults).
-  static const char *device_name_for_address_(uint8_t source_address) {
-    switch (source_address) {
-      case 0x01: return "Manager30";
-      case 0x08: return "Battery Sensor";
-      case 0x20: return "RedVision Display";
-      case 0x21: return "RedVision Display 2";
-      case 0x24: return "TVMS 1280";
-      case 0x30: return "TVMS Rogue";
-      default: return nullptr;
-    }
-  }
+  // Passive device discovery. Every REDARC device broadcasts a DGN 0x1F404
+  // identity frame every couple of seconds, so the whole bus is discovered just
+  // by listening — no request is sent. Each device is logged once.
+  // Layout: D1-D4 serial prefix (uint32 LE), D5-D6 serial suffix (uint16 LE),
+  // D7 device type, D8 subtype/family.
+  void handle_device_identity_(uint32_t id, const std::vector<uint8_t> &data) {
+    if ((((id >> 8) & 0x1FFFFUL) != 0x1F404UL) || data.size() < 8) return;
 
-  // Log each source address seen transmitting on the bus, once per scan. This
-  // catches every active device, not just the few that answer 0x1F404.
-  void note_bus_address_(uint32_t id) {
     const uint8_t source_address = (uint8_t) (id & 0xFFU);
-    if (source_address == 0xFF || source_address == this->host_address_) return;
     if (std::find(this->seen_addresses_.begin(), this->seen_addresses_.end(), source_address) !=
         this->seen_addresses_.end()) {
       return;
     }
     this->seen_addresses_.push_back(source_address);
-    const char *name = device_name_for_address_(source_address);
-    ESP_LOGI(TAG, "Device on bus: %s at %u (0x%02X)", name != nullptr ? name : "Unknown",
-             (unsigned) source_address, (unsigned) source_address);
-  }
 
-  void request_all_devices_() {
-    if (this->canbus_ == nullptr) return;
-
-    // Request-only responders (displays, TVMS1280, Rogue) ignore a request from
-    // the null address 0xFF, so fall back to the standard diagnostic/request
-    // address 0xFA when host_address isn't a real claimed address. (Manager and
-    // battery self-announce regardless, which is why they show up either way.)
-    const uint8_t requester = (this->host_address_ == 0xFF) ? 0xFA : this->host_address_;
-    const uint32_t can_id = 0x0F03FF00UL | requester;
-    const std::vector<uint8_t> data = {0x04, 0xF4, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-
-    log_can_frame("CAN_TX", can_id, data, false);
-    const auto error = this->canbus_->send_data(can_id, true, false, data);
-    if (error != canbus::ERROR_OK) {
-      ESP_LOGW(TAG, "Device discovery request failed with CAN error %u", (unsigned) error);
-    } else {
-      ESP_LOGD(TAG, "Requested DGN 0x1F404 from all devices as source address 0x%02X", (unsigned) requester);
-    }
-  }
-
-  void handle_device_identity_(uint32_t can_id, const std::vector<uint8_t> &data) {
-    const uint32_t id = can_id & 0x1FFFFFFFUL;
-    const uint32_t dgn = (id >> 8) & 0x1FFFFUL;
-    if (dgn != 0x1F404UL || data.size() < 8) return;
-
-    const uint8_t source_address = (uint8_t) (id & 0xFFU);
-    const uint32_t serial_prefix =
-        ((uint32_t) data[0]) |
-        ((uint32_t) data[1] << 8) |
-        ((uint32_t) data[2] << 16) |
-        ((uint32_t) data[3] << 24);
-    const uint16_t serial_suffix =
-        (uint16_t) data[4] | ((uint16_t) data[5] << 8);
+    const uint32_t serial_prefix = ((uint32_t) data[0]) | ((uint32_t) data[1] << 8) |
+                                   ((uint32_t) data[2] << 16) | ((uint32_t) data[3] << 24);
+    const uint16_t serial_suffix = (uint16_t) data[4] | ((uint16_t) data[5] << 8);
     const uint8_t device_type = data[6];
+    const uint8_t device_subtype = data[7];
+    const char *name = device_type_name_(device_type);
 
-    const uint64_t device_key =
-        ((uint64_t) serial_prefix << 32) |
-        ((uint64_t) serial_suffix << 16) |
-        ((uint64_t) device_type << 8) |
-        (uint64_t) source_address;
-
-    if (std::find(this->seen_device_keys_.begin(), this->seen_device_keys_.end(), device_key) !=
-        this->seen_device_keys_.end()) {
-      return;
-    }
-    this->seen_device_keys_.push_back(device_key);
-
-    const char *device_name = device_type_name_(device_type);
-    if (device_name != nullptr) {
-      ESP_LOGI(TAG, "Device Type: %s", device_name);
-    } else {
-      ESP_LOGI(TAG, "Device Type: Unknown (0x%02X)", (unsigned) device_type);
-    }
-    ESP_LOGI(TAG, "Address: %u (0x%02X)", (unsigned) source_address, (unsigned) source_address);
-    ESP_LOGI(TAG, "Serial No: %010lu-%04u", (unsigned long) serial_prefix, (unsigned) serial_suffix);
+    ESP_LOGI(TAG, "Discovered %s at 0x%02X  serial %010lu-%04u  (type 0x%02X subtype 0x%02X)",
+             name != nullptr ? name : "Unknown device", (unsigned) source_address,
+             (unsigned long) serial_prefix, (unsigned) serial_suffix,
+             (unsigned) device_type, (unsigned) device_subtype);
   }
 
   canbus::Canbus *canbus_{nullptr};
   uint8_t host_address_{0x22};
-  uint32_t discovery_delay_ms_{2000};
-  uint32_t last_discovery_ms_{0};
-  std::vector<uint64_t> seen_device_keys_;
   std::vector<uint8_t> seen_addresses_;
 };
 

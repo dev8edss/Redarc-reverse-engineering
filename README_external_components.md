@@ -8,7 +8,7 @@ The one `redarc:` component holds the shared bus/dispatcher settings plus a nest
 
 | Sub-block | Purpose |
 |---|---|
-| (top level) | `host_address`, `discovery_delay`, shared `filter_interval` / `history_poll_interval` / `transition_length`; CAN byte/decode helpers and startup device discovery. |
+| (top level) | `host_address`, shared `filter_interval` / `history_poll_interval` / `transition_length`; CAN byte/decode helpers and passive device discovery (DGN 0x1F404). |
 | `canbus` | The `esp32_can` CAN interface, built internally (same options as ESPHome's `esp32_can`). Or reference an external bus with `canbus_id`. |
 | `time` | Internal Home Assistant time source for the Manager Set Time button — enabled by default; `time: false` disables it (and the button). |
 | `tvms_rogue` | TVMS Rogue dimmable output lights, direct set-level and OFF commands, output level feedback, physical input/button binary sensors, input voltage, candidate input current, and tank sensors. |
