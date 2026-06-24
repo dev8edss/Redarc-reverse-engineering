@@ -45,7 +45,7 @@ external_components:  # [required] pulls the `redarc` component from GitHub
   - source:
       type: git
       url: https://github.com/dev8edss/Redarc-reverse-engineering
-      ref: dev        # branch: `main` for stable, `dev` for latest
+      ref: main        # branch: `main` for stable, `dev` for latest
     refresh: 0s
     components:
       - redarc
