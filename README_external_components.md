@@ -1,6 +1,6 @@
 # Redarc / RedVision ESPHome External Components v86
 
-This package ships the RedVision / TVMS CAN bridge as a **single** ESPHome external component, `redarc`, so the main YAML can stay mostly declarative. The YAML still owns the CAN bus and dispatches every extended CAN frame to the shared dispatcher; each nested device sub-block then handles only the frames for its source device or command group.
+This package ships the RedVision / TVMS CAN bridge as a **single** ESPHome external component, `redarc`. The component owns the CAN bus and the Home Assistant time source internally (configured under `redarc: canbus:` / `redarc: time:`), subscribes to the bus on boot, and dispatches every extended CAN frame to the device sub-blocks; each nested device handles only the frames for its source device or command group. No separate `base.yaml`, top-level `canbus:`/`time:`, or `on_frame:` automation is needed.
 
 ## Component and its device sub-blocks
 
@@ -8,7 +8,9 @@ The one `redarc:` component holds the shared bus/dispatcher settings plus a nest
 
 | Sub-block | Purpose |
 |---|---|
-| (top level) | `canbus_id`, `host_address`, `discovery_delay`; shared CAN byte/decode helpers and startup device discovery. |
+| (top level) | `host_address`, `discovery_delay`, shared `filter_interval` / `history_poll_interval` / `transition_length`; CAN byte/decode helpers and startup device discovery. |
+| `canbus` | The `esp32_can` CAN interface, built internally (same options as ESPHome's `esp32_can`). Or reference an external bus with `canbus_id`. |
+| `time` | Optional internal Home Assistant time source for the Manager Set Time button. |
 | `tvms_rogue` | TVMS Rogue dimmable output lights, direct set-level and OFF commands, output level feedback, physical input/button binary sensors, input voltage, candidate input current, and tank sensors. |
 | `tvms_1280` | TVMS1280 relay output switches, inverter switch, output feedback from RedVision/display changes, tank sensors, temperature sensors, supply voltage, voltage-input diagnostic candidates, and notes for the 3 unused digital inputs. |
 | `manager` | Manager30 output current, battery voltage, source-derived device current, solar current/voltage/power, solar Wh/yield, AC input current/voltage, charging mode select, and charging stage text. |
@@ -70,36 +72,30 @@ rm -rf /data/external_components/*
 
 ## CAN bus setup
 
-Current control-capable YAML uses `NORMAL` mode because ESPHome transmits TVMS1280 and TVMS Rogue commands:
+The CAN bus is configured **inside** the component as `redarc: canbus:` — there is
+no separate top-level `canbus:` block and no `on_frame:` automation. The options
+are exactly ESPHome's `esp32_can` platform options, so anything `esp32_can`
+supports (pins, `bit_rate`, `mode`, `rx_queue_len`, …) can be set here:
 
 ```yaml
-canbus:
-  - platform: esp32_can
-    id: rv_can
+redarc:
+  canbus:
     tx_pin: GPIO22
     rx_pin: GPIO19
-    can_id: 0x7FE
-    use_extended_id: true
     bit_rate: 250KBPS
-    mode: NORMAL
+    mode: NORMAL          # NORMAL to transmit commands; LISTENONLY for monitor-only
     rx_queue_len: 64
-    on_frame:
-      - can_id: 0x00000000
-        can_id_mask: 0x00000000
-        use_extended_id: true
-        remote_transmission_request: false
-        then:
-          - lambda: |-
-              const uint32_t id_rx = can_id & 0x1FFFFFFFUL;
-              id(tvms_rogue_hub).handle_can_frame(id_rx, x);
-              id(tvms1280_hub).handle_can_frame(id_rx, x);
-              id(manager30_hub).handle_can_frame(id_rx, x);
-              id(battery_sensor_hub).handle_can_frame(id_rx, x);
-              id(redvision1_hub).handle_can_frame(id_rx, x);
-              id(redvision2_hub).handle_can_frame(id_rx, x);
+  # ... time:, host_address:, and the device sub-blocks ...
 ```
 
-Use `LISTENONLY` only for passive monitoring YAMLs where nothing is transmitted.
+The component subscribes to the bus on boot and dispatches every received frame
+to the device listeners itself, so no `on_frame:` lambda is needed. `can_id`
+defaults to `0x7FE` and `use_extended_id` to `true`. Use `LISTENONLY` only for
+passive monitoring builds where nothing is transmitted.
+
+To reference an externally-declared `canbus:` instead of the internal one, omit
+`redarc: canbus:` and set `redarc: canbus_id: <id>` (exactly one of the two is
+required).
 
 ## TVMS Rogue
 

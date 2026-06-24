@@ -122,12 +122,11 @@ unless you are the physical end of the bus.
 ### File map
 
 ```text
-RedVision_TVMS_Atom_lite_Cais3050g.yaml                    <- the device config you flash
-packages/base.yaml                                         <- shared infra (esp32, wifi, api, canbus)
+RedVision_TVMS_Atom_lite_Cais3050g.yaml                    <- the single self-contained config you flash
 components/
   redarc/                   <- single component for the whole bridge:
     redarc_common.h         <- CAN dispatcher, address claim, decode helpers (no entities)
-    __init__.py             <- top-level `redarc:` schema + device orchestration
+    __init__.py             <- top-level `redarc:` schema (canbus + time + devices)
     _manager.* / manager.*          <- Manager30  (0x01)
     _battery_sensor.* / battery_sensor.*  <- Battery (0x08)
     _redvision_display.* / redvision_display.*  <- Display(s) (0x20 / 0x21)
@@ -137,58 +136,45 @@ RedVision_TVMS_Dashboard.yaml                              <- example Home Assis
 RedVision_TVMS_components.dbc                              <- byte-level signal database (component-derived)
 ```
 
-The top-level YAML is intentionally thin: a `substitutions:` block (pins, bus
-speed, host address, intervals), a `packages:` include of `base.yaml`, and one
-block per device you actually have on your bus.
+There is **no separate `base.yaml`** — the device YAML is self-contained: the
+standard ESPHome blocks (`esphome:`, `esp32:`, `logger:`, `api:`, `ota:`, `wifi:`),
+an `external_components:` pull of `redarc`, and a single `redarc:` block. The CAN
+bus and Home Assistant time source live **inside** `redarc:` (no top-level
+`canbus:`/`time:` blocks).
 
 ### How the components fit together
 
-`packages/base.yaml` builds the platform and the **single** CAN interface, then
-fans every received frame out to a shared dispatcher:
+Everything ships as **one** ESPHome external component, `redarc`. The single
+top-level `redarc:` block holds the CAN bus (`canbus:`), an optional time source
+(`time:`), the shared dispatcher settings, and one nested sub-block per device
+(`manager:`, `battery_sensor:`, `redvision_display:`, `tvms_rogue:`, `tvms_1280:`).
 
-```yaml
-canbus:
-  - platform: esp32_can
-    id: rv_can
-    on_frame:
-      - can_id: 0x00000000
-        can_id_mask: 0x00000000        # match everything
-        # No remote_transmission_request filter, so RTR request frames are also
-        # captured and logged instead of being dropped.
-        then:
-          - lambda: esphome::redarc_common::RedarcCanDispatcher::instance()
-                      .dispatch(can_id & 0x1FFFFFFFUL, x, remote_transmission_request);
-```
-
-`redarc_common` is the glue (it has **no entities of its own**):
-
-- **`RedarcCanDispatcher`** — a singleton. Each device component calls
-  `add_listener(...)` in `setup()`; `dispatch()` logs the frame (at DEBUG, with
-  an `rtr=` flag) and hands it to every listener. **RTR (remote-request) frames
-  are logged but not decoded** — they carry no payload. So all decoding is just
-  "did this data frame match my `(DGN, source address)`?".
-- **Bus handle** — on boot it stores the single `canbus` interface in the
-  dispatcher (at `setup_priority::BUS`, so it is ready before any device
-  component's `loop()` runs). Transmit helpers just null-check that handle; the
-  bridge does not announce/claim an address on the bus.
+- **CAN bus** — `redarc: canbus:` builds an `esp32_can` interface internally (its
+  options are exactly ESPHome's `esp32_can` platform options). The component
+  subscribes to the bus in `setup()` and dispatches every frame itself, so **no
+  YAML `on_frame:` automation is needed**. (You can instead point `canbus_id:` at
+  an externally-declared `canbus:` if you prefer.)
+- **`RedarcCanDispatcher`** — a singleton. Each device registers a listener in
+  `setup()`; the component's bus callback logs each frame (at DEBUG, with an
+  `rtr=` flag) and hands it to every listener. **RTR frames are logged but not
+  decoded.** Decoding is just "did this data frame match my `(DGN, source
+  address)`?".
+- **Time** — `redarc: time:` creates a Home Assistant time source and wires it
+  into every Manager (for the Set Time button) unless a Manager sets its own
+  `time_id:`.
 - **Decode helpers** — `u16_le` / `u32_le`, `rvc_dgn` / `rvc_source_address`,
   `rvc_matches`, and the `current_32_centered` / `current_display_16_centered`
   scalers described above.
 
-Everything ships as **one** ESPHome external component, `redarc`. The single
-top-level `redarc:` block holds the shared bus/dispatcher settings plus one
-nested sub-block per device (`manager:`, `battery_sensor:`, `redvision_display:`,
-`tvms_rogue:`, `tvms_1280:`). Each device sub-schema **auto-generates the entity
-IDs/names** (you don't list every sensor in YAML — you just give the sub-block an
-`id:` prefix and a `source_address:`). Per device, the C++ registers a dispatcher
-listener, parses the frames for its address, and publishes to the entities; for
-controllable devices it also builds the outbound command frames. The C++ keeps
-its per-device namespaces (`redarc_manager`, `redarc_tvms_1280`, …); only the
-ESPHome component folder/key is unified to `redarc`.
+Each device sub-schema **auto-generates the entity IDs/names** (you don't list
+every sensor in YAML — just give the sub-block an `id:` prefix and a
+`source_address:`). The C++ keeps its per-device namespaces (`redarc_manager`,
+`redarc_tvms_1280`, …); only the ESPHome component folder/key is unified to
+`redarc`.
 
-`external_components:` in `base.yaml` pulls the `redarc` component from GitHub
-(the `ref:` controls which branch — `main` for stable). Clearing the ESPHome
-external-component cache is required if a schema change seems to be ignored.
+`external_components:` pulls the `redarc` component from GitHub (the `ref:`
+controls which branch — `main` for stable). Clearing the ESPHome external-
+component cache is required if a schema change seems to be ignored.
 
 ---
 
@@ -200,20 +186,19 @@ sub-block becomes the **entity name prefix** (e.g. `id: Manager30` → "Manager3
 Output Current"); `source_address:` must match the device on your bus.
 
 ```yaml
-substitutions:
-  can_tx_pin: GPIO22
-  can_rx_pin: GPIO19
-  can_bit_rate: 250KBPS
-  can_mode: NORMAL                 # or LISTENONLY for a monitor build
-  host_address: "0x22"             # this ESP32's address on the bus
-  history_poll_interval: 60s       # how often to request SOC/solar history (0 = off)
-
 redarc:
-  canbus_id: rv_can                # the canbus: id from base.yaml
-  host_address: ${host_address}    # source address for discovery/commands; devices inherit this
+  # CAN bus, built inside the component (same options as ESPHome's esp32_can).
+  canbus:
+    tx_pin: GPIO22
+    rx_pin: GPIO19
+    bit_rate: 250KBPS
+    mode: NORMAL                   # or LISTENONLY for a monitor build
+  time:                            # Home Assistant time for the Set Time button
+
+  host_address: "0x22"             # source address for discovery/commands; devices inherit this
   discovery_delay: 60s
-  filter_interval: ${sensor_average_interval}   # publish throttle; all devices inherit
-  history_poll_interval: ${history_poll_interval}  # SOC + solar poll; inherited (0s = off)
+  filter_interval: 5s              # publish throttle; all devices inherit
+  history_poll_interval: 60s       # SOC + solar poll; inherited (0s = off)
 
   # Every device is a list — one `- ` entry per physical device.
   battery_sensor:
