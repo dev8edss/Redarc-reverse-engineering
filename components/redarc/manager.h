@@ -106,10 +106,8 @@ class Manager30Component : public Component {
   uint32_t last_solar_ms_{0};
   uint32_t last_ac_ms_{0};
   uint32_t last_charger_status_ms_{0};
-  uint32_t last_manager_status_ms_{0};
   uint32_t last_charging_stage_ms_{0};
   uint32_t last_clock_ms_{0};
-  bool charging_mode_status_seen_{false};
   redarc_battery_sensor::BatterySensorComponent *battery_sensor_{nullptr};
   sensor::Sensor *output_current_sensor_{nullptr};
   sensor::Sensor *battery_voltage_sensor_{nullptr};
