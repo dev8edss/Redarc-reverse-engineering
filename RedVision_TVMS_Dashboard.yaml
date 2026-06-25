@@ -3,6 +3,636 @@ path: redvision-tvms
 icon: mdi:caravan
 badges: []
 cards:
+  - type: custom:button-card
+    show_name: false
+    show_icon: false
+    show_state: false
+    tap_action:
+      action: none
+    hold_action:
+      action: none
+    double_tap_action:
+      action: none
+    variables:
+      vehicle_current: sensor.redvision_can_bridge_manager30_vehicle_input_current
+      vehicle_voltage: sensor.redvision_can_bridge_manager30_vehicle_input_voltage
+      solar_current: sensor.redvision_can_bridge_manager30_solar_input_current
+      solar_voltage: sensor.redvision_can_bridge_manager30_solar_input_voltage
+      ac_current: sensor.redvision_can_bridge_manager30_ac_input_current
+      ac_voltage: sensor.redvision_can_bridge_manager30_ac_input_voltage
+      fallback_solar_current: sensor.redvision_can_bridge_manager30_solar_current
+      fallback_solar_voltage: sensor.redvision_can_bridge_manager30_solar_voltage
+      fallback_solar_power: sensor.redvision_can_bridge_manager30_solar_power
+      fallback_solar_energy: sensor.redvision_can_bridge_manager30_solar_energy
+      fallback_ac_voltage: sensor.redvision_can_bridge_manager30_ac_input_voltage
+    triggers_update:
+      - sensor.redvision_can_bridge_manager30_vehicle_input_current
+      - sensor.redvision_can_bridge_manager30_vehicle_input_voltage
+      - sensor.redvision_can_bridge_manager30_solar_input_current
+      - sensor.redvision_can_bridge_manager30_solar_input_voltage
+      - sensor.redvision_can_bridge_manager30_ac_input_current
+      - sensor.redvision_can_bridge_manager30_ac_input_voltage
+      - sensor.redvision_can_bridge_manager30_solar_current
+      - sensor.redvision_can_bridge_manager30_solar_voltage
+      - sensor.redvision_can_bridge_manager30_solar_power
+      - sensor.redvision_can_bridge_manager30_solar_energy
+    custom_fields:
+      panel: |
+        [[[
+          const unavailable = new Set([
+            undefined,
+            null,
+            "",
+            "unknown",
+            "unavailable",
+            "none",
+            "Unknown",
+            "Unavailable"
+          ]);
+
+          const numberState = (entityId) => {
+            if (!entityId || !states[entityId]) return null;
+
+            const raw = states[entityId].state;
+
+            if (unavailable.has(raw)) return null;
+
+            const value = Number(raw);
+
+            return Number.isFinite(value) ? value : null;
+          };
+
+          const firstNumber = (...entityIds) => {
+            for (const entityId of entityIds) {
+              const value = numberState(entityId);
+
+              if (value !== null) return value;
+            }
+
+            return null;
+          };
+
+          const positive = (value) =>
+            value !== null && value > 0 ? value : 0;
+
+          const vehicleA = firstNumber(variables.vehicle_current);
+          const vehicleV = firstNumber(variables.vehicle_voltage);
+
+          const solarA = firstNumber(
+            variables.solar_current,
+            variables.fallback_solar_current
+          );
+
+          const solarV = firstNumber(
+            variables.solar_voltage,
+            variables.fallback_solar_voltage
+          );
+
+          const acA = firstNumber(variables.ac_current);
+
+          const acV = firstNumber(
+            variables.ac_voltage,
+            variables.fallback_ac_voltage
+          );
+
+          const vehicleW =
+            vehicleA !== null && vehicleV !== null
+              ? positive(vehicleA) * positive(vehicleV)
+              : 0;
+
+          const calculatedSolarW =
+            solarA !== null && solarV !== null
+              ? positive(solarA) * positive(solarV)
+              : 0;
+
+          const publishedSolarW = firstNumber(
+            variables.fallback_solar_power
+          );
+
+          const solarW =
+            publishedSolarW !== null
+              ? Math.max(publishedSolarW, 0)
+              : calculatedSolarW;
+
+          const acW =
+            acA !== null && acV !== null
+              ? positive(acA) * positive(acV)
+              : 0;
+
+          const totalW = vehicleW + solarW + acW;
+
+          const percentage = (watts) =>
+            totalW > 0
+              ? Math.max(0, Math.min(100, watts / totalW * 100))
+              : 0;
+
+          const vehiclePct = percentage(vehicleW);
+          const solarPct = percentage(solarW);
+          const acPct = percentage(acW);
+
+          const solarWh = firstNumber(
+            variables.fallback_solar_energy
+          );
+
+          const formatVoltage = (
+            value,
+            decimals,
+            minimumVoltage
+          ) => {
+            if (value === null || value < minimumVoltage) return "";
+
+            return `${value.toFixed(decimals)}V`;
+          };
+
+          const formatPower = (value) =>
+            value === null
+              ? "— W"
+              : `${Math.round(value)} W`;
+
+          const formatEnergy = (value) =>
+            value === null
+              ? "— Wh"
+              : `${Math.round(value)} Wh`;
+
+          const row = (
+            icon,
+            label,
+            pct,
+            voltage,
+            decimals,
+            minimumVoltage,
+            active
+          ) => `
+            <div style="
+              display:grid;
+              grid-template-columns:34px minmax(100px,1fr) 64px;
+              align-items:center;
+              gap:14px;
+              min-height:46px;
+            ">
+              <ha-icon
+                icon="${icon}"
+                title="${label}"
+                style="
+                  --mdc-icon-size:29px;
+                  color:${active ? "#95d94a" : "#f0f0f0"};
+                  filter:${active
+                    ? "drop-shadow(0 0 5px rgba(149,217,74,.35))"
+                    : "none"};
+                ">
+              </ha-icon>
+
+              <div style="
+                height:18px;
+                box-sizing:border-box;
+                padding:2px;
+                overflow:hidden;
+                border:2px solid #9b9b9b;
+                border-radius:12px;
+                background:#181818;
+                box-shadow:inset 0 1px 4px rgba(0,0,0,.8);
+                clip-path:inset(0 round 12px);
+              ">
+                <div style="
+                  width:${pct.toFixed(1)}%;
+                  height:100%;
+                  border-radius:8px;
+                  background:linear-gradient(
+                    90deg,
+                    #78c536 0%,
+                    #9cdd50 100%
+                  );
+                  box-shadow:0 0 8px rgba(145,214,67,.5);
+                  transition:width .6s ease;
+                "></div>
+              </div>
+
+              <div style="
+                color:#f2f2f2;
+                text-align:right;
+                white-space:nowrap;
+                font-size:18px;
+                font-weight:500;
+                letter-spacing:.1px;
+              ">
+                ${formatVoltage(
+                  voltage,
+                  decimals,
+                  minimumVoltage
+                )}
+              </div>
+            </div>
+          `;
+
+          return `
+            <div style="
+              width:100%;
+              overflow:hidden;
+              border-radius:18px;
+              background:#333333;
+              color:#f4f4f4;
+              font-family:Arial,Helvetica,sans-serif;
+            ">
+              <div style="
+                padding:19px 22px 17px;
+                border-radius:0 0 18px 18px;
+                background:linear-gradient(
+                  180deg,
+                  #252525 0%,
+                  #202020 100%
+                );
+              ">
+                ${row(
+                  "mdi:car",
+                  "Vehicle input",
+                  vehiclePct,
+                  vehicleV,
+                  1,
+                  4,
+                  vehicleW > 0
+                )}
+
+                ${row(
+                  "mdi:white-balance-sunny",
+                  "Solar input",
+                  solarPct,
+                  solarV,
+                  1,
+                  2,
+                  solarW > 0
+                )}
+
+                ${row(
+                  "mdi:power-plug",
+                  "240 volt input",
+                  acPct,
+                  acV,
+                  0,
+                  1,
+                  acW > 0
+                )}
+              </div>
+
+              <div style="
+                display:grid;
+                grid-template-columns:1fr auto;
+                align-items:center;
+                min-height:112px;
+                margin-top:10px;
+                padding:15px 39px;
+                border-radius:18px 18px 0 0;
+                background:#1b1b1b;
+              ">
+                <ha-icon
+                  icon="mdi:white-balance-sunny"
+                  style="
+                    --mdc-icon-size:67px;
+                    color:#ffb000;
+                    filter:drop-shadow(
+                      0 0 9px rgba(255,176,0,.25)
+                    );
+                  ">
+                </ha-icon>
+
+                <div style="
+                  display:grid;
+                  gap:8px;
+                  min-width:94px;
+                  color:#f4f4f4;
+                  font-size:22px;
+                  font-weight:500;
+                  line-height:1.05;
+                  text-align:left;
+                ">
+                  <div>
+                    ${formatPower(
+                      publishedSolarW !== null
+                        ? publishedSolarW
+                        : solarW
+                    )}
+                  </div>
+
+                  <div>
+                    ${formatEnergy(solarWh)}
+                  </div>
+                </div>
+              </div>
+            </div>
+          `;
+        ]]]
+    styles:
+      grid:
+        - grid-template-areas: "\"panel\""
+        - grid-template-columns: 1fr
+        - grid-template-rows: auto
+      card:
+        - padding: 0
+        - overflow: hidden
+        - border-radius: 18px
+        - background: "#202020"
+        - border: 1px solid rgba(255,255,255,0.08)
+        - box-shadow: 0 10px 28px rgba(0,0,0,0.32)
+      custom_fields:
+        panel:
+          - width: 100%
+          - display: block
+  - type: custom:button-card
+    show_name: false
+    show_icon: false
+    show_state: false
+    tap_action:
+      action: none
+    hold_action:
+      action: none
+    double_tap_action:
+      action: none
+    variables:
+      input_current: sensor.redvision_can_bridge_manager30_output_current
+      device_current: sensor.redvision_can_bridge_manager30_device_current
+      fallback_device_current: >-
+        sensor.redvision_can_bridge_device_current_derived_from_manager_and_battery
+      battery_current: sensor.redvision_can_bridge_battery_current
+    triggers_update:
+      - sensor.redvision_can_bridge_manager30_output_current
+      - sensor.redvision_can_bridge_manager30_device_current
+      - >-
+        sensor.redvision_can_bridge_device_current_derived_from_manager_and_battery
+      - sensor.redvision_can_bridge_battery_current
+    custom_fields:
+      diagram: |
+        [[[
+          const invalid = new Set([
+            undefined,
+            null,
+            "",
+            "unknown",
+            "unavailable",
+            "none",
+            "Unknown",
+            "Unavailable"
+          ]);
+
+          const numberState = entityId => {
+            if (!entityId || !states[entityId]) return null;
+            const raw = states[entityId].state;
+            if (invalid.has(raw)) return null;
+            const value = Number(raw);
+            return Number.isFinite(value) ? value : null;
+          };
+
+          const firstNumber = (...ids) => {
+            for (const id of ids) {
+              const value = numberState(id);
+              if (value !== null) return value;
+            }
+            return null;
+          };
+
+          const input = firstNumber(variables.input_current);
+          const battery = firstNumber(variables.battery_current);
+
+          let devices = firstNumber(
+            variables.device_current,
+            variables.fallback_device_current
+          );
+
+          if (devices === null && input !== null && battery !== null) {
+            devices = input - battery;
+          }
+
+          const active = "#78cf09";
+          const negative = "#ff2b2b";
+          const inactive = "#555555";
+          const white = "#f3f3f3";
+
+          const isActive = value =>
+            value !== null && Math.abs(value) >= 0.05;
+
+          const arrowVisible = value =>
+            value !== null && value !== 0;
+
+          const formatCurrent = value =>
+            value === null ? "—" : `${Math.abs(value).toFixed(1)}A`;
+
+          const inputDirection =
+            input !== null && input < -0.05 ? "left" : "right";
+
+          const deviceDirection =
+            devices !== null && devices < -0.05 ? "left" : "right";
+
+          const batteryDirection =
+            battery !== null && battery < -0.05 ? "left" : "right";
+
+          const batteryColour =
+            battery === null
+              ? inactive
+              : battery < -0.4
+                ? negative
+                : battery > 0.4
+                  ? active
+                  : inactive;
+
+          const batteryArrowColour =
+            battery !== null && battery < 0 ? negative : active;
+
+          const arrow = (x, y, direction, colour, visible) => {
+            if (!visible) return "";
+
+            const points =
+              direction === "left"
+                ? "100,0 25,0 25,-10 0,10 25,30 25,20 100,20"
+                : "0,0 75,0 75,-10 100,10 75,30 75,20 0,20";
+
+            return `
+              <polygon
+                points="${points}"
+                transform="translate(${x} ${y})"
+                fill="${colour}">
+              </polygon>
+            `;
+          };
+
+          return `
+            <style>
+              .rv-current-flow {
+                position: relative;
+                width: 100%;
+                aspect-ratio: 1000 / 535;
+                container-type: inline-size;
+                overflow: hidden;
+                box-sizing: border-box;
+                border-radius: 24px;
+                background: #222222;
+                color: ${white};
+                font-family: Arial, Helvetica, sans-serif;
+                box-shadow:
+                  inset 0 0 0 1px rgba(255,255,255,.015),
+                  0 4px 14px rgba(0,0,0,.30);
+              }
+
+              .rv-current-flow svg {
+                position: absolute;
+                inset: 0;
+                width: 100%;
+                height: 100%;
+              }
+
+              .rv-value {
+                position: absolute;
+                z-index: 3;
+                transform: translate(-50%, -50%);
+                color: ${white};
+                font-size: clamp(17px, 4.35cqw, 46px);
+                font-weight: 300;
+                line-height: 1;
+                white-space: nowrap;
+                letter-spacing: .01em;
+              }
+
+              .rv-input-value {
+                left: 34.8%;
+                top: 43.5%;
+              }
+
+              .rv-load-value {
+                left: 59.8%;
+                top: 20.6%;
+              }
+
+              .rv-battery-value {
+                left: 59.8%;
+                top: 65.8%;
+              }
+
+              .rv-icon {
+                position: absolute;
+                z-index: 4;
+                display: grid;
+                place-items: center;
+                transform: translate(-50%, -50%);
+              }
+
+              .rv-source {
+                left: 15%;
+                top: 50%;
+                width: 10.6%;
+                aspect-ratio: 1 / 1;
+                border-radius: 9px;
+                background: #f7f7f7;
+              }
+
+              .rv-source ha-icon {
+                --mdc-icon-size: clamp(32px, 8.2cqw, 82px);
+                color: #202020;
+              }
+
+              .rv-load {
+                left: 84.5%;
+                top: 28%;
+              }
+
+              .rv-load ha-icon {
+                --mdc-icon-size: clamp(50px, 13.5cqw, 135px);
+                color: ${isActive(devices) ? active : inactive};
+              }
+
+              .rv-battery {
+                left: 84.5%;
+                top: 71.5%;
+              }
+
+              .rv-battery ha-icon {
+                --mdc-icon-size: clamp(48px, 12.7cqw, 127px);
+                color: ${batteryColour};
+              }
+
+              @supports not (font-size: 1cqw) {
+                .rv-value {
+                  font-size: clamp(17px, 4.35%, 46px);
+                }
+
+                .rv-source ha-icon {
+                  --mdc-icon-size: 48px;
+                }
+
+                .rv-load ha-icon {
+                  --mdc-icon-size: 78px;
+                }
+
+                .rv-battery ha-icon {
+                  --mdc-icon-size: 74px;
+                }
+              }
+            </style>
+
+            <div class="rv-current-flow">
+              <svg
+                viewBox="0 0 1000 535"
+                preserveAspectRatio="none"
+                aria-hidden="true">
+
+                <path
+                  d="M 248 270 H 447 V 150 H 748"
+                  fill="none"
+                  stroke="${white}"
+                  stroke-width="4"
+                  stroke-linecap="round"
+                  stroke-linejoin="round">
+                </path>
+
+                <path
+                  d="M 447 270 V 388 H 748"
+                  fill="none"
+                  stroke="${white}"
+                  stroke-width="4"
+                  stroke-linecap="round"
+                  stroke-linejoin="round">
+                </path>
+
+                ${arrow(291, 287, inputDirection, active, arrowVisible(input))}
+                ${arrow(531, 166, deviceDirection, active, arrowVisible(devices))}
+                ${arrow(531, 404, batteryDirection, batteryArrowColour, arrowVisible(battery))}
+              </svg>
+
+              <div class="rv-value rv-input-value">
+                ${formatCurrent(input)}
+              </div>
+
+              <div class="rv-value rv-load-value">
+                ${formatCurrent(devices)}
+              </div>
+
+              <div class="rv-value rv-battery-value">
+                ${formatCurrent(battery)}
+              </div>
+
+              <div class="rv-icon rv-source">
+                <ha-icon icon="mdi:lightning-bolt"></ha-icon>
+              </div>
+
+              <div class="rv-icon rv-load">
+                <ha-icon icon="mdi:lightbulb-on-outline"></ha-icon>
+              </div>
+
+              <div class="rv-icon rv-battery">
+                <ha-icon icon="mdi:battery-charging-high"></ha-icon>
+              </div>
+            </div>
+          `;
+        ]]]
+    styles:
+      grid:
+        - grid-template-areas: "\"diagram\""
+        - grid-template-columns: 1fr
+        - grid-template-rows: auto
+      card:
+        - padding: 0
+        - border-radius: 24px
+        - background: transparent
+        - box-shadow: none
+      custom_fields:
+        diagram:
+          - width: 100%
   - type: markdown
     content: |
       # RedVision / TVMS CAN Monitor
@@ -36,7 +666,7 @@ cards:
         needle: true
         severity:
           green: 0
-          yellow: 500
+          yellow: 600
           red: -250
       - type: gauge
         name: Manager30 Output
@@ -93,13 +723,16 @@ cards:
         icon: mdi:power-plug
       - entity: sensor.redvision_can_bridge_manager30_ac_input_current
         name: AC Input Current
-        icon: mdi:current-ac
       - entity: sensor.redvision_can_bridge_manager30_vehicle_input_voltage
         name: Vehicle Input Voltage
         icon: mdi:car-electric
       - entity: sensor.redvision_can_bridge_manager30_vehicle_input_current
         name: Vehicle Input Current
         icon: mdi:current-dc
+      - entity: sensor.redvision_can_bridge_manager30_solar_voltage
+        name: Solar Input Voltage
+      - entity: sensor.redvision_can_bridge_manager30_solar_current
+        name: Solar Input Current
       - entity: sensor.redvision_can_bridge_manager30_charging_stage
         name: Charging Stage
         icon: mdi:battery-clock
@@ -264,12 +897,8 @@ cards:
           yellow: 0
           red: 0
       - type: entity
-        name: Solar Today
-        entity: sensor.redvision_can_bridge_manager30_solar_energy_today
-        icon: mdi:solar-power
-      - type: entity
-        name: Solar Energy Total
-        entity: sensor.redvision_can_bridge_manager30_solar_energy_total
+        name: Solar Energy
+        entity: sensor.redvision_can_bridge_manager30_solar_energy
         icon: mdi:solar-power
       - type: entity
         name: Solar Voltage
@@ -285,10 +914,8 @@ cards:
     entities:
       - entity: sensor.redvision_can_bridge_manager30_solar_power
         name: Solar W
-      - entity: sensor.redvision_can_bridge_manager30_solar_energy_today
-        name: Solar Wh Today
-      - entity: sensor.redvision_can_bridge_manager30_solar_energy_total
-        name: Solar Wh Total
+      - entity: sensor.redvision_can_bridge_manager30_solar_energy
+        name: Solar Wh
       - entity: sensor.redvision_can_bridge_manager30_solar_voltage
         name: Solar V
       - entity: sensor.redvision_can_bridge_manager30_solar_current
@@ -310,10 +937,9 @@ cards:
           return vals
             .map((v, i) => {
               const n = parseInt(v, 10);
-              return [base.getTime() - i * day, (isNaN(n) || n === 255) ? null : n];
+              return [base.getTime() - (i) * day, (isNaN(n) || n === 255) ? null : n];
             })
             .sort((a, b) => a[0] - b[0]);
-
   - type: grid
     title: TVMS Rogue Outputs
     columns: 2
@@ -596,3 +1222,19 @@ cards:
         name: Device Derived
       - entity: sensor.redvision_can_bridge_redvision_device_current_display
         name: Device Redvision
+  - type: history-graph
+    entities:
+      - entity: sensor.redvision_can_bridge_manager30_solar_voltage
+        name: Solar Voltage
+      - entity: sensor.redvision_can_bridge_manager30_solar_current
+        name: Solar Current
+      - entity: sensor.redvision_can_bridge_manager30_vehicle_input_voltage
+        name: Vehicle Voltage
+      - entity: sensor.redvision_can_bridge_manager30_vehicle_input_current
+        name: Vehicle Current
+      - entity: sensor.redvision_can_bridge_manager30_ac_input_voltage
+        name: AC Voltage
+      - entity: sensor.redvision_can_bridge_manager30_ac_input_current
+        name: AC Current
+    title: Input Comparison
+    hours_to_show: 6
