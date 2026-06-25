@@ -17,7 +17,7 @@ want the technical detail behind the decoding, see
 ## What you need
 
 - **[M5Stack Atom Lite](https://shop.m5stack.com/products/atom-lite-esp32-development-kit)**
-  (ESP32) + **[M5Stack Atom CAN base](https://shop.m5stack.com/products/atom-can-kit-ca-is3050g)**
+  (ESP32) + **[M5Stack Atom CAN base](https://shop.m5stack.com/products/atomic-canbus-base-ca-is3050g)**
   (CA-IS3050G).
 - A way to connect to your REDARC bus (the system uses standard RJ45 / network
   cables — see wiring below).
