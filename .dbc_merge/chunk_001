@@ -1,0 +1,153 @@
+5] "%" Bridge
+
+BO_ 2213677568 MGR_1F20A_OutputCurrentVoltage: 8 Manager30
+ SG_ OutputCurrent : 0|32@1+ (0.001,-1000) [-1000|1000] "A" Bridge
+ SG_ ManagerBatteryVoltage : 32|16@1+ (0.001,0) [0|65.535] "V" Bridge
+
+BO_ 2213677056 MGR_1F208_Solar: 8 Manager30
+ SG_ SolarCurrent : 0|32@1+ (0.001,-1000) [-1000|1000] "A" Bridge
+ SG_ SolarVoltage : 32|16@1+ (0.001,0) [0|65.535] "V" Bridge
+
+BO_ 2213676032 MGR_1F204_ACInput: 8 Manager30
+ SG_ ACInputCurrent : 0|32@1+ (0.001,-1000) [-1000|1000] "A" Bridge
+ SG_ ACInputVoltage : 32|16@1+ (1,0) [0|65535] "V" Bridge
+
+BO_ 2213611520 MGR_1F108_LoadDisconnectConfig: 8 Manager30
+ SG_ ConfigFlag0Raw : 0|1@1+ (1,0) [0|1] "" Bridge
+ SG_ ConfigFlag1Raw : 1|1@1+ (1,0) [0|1] "" Bridge
+ SG_ LoadDisconnectTrigger : 2|3@1+ (1,0) [0|7] "" Bridge
+ SG_ ConfigHighFlagsRaw : 5|3@1+ (1,0) [0|7] "" Bridge
+ SG_ LoadDisconnectVoltage : 8|16@1+ (0.001,0) [0|65.535] "V" Bridge
+ SG_ LoadReconnectVoltage : 24|16@1+ (0.001,0) [0|65.535] "V" Bridge
+ SG_ LoadDisconnectSOC : 40|8@1+ (1,0) [0|100] "%" Bridge
+ SG_ LoadReconnectSOC : 48|8@1+ (1,0) [0|100] "%" Bridge
+ SG_ ConfigReservedD8 : 56|8@1+ (1,0) [0|255] "" Bridge
+
+BO_ 2482046976 TVMS_1F108_LoadDisconnectConfig: 8 AnyNode
+ SG_ ConfigFlagsLowRaw : 0|2@1+ (1,0) [0|3] "" Bridge
+ SG_ LoadDisconnectTrigger : 2|3@1+ (1,0) [0|7] "" Bridge
+ SG_ ConfigHighFlagsRaw : 5|3@1+ (1,0) [0|7] "" Bridge
+ SG_ LoadDisconnectVoltage : 8|16@1+ (0.001,0) [0|65.535] "V" Bridge
+ SG_ LoadReconnectVoltage : 24|16@1+ (0.001,0) [0|65.535] "V" Bridge
+ SG_ LoadDisconnectSOC : 40|8@1+ (1,0) [0|100] "%" Bridge
+ SG_ LoadReconnectSOC : 48|8@1+ (1,0) [0|100] "%" Bridge
+ SG_ ConfigReservedD8 : 56|8@1+ (1,0) [0|255] "" Bridge
+
+BO_ 2213675008 MGR_1F200_ChargingStageMode: 8 Manager30
+ SG_ ChargingStageCode : 0|8@1+ (1,0) [0|255] "" Bridge
+ SG_ ChargingMode : 0|1@1+ (1,0) [0|1] "" Bridge
+ SG_ ChargingStageBase : 1|7@1+ (2,0) [0|254] "" Bridge
+ SG_ ChargerRatedCurrent_Candidate : 8|8@1+ (1,0) [0|255] "A" Bridge
+
+BO_ 2213676544 MGR_1F206_VehicleInput: 8 Manager30
+ SG_ VehicleInputCurrent : 0|32@1+ (0.001,-1000) [-1000|1000] "A" Bridge
+ SG_ VehicleInputVoltage : 32|16@1+ (0.001,0) [0|65.535] "V" Bridge
+ SG_ VehicleInputTrigger : 56|8@1+ (1,0) [0|255] "" Bridge
+
+BO_ 2213741568 MGR_1F304_Clock: 8 Manager30
+ SG_ ClockFlags : 0|3@1+ (1,0) [0|7] "" Bridge
+ SG_ ClockDay : 3|5@1+ (1,1) [1|31] "" Bridge
+ SG_ ClockMonth : 8|8@1+ (1,0) [1|12] "" Bridge
+ SG_ ClockYear : 16|16@1+ (1,0) [2000|2100] "" Bridge
+ SG_ ClockHour : 32|8@1+ (1,0) [0|23] "" Bridge
+ SG_ ClockMinute : 40|8@1+ (1,0) [0|59] "" Bridge
+ SG_ ClockSecond : 48|8@1+ (1,0) [0|59] "" Bridge
+
+BO_ 2214385152 MGR_1FCD6_SolarEnergyHistory: 8 Manager30
+ SG_ SolarPageIndex M : 0|8@1+ (1,0) [0|3] "" Bridge
+ SG_ SolarDay0Wh m0 : 8|16@1+ (1,0) [0|65535] "Wh" Bridge
+ SG_ SolarDay1Wh m0 : 24|16@1+ (1,0) [0|65535] "Wh" Bridge
+ SG_ SolarDay2Wh m0 : 40|16@1+ (1,0) [0|65535] "Wh" Bridge
+ SG_ SolarDay3Wh m1 : 8|16@1+ (1,0) [0|65535] "Wh" Bridge
+ SG_ SolarDay4Wh m1 : 24|16@1+ (1,0) [0|65535] "Wh" Bridge
+ SG_ SolarDay5Wh m1 : 40|16@1+ (1,0) [0|65535] "Wh" Bridge
+ SG_ SolarDay6Wh m2 : 8|16@1+ (1,0) [0|65535] "Wh" Bridge
+ SG_ SolarDay7Wh m2 : 24|16@1+ (1,0) [0|65535] "Wh" Bridge
+ SG_ SolarDay8Wh m2 : 40|16@1+ (1,0) [0|65535] "Wh" Bridge
+ SG_ SolarDay9Wh m3 : 8|16@1+ (1,0) [0|65535] "Wh" Bridge
+ SG_ SolarDay10Wh m3 : 24|16@1+ (1,0) [0|65535] "Wh" Bridge
+ SG_ SolarDay11Wh m3 : 40|16@1+ (1,0) [0|65535] "Wh" Bridge
+
+BO_ 2482143232 DISP_1F280_DisplayCurrentsVoltage: 8 RedVisionDisplay
+ SG_ BatteryCurrentDisplay : 0|16@1+ (0.1,-1000) [-1000|5553.5] "A" Bridge
+ SG_ BatteryVoltageDisplay : 16|16@1+ (0.1,0) [0|6553.5] "V" Bridge
+ SG_ DeviceCurrentDisplay : 32|16@1+ (0.1,-1000) [-1000|5553.5] "A" Bridge
+
+BO_ 2482143744 DISP_1F282_InputOutputCurrents: 8 RedVisionDisplay
+ SG_ DisplayACInputCurrent : 0|16@1+ (0.1,-1000) [-1000|5553.5] "A" Bridge
+ SG_ DisplayVehicleCurrent : 16|16@1+ (0.1,-1000) [-1000|5553.5] "A" Bridge
+ SG_ DisplaySolarInputCurrent : 32|16@1+ (0.1,-1000) [-1000|5553.5] "A" Bridge
+ SG_ ManagerOutputCurrentDisplay : 48|16@1+ (0.1,-1000) [-1000|5553.5] "A" Bridge
+
+BO_ 2482144256 DISP_1F284_InputOutputVoltages: 8 RedVisionDisplay
+ SG_ DisplayACInputVoltage : 0|16@1+ (1,0) [0|65535] "V" Bridge
+ SG_ DisplayVehicleVoltage : 16|16@1+ (0.1,0) [0|6553.5] "V" Bridge
+ SG_ DisplaySolarInputVoltage : 32|16@1+ (0.1,0) [0|6553.5] "V" Bridge
+ SG_ DisplayBatteryVoltage : 48|16@1+ (0.1,0) [0|6553.5] "V" Bridge
+
+BO_ 2617049088 TVMS_1FD00_States_ValuesUnconfirmed: 8 Vector__XXX
+ SG_ BaseItem : 0|8@1+ (1,0) [0|255] "" Bridge
+ SG_ State_Plus0 : 8|8@1+ (1,0) [0|255] "" Bridge
+ SG_ State_Plus1 : 16|8@1+ (1,0) [0|255] "" Bridge
+ SG_ State_Plus2 : 24|8@1+ (1,0) [0|255] "" Bridge
+ SG_ State_Plus3 : 32|8@1+ (1,0) [0|255] "" Bridge
+ SG_ State_Plus4 : 40|8@1+ (1,0) [0|255] "" Bridge
+ SG_ State_Plus5 : 48|8@1+ (1,0) [0|255] "" Bridge
+ SG_ State_Plus6 : 56|8@1+ (1,0) [0|255] "" Bridge
+
+BO_ 2617049600 TVMS_1FD02_MuxSensors: 8 Vector__XXX
+ SG_ ItemId M : 0|8@1+ (1,0) [0|255] "" Bridge
+ SG_ RogueTank1 m9 : 8|8@1+ (1,0) [0|100] "%" Bridge
+ SG_ RogueTank2 m9 : 16|8@1+ (1,0) [0|100] "%" Bridge
+ SG_ RogueInputVoltage m22 : 8|16@1+ (0.001,0) [0|65.535] "V" Bridge
+ SG_ RogueInputCurrent m22 : 24|16@1+ (0.001,0) [0|65.535] "A" Bridge
+ SG_ TVMS1280VoltageInput1 m17 : 8|16@1+ (0.001,0) [0|65.535] "V" Bridge
+ SG_ TVMS1280VoltageInput2 m17 : 24|16@1+ (0.001,0) [0|65.535] "V" Bridge
+ SG_ TVMS1280Temp2 m17 : 40|8@1+ (1,-100) [-100|155] "degC" Bridge
+ SG_ TVMS1280Temp1 m20 : 8|8@1+ (1,-100) [-100|155] "degC" Bridge
+ SG_ TVMS1280Tank1 m20 : 24|8@1+ (1,0) [0|100] "%" Bridge
+ SG_ TVMS1280Tank2 m20 : 40|8@1+ (1,0) [0|100] "%" Bridge
+ SG_ TVMS1280Tank3 m23 : 8|8@1+ (1,0) [0|100] "%" Bridge
+ SG_ TVMS1280Tank4 m23 : 24|8@1+ (1,0) [0|100] "%" Bridge
+ SG_ TVMS1280Tank5 m23 : 40|8@1+ (1,0) [0|100] "%" Bridge
+ SG_ TVMS1280Tank6 m26 : 8|8@1+ (1,0) [0|100] "%" Bridge
+
+BO_ 2617053696 TVMS_1FD12_OutputInputStates: 8 TVMSRogue
+ SG_ LevelPageId M : 0|8@1+ (1,0) [0|255] "" Bridge
+ SG_ RogueOutput1Level m12 : 8|8@1+ (1,0) [0|100] "%" Bridge
+ SG_ RogueOutput2Level m12 : 16|8@1+ (1,0) [0|100] "%" Bridge
+ SG_ RogueOutput3Level m12 : 24|8@1+ (1,0) [0|100] "%" Bridge
+ SG_ RogueOutput4Level m12 : 32|8@1+ (1,0) [0|100] "%" Bridge
+ SG_ RogueOutput5Level m12 : 40|8@1+ (1,0) [0|100] "%" Bridge
+ SG_ RogueOutput6Level m12 : 48|8@1+ (1,0) [0|100] "%" Bridge
+ SG_ RogueOutput7Level m12 : 56|8@1+ (1,0) [0|100] "%" Bridge
+ SG_ RogueOutput8Level m19 : 8|8@1+ (1,0) [0|100] "%" Bridge
+ SG_ RogueOutput9Level m19 : 16|8@1+ (1,0) [0|100] "%" Bridge
+ SG_ RogueOutput10Level m19 : 24|8@1+ (1,0) [0|100] "%" Bridge
+ SG_ Page1A_ValuePlus0 m26 : 8|8@1+ (1,0) [0|255] "" Bridge
+ SG_ Page1A_ValuePlus1 m26 : 16|8@1+ (1,0) [0|255] "" Bridge
+ SG_ Page1A_ValuePlus2 m26 : 24|8@1+ (1,0) [0|255] "" Bridge
+ SG_ Page1A_ValuePlus3 m26 : 32|8@1+ (1,0) [0|255] "" Bridge
+ SG_ Page1A_ValuePlus4 m26 : 40|8@1+ (1,0) [0|255] "" Bridge
+ SG_ Page1A_ValuePlus5 m26 : 48|8@1+ (1,0) [0|255] "" Bridge
+ SG_ Page1A_ValuePlus6 m26 : 56|8@1+ (1,0) [0|255] "" Bridge
+ SG_ Page21_ValuePlus0 m33 : 8|8@1+ (1,0) [0|255] "" Bridge
+ SG_ Page21_ValuePlus1 m33 : 16|8@1+ (1,0) [0|255] "" Bridge
+ SG_ Page21_ValuePlus2 m33 : 24|8@1+ (1,0) [0|255] "" Bridge
+ SG_ Page21_ValuePlus3 m33 : 32|8@1+ (1,0) [0|255] "" Bridge
+ SG_ Page21_ValuePlus4 m33 : 40|8@1+ (1,0) [0|255] "" Bridge
+ SG_ Page21_ValuePlus5 m33 : 48|8@1+ (1,0) [0|255] "" Bridge
+ SG_ Page21_ValuePlus6 m33 : 56|8@1+ (1,0) [0|255] "" Bridge
+
+BO_ 2617044992 TVMS1280_1FCF0_InverterStatus: 8 TVMS1280
+ SG_ InverterState : 0|8@1+ (1,0) [0|1] "" Bridge
+ SG_ InverterItemId : 8|8@1+ (1,0) [0|255] "" Bridge
+
+
+BO_ 2549350400 DGN_1F400_DeviceFirmwareVersion: 8 AnyNode
+ SG_ FirmwareProductNumber : 0|16@1+ (1,0) [0|65535] "" Bridge
+ SG_ FirmwareVersionMajor : 16|8@1+ (1,0) [0|255] "" Bridge
+ SG_ FirmwareVersionMinor : 24|8@1+ (1,0) [0|255] "" Bridge
+ SG_ FirmwareReserved5 : 32|8@1+ (1,0) [0|255] "" Bridge
+ SG_ FirmwareReserved6 : 40|8@1+ (1,0) [0|255] "" Bridge
+ SG_ FirmwareRecordIndex : 48|8@1+ 
