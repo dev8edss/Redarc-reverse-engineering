@@ -24,7 +24,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cat .dbc_merge/chunk_* | base64 --decode > RedVision_TVMS_components.dbc
+          cat .dbc_merge/chunk_* > RedVision_TVMS_components.dbc
           echo "50137ba76c07f5c01797f0856fa17f719ead27a240bbabb4e11c8f29091c16f8  RedVision_TVMS_components.dbc" | sha256sum --check --strict
           grep -q 'BO_ 2213675008 MGR_1F200_ChargingStageMode' RedVision_TVMS_components.dbc
           grep -q 'SG_ ChargingMode : 0|1@1+' RedVision_TVMS_components.dbc
