@@ -1,0 +1,161 @@
+(1,0) [0|255] "" Bridge
+ SG_ FirmwareReserved8 : 56|8@1+ (1,0) [0|255] "" Bridge
+
+BO_ 2549350912 X_DGN_1F402_DeviceDate: 8 AnyNode
+ SG_ DeviceDateDay : 0|8@1+ (1,0) [1|31] "day" Bridge
+ SG_ DeviceDateMonth : 8|8@1+ (1,0) [1|12] "month" Bridge
+ SG_ DeviceDateYear : 16|16@1+ (1,0) [2000|65535] "year" Bridge
+
+BO_ 2549351168 DGN_1F403_ProductNameSegment: 8 AnyNode
+ SG_ ProductNameSegmentIndex : 0|8@1+ (1,0) [0|255] "" Bridge
+ SG_ ProductNameChar1 : 8|8@1+ (1,0) [0|255] "ASCII" Bridge
+ SG_ ProductNameChar2 : 16|8@1+ (1,0) [0|255] "ASCII" Bridge
+ SG_ ProductNameChar3 : 24|8@1+ (1,0) [0|255] "ASCII" Bridge
+ SG_ ProductNameChar4 : 32|8@1+ (1,0) [0|255] "ASCII" Bridge
+ SG_ ProductNameChar5 : 40|8@1+ (1,0) [0|255] "ASCII" Bridge
+ SG_ ProductNameChar6 : 48|8@1+ (1,0) [0|255] "ASCII" Bridge
+ SG_ ProductNameChar7 : 56|8@1+ (1,0) [0|255] "ASCII" Bridge
+
+BO_ 2616460288 DGN_1F404_DeviceSerialIdentity: 8 AnyNode
+ SG_ SerialNumberPrefix : 0|32@1+ (1,0) [0|4294967295] "" Bridge
+ SG_ SerialNumberSuffix : 32|16@1+ (1,0) [0|65535] "" Bridge
+ SG_ DeviceType : 48|8@1+ (1,0) [0|255] "" Bridge
+ SG_ DeviceSubtypeRaw : 56|8@1+ (1,0) [0|255] "" Bridge
+
+BO_ 2616460544 X_DGN_1F405_DeviceUniqueId: 8 AnyNode
+ SG_ UniqueIdRecordIndex : 0|8@1+ (1,0) [0|255] "" Bridge
+ SG_ UniqueIdByte1 : 8|8@1+ (1,0) [0|255] "" Bridge
+ SG_ UniqueIdByte2 : 16|8@1+ (1,0) [0|255] "" Bridge
+ SG_ UniqueIdByte3 : 24|8@1+ (1,0) [0|255] "" Bridge
+ SG_ UniqueIdByte4 : 32|8@1+ (1,0) [0|255] "" Bridge
+ SG_ UniqueIdByte5 : 40|8@1+ (1,0) [0|255] "" Bridge
+ SG_ UniqueIdByte6 : 48|8@1+ (1,0) [0|255] "" Bridge
+ SG_ UniqueIdByte7 : 56|8@1+ (1,0) [0|255] "" Bridge
+
+BO_ 2213808128 MGR_1F408_StaticConfig_BytesUnconfirmed: 8 AnyNode
+ SG_ RatedChargeCurrent_Candidate : 0|16@1+ (0.1,0) [0|6553.5] "A" Bridge
+ SG_ StaticConfigByte3 : 16|8@1+ (1,0) [0|255] "" Bridge
+ SG_ StaticConfigByte4 : 24|8@1+ (1,0) [0|255] "" Bridge
+ SG_ StaticConfigByte5 : 32|8@1+ (1,0) [0|255] "" Bridge
+
+BO_ 2616332032 X_DGN_1F20F_TankInputConfiguration: 8 AnyNode
+ SG_ TankConfigPage : 0|8@1+ (1,0) [0|255] "" Bridge
+ SG_ Tank1ConfigCode : 8|8@1+ (1,0) [0|255] "" Bridge
+ SG_ Tank2ConfigCode : 16|8@1+ (1,0) [0|255] "" Bridge
+ SG_ Tank3ConfigCode : 24|8@1+ (1,0) [0|255] "" Bridge
+ SG_ Tank4ConfigCode : 32|8@1+ (1,0) [0|255] "" Bridge
+ SG_ Tank5ConfigCode : 40|8@1+ (1,0) [0|255] "" Bridge
+ SG_ Tank6ConfigCode : 48|8@1+ (1,0) [0|255] "" Bridge
+ SG_ TankConfigReserved : 56|8@1+ (1,0) [0|255] "" Bridge
+
+BO_ 2617045504 DGN_1FCF2_InverterData_Unconfirmed: 8 AnyNode
+ SG_ SecondaryInverterItemId : 0|8@1+ (1,0) [0|255] "" Bridge
+ SG_ InverterSecondaryState_Candidate : 8|8@1+ (1,0) [0|255] "" Bridge
+ SG_ InverterSecondaryValue2_Candidate : 16|8@1+ (1,0) [0|255] "" Bridge
+ SG_ InverterSecondaryValue3_Candidate : 24|8@1+ (1,0) [0|255] "" Bridge
+
+BO_ 2549942016 X_DGN_1FD07_SensorMetadataArray: 8 AnyNode
+ SG_ MetadataBaseItem : 0|8@1+ (1,0) [0|255] "" Bridge
+ SG_ Metadata_Plus0 : 8|8@1+ (1,0) [0|255] "" Bridge
+ SG_ Metadata_Plus1 : 16|8@1+ (1,0) [0|255] "" Bridge
+ SG_ Metadata_Plus2 : 24|8@1+ (1,0) [0|255] "" Bridge
+ SG_ Metadata_Plus3 : 32|8@1+ (1,0) [0|255] "" Bridge
+ SG_ Metadata_Plus4 : 40|8@1+ (1,0) [0|255] "" Bridge
+ SG_ Metadata_Plus5 : 48|8@1+ (1,0) [0|255] "" Bridge
+ SG_ Metadata_Plus6 : 56|8@1+ (1,0) [0|255] "" Bridge
+
+BO_ 2617054208 X_DGN_1FD14_OutputSecondaryArray: 8 AnyNode
+ SG_ OutputSecondaryBaseItem : 0|8@1+ (1,0) [0|255] "" Bridge
+ SG_ OutputSecondary_Plus0 : 8|8@1+ (1,0) [0|255] "" Bridge
+ SG_ OutputSecondary_Plus1 : 16|8@1+ (1,0) [0|255] "" Bridge
+ SG_ OutputSecondary_Plus2 : 24|8@1+ (1,0) [0|255] "" Bridge
+ SG_ OutputSecondary_Plus3 : 32|8@1+ (1,0) [0|255] "" Bridge
+ SG_ OutputSecondary_Plus4 : 40|8@1+ (1,0) [0|255] "" Bridge
+ SG_ OutputSecondary_Plus5 : 48|8@1+ (1,0) [0|255] "" Bridge
+ SG_ OutputSecondary_Plus6 : 56|8@1+ (1,0) [0|255] "" Bridge
+
+
+BO_ 2399338496 SVC_0F03_DGNRequest: 8 Bridge
+ SG_ RequestedDGNLowByte : 0|8@1+ (1,0) [0|255] "" AnyNode
+ SG_ RequestedDGNHighByte : 8|8@1+ (1,0) [0|255] "" AnyNode
+ SG_ DGNRequestReserved3 : 16|8@1+ (1,0) [0|255] "" AnyNode
+ SG_ DGNRequestReserved4 : 24|8@1+ (1,0) [0|255] "" AnyNode
+ SG_ DGNRequestReserved5 : 32|8@1+ (1,0) [0|255] "" AnyNode
+ SG_ DGNRequestReserved6 : 40|8@1+ (1,0) [0|255] "" AnyNode
+ SG_ DGNRequestReserved7 : 48|8@1+ (1,0) [0|255] "" AnyNode
+ SG_ DGNRequestReserved8 : 56|8@1+ (1,0) [0|255] "" AnyNode
+
+BO_ 2390818816 SVC_0E81_BlockWriteData: 8 Bridge
+ SG_ WriteDataByte1 : 0|8@1+ (1,0) [0|255] "" AnyNode
+ SG_ WriteDataByte2 : 8|8@1+ (1,0) [0|255] "" AnyNode
+ SG_ WriteDataByte3 : 16|8@1+ (1,0) [0|255] "" AnyNode
+ SG_ WriteDataByte4 : 24|8@1+ (1,0) [0|255] "" AnyNode
+ SG_ WriteDataByte5 : 32|8@1+ (1,0) [0|255] "" AnyNode
+ SG_ WriteDataByte6 : 40|8@1+ (1,0) [0|255] "" AnyNode
+ SG_ WriteDataByte7 : 48|8@1+ (1,0) [0|255] "" AnyNode
+ SG_ WriteDataByte8 : 56|8@1+ (1,0) [0|255] "" AnyNode
+
+BO_ 2390949888 SVC_0E83_PreWriteQuery: 8 Bridge
+ SG_ PreWriteQueryArg1Raw : 0|32@1+ (1,0) [0|4294967295] "" AnyNode
+ SG_ PreWriteQueryArg2Raw : 32|32@1+ (1,0) [0|4294967295] "" AnyNode
+
+BO_ 2391080960 SVC_0E85_ObjectSelect: 8 Bridge
+ SG_ ObjectRecordIndex : 0|8@1+ (1,0) [0|255] "" AnyNode
+ SG_ ObjectSelectReserved2 : 8|8@1+ (1,0) [0|255] "" AnyNode
+ SG_ ObjectSelectReserved3 : 16|8@1+ (1,0) [0|255] "" AnyNode
+ SG_ ObjectSelectReserved4 : 24|8@1+ (1,0) [0|255] "" AnyNode
+ SG_ ObjectSelectReserved5 : 32|8@1+ (1,0) [0|255] "" AnyNode
+ SG_ ObjectSelectReserved6 : 40|8@1+ (1,0) [0|255] "" AnyNode
+ SG_ ObjectSelectReserved7 : 48|8@1+ (1,0) [0|255] "" AnyNode
+ SG_ ObjectSelectReserved8 : 56|8@1+ (1,0) [0|255] "" AnyNode
+
+BO_ 2391146496 SVC_0E86_BlockReadRequest: 8 Bridge
+ SG_ BlockReadOffset : 0|32@1+ (1,0) [0|4294967295] "byte" AnyNode
+ SG_ BlockReadLength : 32|32@1+ (1,0) [0|4294967295] "byte" AnyNode
+
+BO_ 2391212032 SVC_0E87_ObjectWritePrepare: 8 Bridge
+ SG_ WritePrepareOffset_Candidate : 0|32@1+ (1,0) [0|4294967295] "byte" AnyNode
+ SG_ WritePrepareLimit_Candidate : 32|32@1+ (1,0) [0|4294967295] "" AnyNode
+
+BO_ 2391277568 SVC_0E88_BlockWriteCommit: 8 Bridge
+ SG_ BlockWriteOffset : 0|32@1+ (1,0) [0|4294967295] "byte" AnyNode
+ SG_ BlockWriteCRC32C : 32|32@1+ (1,0) [0|4294967295] "" AnyNode
+
+BO_ 2391343104 SVC_0E89_ObjectClose: 8 Bridge
+
+BO_ 2391408640 SVC_0E8A_ObjectApply: 8 Bridge
+
+BO_ 2189426688 SVC_0280_ServiceAcknowledge: 8 AnyNode
+ SG_ ServiceState : 0|8@1+ (1,0) [0|255] "" Bridge
+ SG_ ServiceAckReserved2 : 8|8@1+ (1,0) [0|255] "" Bridge
+ SG_ ServiceOpcodeEcho : 16|8@1+ (1,0) [0|255] "" Bridge
+ SG_ ServiceAckReserved4 : 24|8@1+ (1,0) [0|255] "" Bridge
+ SG_ ServiceAckReserved5 : 32|8@1+ (1,0) [0|255] "" Bridge
+ SG_ ServiceAckReserved6 : 40|8@1+ (1,0) [0|255] "" Bridge
+ SG_ ServiceAckReserved7 : 48|8@1+ (1,0) [0|255] "" Bridge
+ SG_ ServiceAckReserved8 : 56|8@1+ (1,0) [0|255] "" Bridge
+
+BO_ 2189492224 SVC_0281_BlockReadData: 8 AnyNode
+ SG_ BlockDataByte1 : 0|8@1+ (1,0) [0|255] "" Bridge
+ SG_ BlockDataByte2 : 8|8@1+ (1,0) [0|255] "" Bridge
+ SG_ BlockDataByte3 : 16|8@1+ (1,0) [0|255] "" Bridge
+ SG_ BlockDataByte4 : 24|8@1+ (1,0) [0|255] "" Bridge
+ SG_ BlockDataByte5 : 32|8@1+ (1,0) [0|255] "" Bridge
+ SG_ BlockDataByte6 : 40|8@1+ (1,0) [0|255] "" Bridge
+ SG_ BlockDataByte7 : 48|8@1+ (1,0) [0|255] "" Bridge
+ SG_ BlockDataByte8 : 56|8@1+ (1,0) [0|255] "" Bridge
+
+BO_ 2189688832 SVC_0284_BlockReadTrailer: 8 AnyNode
+ SG_ BlockTrailerLength : 0|32@1+ (1,0) [0|4294967295] "byte" Bridge
+ SG_ BlockTrailerCRC32C : 32|32@1+ (1,0) [0|4294967295] "" Bridge
+
+
+BO_ 2617036288 CMD_1FCCE_ClearHistory: 8 Bridge
+ SG_ HistoryDataset : 0|8@1+ (1,0) [0|255] "" Manager30,BatterySensor
+ SG_ HistoryClearCommand : 8|8@1+ (1,0) [252|252] "" Manager30,BatterySensor
+ SG_ HistoryReservedD3 : 16|8@1+ (1,0) [255|255] "" Manager30,BatterySensor
+ SG_ HistoryReservedD4 : 24|8@1+ (1,0) [255|255] "" Manager30,BatterySensor
+ SG_ HistoryReservedD5 : 32|8@1+ (1,0) [255|255] "" Manager30,BatterySensor
+ SG_ HistoryReservedD6 : 40|8@1+ (1,0) [255|255] "" Manager30,BatterySensor
+ SG_ HistoryReservedD7 : 48|8@1+ (1,0) [255|255] "" Manager30,BatterySensor
+ SG_ His
