@@ -30,7 +30,6 @@ VehicleInputTriggerSelect = manager30_ns.class_("VehicleInputTriggerSelect", sel
 ChargingModeSelect = manager30_ns.class_("ChargingModeSelect", select.Select)
 Manager30SetClockButton = manager30_ns.class_("Manager30SetClockButton", button.Button)
 Manager30ClearSolarHistoryButton = manager30_ns.class_("Manager30ClearSolarHistoryButton", button.Button)
-Manager30ToggleStorageLockButton = manager30_ns.class_("Manager30ToggleStorageLockButton", button.Button)
 
 _sensor_ns = cg.esphome_ns.namespace("sensor")
 _SensorClass = _sensor_ns.class_("Sensor")
@@ -53,7 +52,6 @@ SCHEMA = cv.Schema({
     cv.Optional(CONF_TIME_ID): cv.use_id(time.RealTimeClock),
     cv.GenerateID("set_clock_button_id"): cv.declare_id(Manager30SetClockButton),
     cv.GenerateID("clear_solar_history_button_id"): cv.declare_id(Manager30ClearSolarHistoryButton),
-    cv.GenerateID("toggle_storage_lock_button_id"): cv.declare_id(Manager30ToggleStorageLockButton),
     cv.GenerateID("output_current_id"): cv.declare_id(_SensorClass),
     cv.GenerateID("battery_voltage_id"): cv.declare_id(_SensorClass),
     cv.GenerateID("source_device_current_id"): cv.declare_id(_SensorClass),
@@ -247,15 +245,5 @@ async def to_code(config):
     })
     cg.add(btn.set_parent(var))
     cg.add(var.set_clear_solar_history_button(btn))
-
-    btn = await button.new_button({
-        CONF_ID: config["toggle_storage_lock_button_id"],
-        CONF_NAME: f"{p} Toggle Storage Mode Lock",
-        CONF_DISABLED_BY_DEFAULT: False,
-        CONF_ICON: "mdi:lock-reset",
-        CONF_ENTITY_CATEGORY: ENTITY_CATEGORY_DIAGNOSTIC,
-    })
-    cg.add(btn.set_parent(var))
-    cg.add(var.set_toggle_storage_lock_button(btn))
 
     return var
