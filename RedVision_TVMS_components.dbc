@@ -1,4 +1,4 @@
-VERSION "1.3 corrected-charging-mode-source"
+VERSION "2.1 merged v15 - charging mode from DGN 0x1F200"
 
 
 NS_ :
@@ -33,7 +33,26 @@ NS_ :
 
 BS_:
 
-BU_: Manager30 BatterySensor RedVisionDisplay TVMS1280 TVMSRogue Bridge
+BU_: Manager30 BatterySensor RedVisionDisplay TVMS1280 TVMSRogue Bridge AnyNode
+
+VAL_TABLE_ RW_LoadDisconnectTrigger 0 "Always" 1 "BMSVoltage" 2 "BMSSOC" 3 "Never" 4 "Voltage" ;
+VAL_TABLE_ RW_AlarmMode 0 "Disabled" 1 "HighLimit" 2 "LowLimit" ;
+VAL_TABLE_ RW_TankSensorType 0 "TLSEN175" 1 "TLSEN200" 2 "TLSEN225" 3 "Custom" ;
+VAL_TABLE_ RW_TVMS1280InputCondition 0 "Low_lt_1V" 1 "High_gt_3V" 2 "Disconnected_OpenCircuit" ;
+VAL_TABLE_ RW_TVMS1280OutputControl 4 "InputControl_OffWhenInputOn_MasterOff" 5 "InputControl_OffWhenInputOn_MasterOn" 8 "AlwaysOn_MasterOff" 10 "UserControl_MasterOff" 11 "UserControl_MasterOn" 12 "InputControl_OnWhenInputOn_MasterOff" 13 "InputControl_OnWhenInputOn_MasterOn" ;
+VAL_TABLE_ RW_RogueOutputControl 0 "Disabled" 1 "UserControl" 2 "AlwaysOn_Candidate" ;
+VAL_TABLE_ RW_ManagerDCInputTrigger 0 "Auto_Candidate" 1 "12V" 2 "24V_Candidate" 3 "Ignition" 5 "On" ;
+
+
+
+BA_DEF_ "BusType" STRING ;
+BA_DEF_ "ProtocolType" STRING ;
+BA_DEF_ BO_ "VFrameFormat" ENUM "StandardCAN","ExtendedCAN","reserved","J1939PG";
+BA_DEF_DEF_ "BusType" "CAN";
+BA_DEF_DEF_ "ProtocolType" "J1939";
+BA_DEF_DEF_ "VFrameFormat" "J1939PG";
+BA_ "BusType" "CAN";
+BA_ "ProtocolType" "J1939";
 
 
 BO_ 2482045440 BATT_1F102_CurrentVoltageTemp: 8 BatterySensor
@@ -41,13 +60,15 @@ BO_ 2482045440 BATT_1F102_CurrentVoltageTemp: 8 BatterySensor
  SG_ BatteryVoltage : 32|16@1+ (0.001,0) [0|65.535] "V" Bridge
  SG_ BatteryTemperature : 48|8@1+ (1,-60) [-60|195] "degC" Bridge
 
-BO_ 2482045952 BATT_1F104_SOC: 8 BatterySensor
+BO_ 2482045952 BATT_1F104_SOC_EstimatorRawUnconfirmed: 8 BatterySensor
  SG_ BatterySOC : 0|8@1+ (1,0) [0|100] "%" Bridge
+ SG_ EstimatorRaw_Candidate : 16|16@1+ (1,0) [0|65535] "" Bridge
 
 BO_ 2482044928 BATT_1F100_Config: 8 BatterySensor
  SG_ BatteryType : 0|8@1+ (1,0) [0|4] "" Bridge
  SG_ ConfiguredCapacity : 8|16@1+ (1,0) [0|65535] "Ah" Bridge
  SG_ MaxChargeCurrent : 32|8@1+ (1,0) [0|254] "A" Bridge
+ SG_ NominalSystemVoltage_Candidate : 40|8@1+ (1,0) [0|255] "V" Bridge
 
 BO_ 2482047488 BATT_1F10A_Alarms: 8 BatterySensor
  SG_ LowSOCAlarm : 8|8@1+ (1,0) [0|100] "%" Bridge
@@ -106,9 +127,21 @@ BO_ 2213611520 MGR_1F108_LoadDisconnectConfig: 8 Manager30
  SG_ LoadReconnectSOC : 48|8@1+ (1,0) [0|100] "%" Bridge
  SG_ ConfigReservedD8 : 56|8@1+ (1,0) [0|255] "" Bridge
 
-BO_ 2213675008 MGR_1F200_ChargingStage: 8 Manager30
+BO_ 2482046976 TVMS_1F108_LoadDisconnectConfig: 8 AnyNode
+ SG_ ConfigFlagsLowRaw : 0|2@1+ (1,0) [0|3] "" Bridge
+ SG_ LoadDisconnectTrigger : 2|3@1+ (1,0) [0|7] "" Bridge
+ SG_ ConfigHighFlagsRaw : 5|3@1+ (1,0) [0|7] "" Bridge
+ SG_ LoadDisconnectVoltage : 8|16@1+ (0.001,0) [0|65.535] "V" Bridge
+ SG_ LoadReconnectVoltage : 24|16@1+ (0.001,0) [0|65.535] "V" Bridge
+ SG_ LoadDisconnectSOC : 40|8@1+ (1,0) [0|100] "%" Bridge
+ SG_ LoadReconnectSOC : 48|8@1+ (1,0) [0|100] "%" Bridge
+ SG_ ConfigReservedD8 : 56|8@1+ (1,0) [0|255] "" Bridge
+
+BO_ 2213675008 MGR_1F200_ChargingStageMode: 8 Manager30
+ SG_ ChargingStageCode : 0|8@1+ (1,0) [0|255] "" Bridge
  SG_ ChargingMode : 0|1@1+ (1,0) [0|1] "" Bridge
  SG_ ChargingStageBase : 1|7@1+ (2,0) [0|254] "" Bridge
+ SG_ ChargerRatedCurrent_Candidate : 8|8@1+ (1,0) [0|255] "A" Bridge
 
 BO_ 2213676544 MGR_1F206_VehicleInput: 8 Manager30
  SG_ VehicleInputCurrent : 0|32@1+ (0.001,-1000) [-1000|1000] "A" Bridge
@@ -139,18 +172,24 @@ BO_ 2214385152 MGR_1FCD6_SolarEnergyHistory: 8 Manager30
  SG_ SolarDay10Wh m3 : 24|16@1+ (1,0) [0|65535] "Wh" Bridge
  SG_ SolarDay11Wh m3 : 40|16@1+ (1,0) [0|65535] "Wh" Bridge
 
-BO_ 2482143232 DISP_1F280_DisplayCurrents: 8 RedVisionDisplay
+BO_ 2482143232 DISP_1F280_DisplayCurrentsVoltage: 8 RedVisionDisplay
  SG_ BatteryCurrentDisplay : 0|16@1+ (0.1,-1000) [-1000|5553.5] "A" Bridge
+ SG_ BatteryVoltageDisplay : 16|16@1+ (0.1,0) [0|6553.5] "V" Bridge
  SG_ DeviceCurrentDisplay : 32|16@1+ (0.1,-1000) [-1000|5553.5] "A" Bridge
 
-BO_ 2482143744 DISP_1F282_DisplayMirror: 8 RedVisionDisplay
+BO_ 2482143744 DISP_1F282_InputOutputCurrents: 8 RedVisionDisplay
+ SG_ DisplayACInputCurrent : 0|16@1+ (0.1,-1000) [-1000|5553.5] "A" Bridge
  SG_ DisplayVehicleCurrent : 16|16@1+ (0.1,-1000) [-1000|5553.5] "A" Bridge
+ SG_ DisplaySolarInputCurrent : 32|16@1+ (0.1,-1000) [-1000|5553.5] "A" Bridge
  SG_ ManagerOutputCurrentDisplay : 48|16@1+ (0.1,-1000) [-1000|5553.5] "A" Bridge
 
-BO_ 2482144256 DISP_1F284_DisplayVehicleVoltage: 8 RedVisionDisplay
+BO_ 2482144256 DISP_1F284_InputOutputVoltages: 8 RedVisionDisplay
+ SG_ DisplayACInputVoltage : 0|16@1+ (1,0) [0|65535] "V" Bridge
  SG_ DisplayVehicleVoltage : 16|16@1+ (0.1,0) [0|6553.5] "V" Bridge
+ SG_ DisplaySolarInputVoltage : 32|16@1+ (0.1,0) [0|6553.5] "V" Bridge
+ SG_ DisplayBatteryVoltage : 48|16@1+ (0.1,0) [0|6553.5] "V" Bridge
 
-BO_ 2617049088 TVMS_1FD00_ChannelStateArray: 8 Vector__XXX
+BO_ 2617049088 TVMS_1FD00_States_ValuesUnconfirmed: 8 Vector__XXX
  SG_ BaseItem : 0|8@1+ (1,0) [0|255] "" Bridge
  SG_ State_Plus0 : 8|8@1+ (1,0) [0|255] "" Bridge
  SG_ State_Plus1 : 16|8@1+ (1,0) [0|255] "" Bridge
@@ -177,7 +216,7 @@ BO_ 2617049600 TVMS_1FD02_MuxSensors: 8 Vector__XXX
  SG_ TVMS1280Tank5 m23 : 40|8@1+ (1,0) [0|100] "%" Bridge
  SG_ TVMS1280Tank6 m26 : 8|8@1+ (1,0) [0|100] "%" Bridge
 
-BO_ 2617053696 ROGUE_1FD12_OutputLevels: 8 TVMSRogue
+BO_ 2617053696 TVMS_1FD12_OutputInputStates: 8 TVMSRogue
  SG_ LevelPageId M : 0|8@1+ (1,0) [0|255] "" Bridge
  SG_ RogueOutput1Level m12 : 8|8@1+ (1,0) [0|100] "%" Bridge
  SG_ RogueOutput2Level m12 : 16|8@1+ (1,0) [0|100] "%" Bridge
@@ -189,11 +228,182 @@ BO_ 2617053696 ROGUE_1FD12_OutputLevels: 8 TVMSRogue
  SG_ RogueOutput8Level m19 : 8|8@1+ (1,0) [0|100] "%" Bridge
  SG_ RogueOutput9Level m19 : 16|8@1+ (1,0) [0|100] "%" Bridge
  SG_ RogueOutput10Level m19 : 24|8@1+ (1,0) [0|100] "%" Bridge
+ SG_ Page1A_ValuePlus0 m26 : 8|8@1+ (1,0) [0|255] "" Bridge
+ SG_ Page1A_ValuePlus1 m26 : 16|8@1+ (1,0) [0|255] "" Bridge
+ SG_ Page1A_ValuePlus2 m26 : 24|8@1+ (1,0) [0|255] "" Bridge
+ SG_ Page1A_ValuePlus3 m26 : 32|8@1+ (1,0) [0|255] "" Bridge
+ SG_ Page1A_ValuePlus4 m26 : 40|8@1+ (1,0) [0|255] "" Bridge
+ SG_ Page1A_ValuePlus5 m26 : 48|8@1+ (1,0) [0|255] "" Bridge
+ SG_ Page1A_ValuePlus6 m26 : 56|8@1+ (1,0) [0|255] "" Bridge
+ SG_ Page21_ValuePlus0 m33 : 8|8@1+ (1,0) [0|255] "" Bridge
+ SG_ Page21_ValuePlus1 m33 : 16|8@1+ (1,0) [0|255] "" Bridge
+ SG_ Page21_ValuePlus2 m33 : 24|8@1+ (1,0) [0|255] "" Bridge
+ SG_ Page21_ValuePlus3 m33 : 32|8@1+ (1,0) [0|255] "" Bridge
+ SG_ Page21_ValuePlus4 m33 : 40|8@1+ (1,0) [0|255] "" Bridge
+ SG_ Page21_ValuePlus5 m33 : 48|8@1+ (1,0) [0|255] "" Bridge
+ SG_ Page21_ValuePlus6 m33 : 56|8@1+ (1,0) [0|255] "" Bridge
 
 BO_ 2617044992 TVMS1280_1FCF0_InverterStatus: 8 TVMS1280
  SG_ InverterState : 0|8@1+ (1,0) [0|1] "" Bridge
  SG_ InverterItemId : 8|8@1+ (1,0) [0|255] "" Bridge
 
+
+BO_ 2549350400 DGN_1F400_DeviceFirmwareVersion: 8 AnyNode
+ SG_ FirmwareProductNumber : 0|16@1+ (1,0) [0|65535] "" Bridge
+ SG_ FirmwareVersionMajor : 16|8@1+ (1,0) [0|255] "" Bridge
+ SG_ FirmwareVersionMinor : 24|8@1+ (1,0) [0|255] "" Bridge
+ SG_ FirmwareReserved5 : 32|8@1+ (1,0) [0|255] "" Bridge
+ SG_ FirmwareReserved6 : 40|8@1+ (1,0) [0|255] "" Bridge
+ SG_ FirmwareRecordIndex : 48|8@1+ (1,0) [0|255] "" Bridge
+ SG_ FirmwareReserved8 : 56|8@1+ (1,0) [0|255] "" Bridge
+
+BO_ 2549350912 X_DGN_1F402_DeviceDate: 8 AnyNode
+ SG_ DeviceDateDay : 0|8@1+ (1,0) [1|31] "day" Bridge
+ SG_ DeviceDateMonth : 8|8@1+ (1,0) [1|12] "month" Bridge
+ SG_ DeviceDateYear : 16|16@1+ (1,0) [2000|65535] "year" Bridge
+
+BO_ 2549351168 DGN_1F403_ProductNameSegment: 8 AnyNode
+ SG_ ProductNameSegmentIndex : 0|8@1+ (1,0) [0|255] "" Bridge
+ SG_ ProductNameChar1 : 8|8@1+ (1,0) [0|255] "ASCII" Bridge
+ SG_ ProductNameChar2 : 16|8@1+ (1,0) [0|255] "ASCII" Bridge
+ SG_ ProductNameChar3 : 24|8@1+ (1,0) [0|255] "ASCII" Bridge
+ SG_ ProductNameChar4 : 32|8@1+ (1,0) [0|255] "ASCII" Bridge
+ SG_ ProductNameChar5 : 40|8@1+ (1,0) [0|255] "ASCII" Bridge
+ SG_ ProductNameChar6 : 48|8@1+ (1,0) [0|255] "ASCII" Bridge
+ SG_ ProductNameChar7 : 56|8@1+ (1,0) [0|255] "ASCII" Bridge
+
+BO_ 2616460288 DGN_1F404_DeviceSerialIdentity: 8 AnyNode
+ SG_ SerialNumberPrefix : 0|32@1+ (1,0) [0|4294967295] "" Bridge
+ SG_ SerialNumberSuffix : 32|16@1+ (1,0) [0|65535] "" Bridge
+ SG_ DeviceType : 48|8@1+ (1,0) [0|255] "" Bridge
+ SG_ DeviceSubtypeRaw : 56|8@1+ (1,0) [0|255] "" Bridge
+
+BO_ 2616460544 X_DGN_1F405_DeviceUniqueId: 8 AnyNode
+ SG_ UniqueIdRecordIndex : 0|8@1+ (1,0) [0|255] "" Bridge
+ SG_ UniqueIdByte1 : 8|8@1+ (1,0) [0|255] "" Bridge
+ SG_ UniqueIdByte2 : 16|8@1+ (1,0) [0|255] "" Bridge
+ SG_ UniqueIdByte3 : 24|8@1+ (1,0) [0|255] "" Bridge
+ SG_ UniqueIdByte4 : 32|8@1+ (1,0) [0|255] "" Bridge
+ SG_ UniqueIdByte5 : 40|8@1+ (1,0) [0|255] "" Bridge
+ SG_ UniqueIdByte6 : 48|8@1+ (1,0) [0|255] "" Bridge
+ SG_ UniqueIdByte7 : 56|8@1+ (1,0) [0|255] "" Bridge
+
+BO_ 2213808128 MGR_1F408_StaticConfig_BytesUnconfirmed: 8 AnyNode
+ SG_ RatedChargeCurrent_Candidate : 0|16@1+ (0.1,0) [0|6553.5] "A" Bridge
+ SG_ StaticConfigByte3 : 16|8@1+ (1,0) [0|255] "" Bridge
+ SG_ StaticConfigByte4 : 24|8@1+ (1,0) [0|255] "" Bridge
+ SG_ StaticConfigByte5 : 32|8@1+ (1,0) [0|255] "" Bridge
+
+BO_ 2616332032 X_DGN_1F20F_TankInputConfiguration: 8 AnyNode
+ SG_ TankConfigPage : 0|8@1+ (1,0) [0|255] "" Bridge
+ SG_ Tank1ConfigCode : 8|8@1+ (1,0) [0|255] "" Bridge
+ SG_ Tank2ConfigCode : 16|8@1+ (1,0) [0|255] "" Bridge
+ SG_ Tank3ConfigCode : 24|8@1+ (1,0) [0|255] "" Bridge
+ SG_ Tank4ConfigCode : 32|8@1+ (1,0) [0|255] "" Bridge
+ SG_ Tank5ConfigCode : 40|8@1+ (1,0) [0|255] "" Bridge
+ SG_ Tank6ConfigCode : 48|8@1+ (1,0) [0|255] "" Bridge
+ SG_ TankConfigReserved : 56|8@1+ (1,0) [0|255] "" Bridge
+
+BO_ 2617045504 DGN_1FCF2_InverterData_Unconfirmed: 8 AnyNode
+ SG_ SecondaryInverterItemId : 0|8@1+ (1,0) [0|255] "" Bridge
+ SG_ InverterSecondaryState_Candidate : 8|8@1+ (1,0) [0|255] "" Bridge
+ SG_ InverterSecondaryValue2_Candidate : 16|8@1+ (1,0) [0|255] "" Bridge
+ SG_ InverterSecondaryValue3_Candidate : 24|8@1+ (1,0) [0|255] "" Bridge
+
+BO_ 2549942016 X_DGN_1FD07_SensorMetadataArray: 8 AnyNode
+ SG_ MetadataBaseItem : 0|8@1+ (1,0) [0|255] "" Bridge
+ SG_ Metadata_Plus0 : 8|8@1+ (1,0) [0|255] "" Bridge
+ SG_ Metadata_Plus1 : 16|8@1+ (1,0) [0|255] "" Bridge
+ SG_ Metadata_Plus2 : 24|8@1+ (1,0) [0|255] "" Bridge
+ SG_ Metadata_Plus3 : 32|8@1+ (1,0) [0|255] "" Bridge
+ SG_ Metadata_Plus4 : 40|8@1+ (1,0) [0|255] "" Bridge
+ SG_ Metadata_Plus5 : 48|8@1+ (1,0) [0|255] "" Bridge
+ SG_ Metadata_Plus6 : 56|8@1+ (1,0) [0|255] "" Bridge
+
+BO_ 2617054208 X_DGN_1FD14_OutputSecondaryArray: 8 AnyNode
+ SG_ OutputSecondaryBaseItem : 0|8@1+ (1,0) [0|255] "" Bridge
+ SG_ OutputSecondary_Plus0 : 8|8@1+ (1,0) [0|255] "" Bridge
+ SG_ OutputSecondary_Plus1 : 16|8@1+ (1,0) [0|255] "" Bridge
+ SG_ OutputSecondary_Plus2 : 24|8@1+ (1,0) [0|255] "" Bridge
+ SG_ OutputSecondary_Plus3 : 32|8@1+ (1,0) [0|255] "" Bridge
+ SG_ OutputSecondary_Plus4 : 40|8@1+ (1,0) [0|255] "" Bridge
+ SG_ OutputSecondary_Plus5 : 48|8@1+ (1,0) [0|255] "" Bridge
+ SG_ OutputSecondary_Plus6 : 56|8@1+ (1,0) [0|255] "" Bridge
+
+
+BO_ 2399338496 SVC_0F03_DGNRequest: 8 Bridge
+ SG_ RequestedDGNLowByte : 0|8@1+ (1,0) [0|255] "" AnyNode
+ SG_ RequestedDGNHighByte : 8|8@1+ (1,0) [0|255] "" AnyNode
+ SG_ DGNRequestReserved3 : 16|8@1+ (1,0) [0|255] "" AnyNode
+ SG_ DGNRequestReserved4 : 24|8@1+ (1,0) [0|255] "" AnyNode
+ SG_ DGNRequestReserved5 : 32|8@1+ (1,0) [0|255] "" AnyNode
+ SG_ DGNRequestReserved6 : 40|8@1+ (1,0) [0|255] "" AnyNode
+ SG_ DGNRequestReserved7 : 48|8@1+ (1,0) [0|255] "" AnyNode
+ SG_ DGNRequestReserved8 : 56|8@1+ (1,0) [0|255] "" AnyNode
+
+BO_ 2390818816 SVC_0E81_BlockWriteData: 8 Bridge
+ SG_ WriteDataByte1 : 0|8@1+ (1,0) [0|255] "" AnyNode
+ SG_ WriteDataByte2 : 8|8@1+ (1,0) [0|255] "" AnyNode
+ SG_ WriteDataByte3 : 16|8@1+ (1,0) [0|255] "" AnyNode
+ SG_ WriteDataByte4 : 24|8@1+ (1,0) [0|255] "" AnyNode
+ SG_ WriteDataByte5 : 32|8@1+ (1,0) [0|255] "" AnyNode
+ SG_ WriteDataByte6 : 40|8@1+ (1,0) [0|255] "" AnyNode
+ SG_ WriteDataByte7 : 48|8@1+ (1,0) [0|255] "" AnyNode
+ SG_ WriteDataByte8 : 56|8@1+ (1,0) [0|255] "" AnyNode
+
+BO_ 2390949888 SVC_0E83_PreWriteQuery: 8 Bridge
+ SG_ PreWriteQueryArg1Raw : 0|32@1+ (1,0) [0|4294967295] "" AnyNode
+ SG_ PreWriteQueryArg2Raw : 32|32@1+ (1,0) [0|4294967295] "" AnyNode
+
+BO_ 2391080960 SVC_0E85_ObjectSelect: 8 Bridge
+ SG_ ObjectRecordIndex : 0|8@1+ (1,0) [0|255] "" AnyNode
+ SG_ ObjectSelectReserved2 : 8|8@1+ (1,0) [0|255] "" AnyNode
+ SG_ ObjectSelectReserved3 : 16|8@1+ (1,0) [0|255] "" AnyNode
+ SG_ ObjectSelectReserved4 : 24|8@1+ (1,0) [0|255] "" AnyNode
+ SG_ ObjectSelectReserved5 : 32|8@1+ (1,0) [0|255] "" AnyNode
+ SG_ ObjectSelectReserved6 : 40|8@1+ (1,0) [0|255] "" AnyNode
+ SG_ ObjectSelectReserved7 : 48|8@1+ (1,0) [0|255] "" AnyNode
+ SG_ ObjectSelectReserved8 : 56|8@1+ (1,0) [0|255] "" AnyNode
+
+BO_ 2391146496 SVC_0E86_BlockReadRequest: 8 Bridge
+ SG_ BlockReadOffset : 0|32@1+ (1,0) [0|4294967295] "byte" AnyNode
+ SG_ BlockReadLength : 32|32@1+ (1,0) [0|4294967295] "byte" AnyNode
+
+BO_ 2391212032 SVC_0E87_ObjectWritePrepare: 8 Bridge
+ SG_ WritePrepareOffset_Candidate : 0|32@1+ (1,0) [0|4294967295] "byte" AnyNode
+ SG_ WritePrepareLimit_Candidate : 32|32@1+ (1,0) [0|4294967295] "" AnyNode
+
+BO_ 2391277568 SVC_0E88_BlockWriteCommit: 8 Bridge
+ SG_ BlockWriteOffset : 0|32@1+ (1,0) [0|4294967295] "byte" AnyNode
+ SG_ BlockWriteCRC32C : 32|32@1+ (1,0) [0|4294967295] "" AnyNode
+
+BO_ 2391343104 SVC_0E89_ObjectClose: 8 Bridge
+
+BO_ 2391408640 SVC_0E8A_ObjectApply: 8 Bridge
+
+BO_ 2189426688 SVC_0280_ServiceAcknowledge: 8 AnyNode
+ SG_ ServiceState : 0|8@1+ (1,0) [0|255] "" Bridge
+ SG_ ServiceAckReserved2 : 8|8@1+ (1,0) [0|255] "" Bridge
+ SG_ ServiceOpcodeEcho : 16|8@1+ (1,0) [0|255] "" Bridge
+ SG_ ServiceAckReserved4 : 24|8@1+ (1,0) [0|255] "" Bridge
+ SG_ ServiceAckReserved5 : 32|8@1+ (1,0) [0|255] "" Bridge
+ SG_ ServiceAckReserved6 : 40|8@1+ (1,0) [0|255] "" Bridge
+ SG_ ServiceAckReserved7 : 48|8@1+ (1,0) [0|255] "" Bridge
+ SG_ ServiceAckReserved8 : 56|8@1+ (1,0) [0|255] "" Bridge
+
+BO_ 2189492224 SVC_0281_BlockReadData: 8 AnyNode
+ SG_ BlockDataByte1 : 0|8@1+ (1,0) [0|255] "" Bridge
+ SG_ BlockDataByte2 : 8|8@1+ (1,0) [0|255] "" Bridge
+ SG_ BlockDataByte3 : 16|8@1+ (1,0) [0|255] "" Bridge
+ SG_ BlockDataByte4 : 24|8@1+ (1,0) [0|255] "" Bridge
+ SG_ BlockDataByte5 : 32|8@1+ (1,0) [0|255] "" Bridge
+ SG_ BlockDataByte6 : 40|8@1+ (1,0) [0|255] "" Bridge
+ SG_ BlockDataByte7 : 48|8@1+ (1,0) [0|255] "" Bridge
+ SG_ BlockDataByte8 : 56|8@1+ (1,0) [0|255] "" Bridge
+
+BO_ 2189688832 SVC_0284_BlockReadTrailer: 8 AnyNode
+ SG_ BlockTrailerLength : 0|32@1+ (1,0) [0|4294967295] "byte" Bridge
+ SG_ BlockTrailerCRC32C : 32|32@1+ (1,0) [0|4294967295] "" Bridge
 
 
 BO_ 2617036288 CMD_1FCCE_ClearHistory: 8 Bridge
@@ -216,24 +426,76 @@ BO_ 2415068160 CMD_0FF304_SetClock: 8 Bridge
  SG_ SetClockSecond : 48|8@1+ (1,0) [0|59] "" Manager30
  SG_ SetClockCommandMarker : 56|8@1+ (1,0) [0|0] "" Manager30
 
-BO_ 2399207168 CMD_0F00FF_ConfigSetting: 8 Bridge
- SG_ CommandId : 0|8@1+ (1,0) [0|255] "" Manager30,BatterySensor
- SG_ ConfigValue : 32|16@1+ (1,0) [0|65535] "" Manager30,BatterySensor
+BO_ 2399207168 CMD_0F00FF_BroadcastConfigSetting: 8 Bridge
+ SG_ CommandId M : 0|8@1+ (1,0) [0|255] "" AnyNode
+ SG_ CommandReservedD2 : 8|8@1+ (1,0) [0|255] "" AnyNode
+ SG_ CommandClassD3 : 16|8@1+ (1,0) [0|255] "" AnyNode
+ SG_ CommandReservedD4 : 24|8@1+ (1,0) [0|255] "" AnyNode
+ SG_ CommandValueRaw32 : 32|32@1+ (1,0) [0|4294967295] "" AnyNode
+ SG_ SetChargingMode m67 : 32|32@1+ (1,0) [0|1] "" AnyNode
+ SG_ StorageModeLock_Candidate m77 : 32|32@1+ (1,0) [0|1] "" AnyNode
 
-BO_ 2399143936 CMD_0F0008_BatterySOCCalib: 8 Bridge
- SG_ CommandId : 0|8@1+ (1,0) [0|255] "" BatterySensor
- SG_ SubCommand : 16|8@1+ (1,0) [0|255] "" BatterySensor
- SG_ SOCCalibrationTarget : 32|8@1+ (1,0) [0|100] "%" BatterySensor
+BO_ 2399142144 CMD_0F0001_Manager30Config: 8 Bridge
+ SG_ CommandId M : 0|8@1+ (1,0) [0|255] "" Manager30
+ SG_ CommandReservedD2 : 8|8@1+ (1,0) [0|255] "" Manager30
+ SG_ CommandClassD3 : 16|8@1+ (1,0) [0|255] "" Manager30
+ SG_ CommandReservedD4 : 24|8@1+ (1,0) [0|255] "" Manager30
+ SG_ LoadDisconnectTrigger m58 : 32|32@1+ (1,0) [0|4] "" Manager30
+ SG_ LoadDisconnectVoltage m59 : 32|32@1+ (0.001,0) [0|4294967.295] "V" Manager30
+ SG_ LoadReconnectVoltage m60 : 32|32@1+ (0.001,0) [0|4294967.295] "V" Manager30
+ SG_ LoadDisconnectSOC m61 : 32|32@1+ (1,0) [0|100] "%" Manager30
+ SG_ LoadReconnectSOC m62 : 32|32@1+ (1,0) [0|100] "%" Manager30
+ SG_ SetChargingMode m67 : 32|32@1+ (1,0) [0|1] "" Manager30
+ SG_ VehicleInputTrigger m104 : 32|32@1+ (1,0) [0|255] "" Manager30
 
-BO_ 2399154176 CMD_0F0030_RogueChannel: 8 Bridge
- SG_ CommandId : 0|8@1+ (1,0) [0|255] "" TVMSRogue
- SG_ Channel : 24|8@1+ (1,0) [0|255] "" TVMSRogue
- SG_ ChannelValue : 32|8@1+ (1,0) [0|100] "" TVMSRogue
+BO_ 2399143936 CMD_0F0008_BatteryConfig: 8 Bridge
+ SG_ CommandId M : 0|8@1+ (1,0) [0|255] "" BatterySensor
+ SG_ CommandReservedD2 : 8|8@1+ (1,0) [0|255] "" BatterySensor
+ SG_ CommandClassD3 : 16|8@1+ (1,0) [0|255] "" BatterySensor
+ SG_ CommandReservedD4 : 24|8@1+ (1,0) [0|255] "" BatterySensor
+ SG_ SetBatteryType m17 : 32|32@1+ (1,0) [0|4] "" BatterySensor
+ SG_ SetConfiguredCapacity m18 : 32|32@1+ (1,0) [0|4294967295] "Ah" BatterySensor
+ SG_ SetMaxChargeCurrent m20 : 32|32@1+ (1,0) [0|4294967295] "A" BatterySensor
+ SG_ SOCCalibrationTarget m21 : 32|32@1+ (1,0) [0|100] "%" BatterySensor
+ SG_ SetLowSOCAlarm m65 : 32|32@1+ (1,0) [0|100] "%" BatterySensor
+ SG_ SetLowVoltageAlarm m66 : 32|32@1+ (0.001,0) [0|4294967.295] "V" BatterySensor
 
-BO_ 2399151104 CMD_0F0024_TVMS1280Channel: 8 Bridge
- SG_ CommandId : 0|8@1+ (1,0) [0|255] "" TVMS1280
- SG_ Channel : 24|8@1+ (1,0) [0|255] "" TVMS1280
- SG_ ChannelState : 32|8@1+ (1,0) [0|1] "" TVMS1280
+BO_ 2399151104 CMD_0F0024_TVMS1280Command: 8 Bridge
+ SG_ CommandId M : 0|8@1+ (1,0) [0|255] "" TVMS1280
+ SG_ CommandReservedD2 : 8|8@1+ (1,0) [0|255] "" TVMS1280
+ SG_ CommandClassD3 : 16|8@1+ (1,0) [0|255] "" TVMS1280
+ SG_ Channel m203 : 24|8@1+ (1,0) [0|255] "" TVMS1280
+ SG_ ChannelState m203 : 32|8@1+ (1,0) [0|1] "" TVMS1280
+ SG_ LoadDisconnectTrigger m58 : 32|32@1+ (1,0) [0|4] "" TVMS1280
+ SG_ LoadDisconnectVoltage m59 : 32|32@1+ (0.001,0) [0|4294967.295] "V" TVMS1280
+ SG_ LoadReconnectVoltage m60 : 32|32@1+ (0.001,0) [0|4294967.295] "V" TVMS1280
+ SG_ LoadDisconnectSOC m61 : 32|32@1+ (1,0) [0|100] "%" TVMS1280
+ SG_ LoadReconnectSOC m62 : 32|32@1+ (1,0) [0|100] "%" TVMS1280
+
+BO_ 2399154176 CMD_0F0030_RogueCommand: 8 Bridge
+ SG_ CommandId M : 0|8@1+ (1,0) [0|255] "" TVMSRogue
+ SG_ CommandReservedD2 : 8|8@1+ (1,0) [0|255] "" TVMSRogue
+ SG_ CommandClassD3 : 16|8@1+ (1,0) [0|255] "" TVMSRogue
+ SG_ ChannelOnOff m203 : 24|8@1+ (1,0) [0|255] "" TVMSRogue
+ SG_ ChannelState m203 : 32|8@1+ (1,0) [0|1] "" TVMSRogue
+ SG_ ChannelLevel m90 : 24|8@1+ (1,0) [0|255] "" TVMSRogue
+ SG_ LevelPercent m90 : 32|8@1+ (1,0) [0|100] "%" TVMSRogue
+ SG_ LoadDisconnectTrigger m58 : 32|32@1+ (1,0) [0|4] "" TVMSRogue
+ SG_ LoadDisconnectVoltage m59 : 32|32@1+ (0.001,0) [0|4294967.295] "V" TVMSRogue
+ SG_ LoadReconnectVoltage m60 : 32|32@1+ (0.001,0) [0|4294967.295] "V" TVMSRogue
+ SG_ LoadDisconnectSOC m61 : 32|32@1+ (1,0) [0|100] "%" TVMSRogue
+ SG_ LoadReconnectSOC m62 : 32|32@1+ (1,0) [0|100] "%" TVMSRogue
+
+BO_ 2399468032 ACK_0F04FA_ConfigSetting: 8 AnyNode
+ SG_ ConfigAckStatus : 0|8@1+ (1,0) [0|255] "" Bridge
+ SG_ ConfigCommandEcho : 8|8@1+ (1,0) [0|255] "" Bridge
+ SG_ ConfigAckReservedD3 : 16|8@1+ (1,0) [0|255] "" Bridge
+ SG_ ConfigAckReservedD4 : 24|8@1+ (1,0) [0|255] "" Bridge
+ SG_ ConfigAckReservedD5 : 32|8@1+ (1,0) [0|255] "" Bridge
+ SG_ ConfigAckReservedD6 : 40|8@1+ (1,0) [0|255] "" Bridge
+ SG_ ConfigAckReservedD7 : 48|8@1+ (1,0) [0|255] "" Bridge
+ SG_ ConfigAckReservedD8 : 56|8@1+ (1,0) [0|255] "" Bridge
+
 
 BO_ 2415710208 REQ_0FFCD0_SOCHourlyPoll: 8 Bridge
 
@@ -245,24 +507,40 @@ BO_ 2415711744 REQ_0FFCD6_SolarHistoryPoll: 8 Bridge
 
 
 
+CM_ "Message names beginning with X_ contain at least one unknown, raw, candidate or otherwise unconfirmed field or interpretation.";
+CM_ "DGN-generic RV-C/J1939 database. Broadcast/status BO_ identifiers use source address 0x00. The low source byte must be ignored or replaced by the real node source address. VFrameFormat=J1939PG is included for decoders that support source-address-independent PGN/DGN matching. Priority may also vary between nodes; match on DGN=(CAN_ID>>8)&0x1FFFF rather than the complete 29-bit identifier.";
+CM_ BO_ 2482044928 "CONFIRMED battery configuration DGN 0x1F100. BatteryType, ConfiguredCapacity and MaxChargeCurrent are decoded. D6 was consistently 0x0C on this 12 V installation and remains NominalSystemVoltage_Candidate until confirmed on another nominal system voltage.";
+CM_ BO_ 2482045952 "CONFIRMED DGN 0x1F104 BatterySOC on D1. D3-D4 are EstimatorRaw_Candidate and remain unconfirmed; 0xFFFF means unavailable in the observed capture.";
+CM_ BO_ 2482143232 "CONFIRMED RedVision display mirror: D1-D2 battery current, D3-D4 battery voltage, D5-D6 device current. Display values are rounded relative to native source frames.";
+CM_ BO_ 2482143744 "CONFIRMED RedVision input/output-current mirror: D1-D2 AC, D3-D4 vehicle, D5-D6 solar, D7-D8 Manager output. All are LE u16 with A=raw*0.1-1000.";
+CM_ BO_ 2482144256 "CONFIRMED RedVision voltage mirror: D1-D2 AC volts at 1 V/count; D3-D4 vehicle, D5-D6 solar, D7-D8 battery/output at 0.1 V/count.";
+CM_ BO_ 2549350400 "CONFIRMED firmware-version record. D1-D2 are the little-endian firmware product number, D3 is version major, D4 is version minor, D5-D6 are zero/reserved in observed records, D7 is the firmware record index and D8 is zero/reserved. Display formatting is FW-%04u-%02u-%02u. Confirmed examples include FW-0256-01-14, FW-0256-00-09, FW-0191-03-04 and FW-0323-01-04.";
+CM_ BO_ 2549350912 "HIGH CONFIDENCE: D1 day, D2 month, D3-D4 little-endian year. Observed dates were plausible device build/manufacture dates. D5-D8 were 0xFF.";
+CM_ BO_ 2549351168 "CONFIRMED segmented ASCII product name. D1 is segment index; D2-D8 are seven ASCII bytes with 0xFF padding. Three observed segments reconstruct 'RedVision Display'.";
+CM_ BO_ 2616460544 "HIGH CONFIDENCE structure: D1 record index and D2-D8 stable 56-bit device-unique value, likely serial/UID. Compare against printed serial/About screen to confirm semantics.";
+CM_ BO_ 2213808128 "CONFIRMED Manager30 static-configuration DGN 0x1F408. The individual static configuration bytes are unconfirmed. D1-D2 decoding as 30.0 A is retained only as RatedChargeCurrent_Candidate; remaining active bytes stay raw.";
+CM_ BO_ 2616332032 "PARTIAL TVMS1280 configuration array. D1 was 0x15 and D2-D7 contained six equal values, matching the six tank inputs. Change one tank sender/type to map each byte and code.";
+CM_ BO_ 2617045504 "CONFIRMED DGN 0x1FCF2 is inverter-related data. Its individual fields remain unconfirmed. D1 was observed as item/channel 0x0E, D2-D4 were zero while the inverter was off, and D5-D8 were 0xFF. Do not apply the 0x1FCF0 byte order to this DGN.";
+CM_ BO_ 2549942016 "HIGH CONFIDENCE array structure: D1 BaseItem then metadata/status bytes for BaseItem..BaseItem+6. Pages align with 0x1FD02 sensor item IDs. Codes 0xFC, 0xFD and 0xFF remain unresolved.";
+CM_ BO_ 2617054208 "HIGH CONFIDENCE array structure, unknown metric: page 0x0C maps Rogue outputs 1-7 and page 0x13 maps outputs 8-10. Values were zero in the capture. Test with a loaded/dimmed output.";
+CM_ BO_ 2617049088 "CONFIRMED DGN 0x1FD00 carries TVMS states. The numeric state-code meanings are not yet confirmed. All value-table labels remain candidates, including observed code 0x24 on configured inactive output/inverter channels.";
+CM_ BO_ 2617053696 "CONFIRMED DGN 0x1FD12 carries output and input state data. D1 is the page/base selector. Pages 0x0C and 0x13 map Rogue outputs; pages 0x1A and 0x21 contain additional input/state data and remain exposed as raw values.";
+
+
+
+
 CM_ "RedVision / TVMS CAN bridge - signals reflect ONLY what the ESPHome components decode and transmit.";
 CM_ BU_ Bridge "This ESP32 / ESPHome CAN bridge. Source address is configurable (host_address, default 0x22).";
 CM_ BO_ 2482045440 "29-bit extended IDs. Receivers key on DGN=(ID>>8)&0x1FFFF and source address=ID&0xFF. Message IDs here have the source-address byte (low 8 bits) set to 0x00 so one definition matches a DGN from ANY source address; OR the real source byte in when transmitting/filtering. Observed source addresses: Manager30 0x01, BatterySensor 0x08, RedVision displays 0x20/0x21, TVMS1280 0x24, TVMSRogue 0x30, Bridge 0x22.";
 CM_ BO_ 2482819072 "Paginated history array. PageIndex (D1) selects the block; absolute hour index = PageIndex*7 + SlotN. Value 255 (0xFF) means no data.";
 CM_ BO_ 2482819584 "Paginated history array. Absolute day index = PageIndex*7 + SlotN. 255 = no data. Combined with the daily-high page into the SOC Daily Range entity.";
 CM_ BO_ 2482820096 "Paginated history array. Absolute day index = PageIndex*7 + SlotN. 255 = no data.";
-CM_ BO_ 2213611520 "Manager30 DGN 0x1F108 is load-disconnect configuration, not charging mode. In the storage-mode transition capture D1 remained 0xEC (bit 0 clear) while command 0x43 set Storage and 0x1F200 changed to 0x21. D1 bits2-4 are the load-disconnect trigger; D2-D3 disconnect voltage, D4-D5 reconnect voltage, D6 disconnect SOC and D7 reconnect SOC.";
-CM_ BO_ 2213675008 "Manager30 charging stage on D1. ChargingStageBase is bits 1-7 with factor 2, so its displayed physical value equals D1 & 0xFE. D1 bit0 is a Touring/Storage startup hint (0=Touring, 1=Storage); retained mode is authoritative from command 0x43. Confirmed stages: 0x00 Not Charging, 0x10 Desulphation, 0x20 Soft Start, 0x30 Boost, 0x40 Absorption, 0x50 Battery Test, 0x60 Equalize, 0x70 Float, 0x80 Maintenance.";
 CM_ BO_ 2213741568 "Manager30 clock/status response. D1 bits 7-3 encode day-1; D1 bits 2-0 encode weekday (1=Monday through 7=Sunday). D2=month, D3-D4=year little-endian, D5=hour, D6=minute, D7=second, D8 is normally 0xFF. Observed from source address 0x01.";
 CM_ BO_ 2214385152 "Solar generation history, 4 pages x 3 days = 12 days. Day 0 = today, Day 1..11 = previous days, in Wh. Requested via REQ_0FFCD6 (RTR).";
-CM_ BO_ 2617049088 "DGN 0x1FD00 shared by TVMS1280 (SA 0x24) and TVMSRogue (SA 0x30). Byte array: BaseItem (D1) then State_Plus0..6 for channels BaseItem..BaseItem+6. Status codes: 0x00 Off, 0x01 On, 0x06 Fuse blown, 0x0A Output over temp, 0x14 Off override, 0x15 On override, 0xF8 Unconfigured, 0xFF no-data. TVMS1280 channel map: 0x01-0x03 Digital Inputs 1-3, 0x04-0x0D Outputs 1-10, 0x0E Inverter, 0x0F Master. TVMSRogue channel map: 0x01-0x08 Input Buttons 1-8, 0x0B Master, 0x0C-0x15 Outputs 1-10.";
+CM_ BO_ 2617049088 "DGN 0x1FD00 is shared by TVMS1280 (SA 0x24) and TVMSRogue (SA 0x30). Confirmed array layout: BaseItem in D1 followed by State_Plus0..6 for channels BaseItem..BaseItem+6. TVMS1280 channel map: 0x01-0x03 Digital Inputs 1-3, 0x04-0x0D Outputs 1-10, 0x0E Inverter, 0x0F Master. TVMSRogue channel map: 0x01-0x08 Input Buttons 1-8, 0x0B Master, 0x0C-0x15 Outputs 1-10. State-code interpretations remain unconfirmed.";
 CM_ BO_ 2617049600 "DGN 0x1FD02 shared by TVMS1280 (SA 0x24) and TVMSRogue (SA 0x30), multiplexed by ItemId (D1). Item codes do not collide between the two devices, so one definition serves both.";
-CM_ BO_ 2617053696 "TVMSRogue dimmable-output levels, multiplexed by LevelPageId (D1): page 0x0C carries outputs 1-7, page 0x13 carries outputs 8-10.";
+CM_ BO_ 2617053696 "DGN 0x1FD12 output/input state data is multiplexed by LevelPageId (D1). Existing output-page signals are retained for pages 0x0C and 0x13; input/state pages 0x1A and 0x21 remain raw pending exact channel mapping.";
 CM_ BO_ 2617044992 "TVMS1280 inverter status. InverterState (D1) is on/off when InverterItemId (D2) == 0x0E.";
-CM_ BO_ 2399207168 "Config command from the bridge. ID = 0x0F00FF<host_address>. CommandId (D1) selects the setting; ConfigValue starts at D5. Command 0x43 sets charging mode: 0=Touring, 1=Storage. Targets Manager30 and BatterySensor settings (D3=D4=0xFF).";
-CM_ BO_ 2399143936 "Battery SOC full calibration. ID = 0x0F00<battery_SA><host_address>, e.g. 0x0F000822. D1=0x15, D3=0x03, D5=target percent.";
-CM_ BO_ 2399154176 "TVMSRogue output command. ID = 0x0F00<rogue_SA><host_address>. CommandId 0xCB = on/off (ChannelValue 0/1), 0x5A = absolute level (ChannelValue 0-100%). Channel 0x0B Master, 0x0C-0x15 Outputs 1-10.";
-CM_ BO_ 2399151104 "TVMS1280 output command. ID = 0x0F00<1280_SA><host_address>. CommandId 0xCB, Channel 0x04-0x0D Outputs 1-10, 0x0E Inverter, 0x0F Master, ChannelState 0/1.";
 CM_ BO_ 2415710208 "RTR remote-request frame (no payload, DLC 8). Polls the battery for SOC hourly history; reply is BATT_1FCD0.";
 CM_ BO_ 2415710720 "RTR remote-request frame (no payload). Polls SOC daily-low history; reply is BATT_1FCD2.";
 CM_ BO_ 2415711232 "RTR remote-request frame (no payload). Polls SOC daily-high history; reply is BATT_1FCD4.";
@@ -288,10 +566,20 @@ CM_ SG_ 2213676544 VehicleInputVoltage "Confirmed: V = raw/1000. Ranged 12.552-1
 CM_ BO_ 2482143744 "RedVision display mirror, ~1 Hz. DisplayVehicleCurrent (D3-D4) and ManagerOutputCurrentDisplay (D7-D8) both scale 0.1, offset -1000.";
 CM_ BO_ 2482144256 "RedVision display mirror of the Manager30 vehicle input voltage, ~1 Hz. D3-D4, scale 0.1 V. Example 0x13F28420 F1 00 7D 00 ... -> 12.5 V.";
 CM_ SG_ 2617049600 RogueInputCurrent "CONFIRMED: DGN 0x1FD02, page 0x16, D4-D5 little-endian. Rogue input current in amperes = raw * 0.001. Controlled capture rose from approximately 0.05 A to 8.781 A and returned to approximately 0.05 A.";
-CM_ SG_ 2213611520 ConfigFlag0Raw "D1 bit0 is a raw load-disconnect configuration flag. It is not charging mode.";
-CM_ SG_ 2213675008 ChargingMode "D1 bit0. 0=Touring mode, 1=Storage mode. Use as a startup hint; command 0x43 is retained and authoritative once observed.";
-CM_ SG_ 2213675008 ChargingStageBase "Bits 1-7 of D1 with factor 2. The physical value equals D1 & 0xFE and should be interpreted using the charging-stage enum.";
 
+
+CM_ BO_ 2616460288 "CONFIRMED DGN 0x1F404 periodic device identity record. D1-D4 are the unsigned little-endian decimal serial-number prefix YYMMDDNNNN. D5-D6 are the unsigned little-endian decimal factory serial suffix SSSS. The complete serial printed on the device is formatted as prefix zero-padded to 10 decimal digits, a hyphen, then suffix zero-padded to 4 decimal digits: %010u-%04u. D7 is the confirmed device type. D8 remains an unresolved subtype/family byte.";
+CM_ SG_ 2616460288 SerialNumberPrefix "CONFIRMED first component of the factory serial number. Unsigned little-endian uint32, displayed as exactly 10 decimal digits in the form YYMMDDNNNN.";
+CM_ SG_ 2616460288 SerialNumberSuffix "CONFIRMED second component of the factory serial number. Unsigned little-endian uint16, displayed as exactly 4 decimal digits SSSS. It is part of the printed production serial number, not an installation sequence.";
+CM_ SG_ 2616460288 DeviceSubtypeRaw "Unresolved raw subtype/family byte. Observed values: 0xFF Manager30 and BMS Battery Sensor, 0x02 RedVision Display, 0x00 TVMS1280 and TVMS Rogue.";
+
+
+VAL_ 2616460288 DeviceType 1 "Manager30" 3 "BMSBatterySensor" 12 "RedVisionDisplay" 14 "TVMS1280" 22 "TVMSRogue" ;
+
+CM_ SG_ 2482044928 NominalSystemVoltage_Candidate "Observed literal 12 V. Candidate until tested on another nominal system voltage.";
+CM_ SG_ 2482045952 EstimatorRaw_Candidate "Dynamic raw estimator. 0xFFFF was the unavailable value; meaning unresolved.";
+CM_ SG_ 2549351168 ProductNameChar1 "ASCII byte; concatenate Char1..Char7 in segment-index order and ignore 0xFF padding.";
+CM_ SG_ 2616460288 DeviceType "CONFIRMED device-type code: 1 Manager30, 3 BMS Battery Sensor, 12 RedVision Display, 14 TVMS1280, 22 TVMS Rogue.";
 
 VAL_ 2617036288 HistoryDataset 208 "HourlySOCHistory" 210 "DailyLowSOCHistory" 212 "DailyHighSOCHistory" 214 "SolarEnergyHistory" ;
 VAL_ 2617036288 HistoryClearCommand 252 "ClearDelete" ;
@@ -299,18 +587,154 @@ VAL_ 2617036288 HistoryClearCommand 252 "ClearDelete" ;
 VAL_ 2415068160 SetClockWeekday 0 "Unknown" 1 "Monday" 2 "Tuesday" 3 "Wednesday" 4 "Thursday" 5 "Friday" 6 "Saturday" 7 "Sunday" ;
 VAL_ 2213741568 ClockFlags 0 "Unknown" 1 "Monday" 2 "Tuesday" 3 "Wednesday" 4 "Thursday" 5 "Friday" 6 "Saturday" 7 "Sunday" ;
 
-VAL_ 2482044928 BatteryType 0 "Gel" 1 "AGM" 2 "LeadAcid" 3 "Calcium" 4 "Lithium" ;
+VAL_ 2482044928 BatteryType 0 "Gel_Candidate" 1 "AGM_Candidate" 2 "LeadAcid_Candidate" 3 "Calcium_Candidate" 4 "Lithium" ;
+VAL_ 2617049088 State_Plus0 0 "Off_Candidate" 1 "On_Candidate" 6 "FuseBlown_Candidate" 10 "OutputOverTemp_Candidate" 20 "OffOverride_Candidate" 21 "OnOverride_Candidate" 36 "ConfiguredNormalOff_Candidate" 248 "Unconfigured_Candidate" ;
+VAL_ 2617049088 State_Plus1 0 "Off_Candidate" 1 "On_Candidate" 6 "FuseBlown_Candidate" 10 "OutputOverTemp_Candidate" 20 "OffOverride_Candidate" 21 "OnOverride_Candidate" 36 "ConfiguredNormalOff_Candidate" 248 "Unconfigured_Candidate" ;
+VAL_ 2617049088 State_Plus2 0 "Off_Candidate" 1 "On_Candidate" 6 "FuseBlown_Candidate" 10 "OutputOverTemp_Candidate" 20 "OffOverride_Candidate" 21 "OnOverride_Candidate" 36 "ConfiguredNormalOff_Candidate" 248 "Unconfigured_Candidate" ;
+VAL_ 2617049088 State_Plus3 0 "Off_Candidate" 1 "On_Candidate" 6 "FuseBlown_Candidate" 10 "OutputOverTemp_Candidate" 20 "OffOverride_Candidate" 21 "OnOverride_Candidate" 36 "ConfiguredNormalOff_Candidate" 248 "Unconfigured_Candidate" ;
+VAL_ 2617049088 State_Plus4 0 "Off_Candidate" 1 "On_Candidate" 6 "FuseBlown_Candidate" 10 "OutputOverTemp_Candidate" 20 "OffOverride_Candidate" 21 "OnOverride_Candidate" 36 "ConfiguredNormalOff_Candidate" 248 "Unconfigured_Candidate" ;
+VAL_ 2617049088 State_Plus5 0 "Off_Candidate" 1 "On_Candidate" 6 "FuseBlown_Candidate" 10 "OutputOverTemp_Candidate" 20 "OffOverride_Candidate" 21 "OnOverride_Candidate" 36 "ConfiguredNormalOff_Candidate" 248 "Unconfigured_Candidate" ;
+VAL_ 2617049088 State_Plus6 0 "Off_Candidate" 1 "On_Candidate" 6 "FuseBlown_Candidate" 10 "OutputOverTemp_Candidate" 20 "OffOverride_Candidate" 21 "OnOverride_Candidate" 36 "ConfiguredNormalOff_Candidate" 248 "Unconfigured_Candidate" ;
+
+
+CM_ "READ-WRITE UPDATE: configuration object transport, CRC-32C, direct setting commands, DGN 0x1F108 readback and confirmed serialized-object enums were added from readwrite.csv and controlled changed-setting captures 1 through 5.";
+CM_ "SERIALIZED CONFIG OBJECTS: object 2 is the main device/system configuration; object 3 is RedVision display/UI configuration. Header +0x04 is uint32 object length and +0x08 is whole-object CRC-32C. Calculate the object CRC across ObjectLength bytes after replacing bytes +0x08..+0x0B with zero.";
+CM_ "SERIALIZED CONFIG INTEGER TAGGING: immediate integer stored = actual value*4+1; decode actual=(stored-1)/4. Pointers are 4-byte aligned. String-alignment bytes can change without representing settings.";
+CM_ "The variable-length object contents cannot be represented as fixed DBC signals. Named VAL_TABLE_ entries and this database comments preserve the confirmed object enum mappings; the companion read-write report contains record-level details.";
+
+CM_ BO_ 2482046976 "CONFIRMED TVMS1280 and TVMS Rogue DGN 0x1F108 priority-4 form. D1 bits2-4 are the load-disconnect trigger, D2-D3 disconnect voltage in millivolts, D4-D5 reconnect voltage in millivolts, D6 disconnect SOC percent and D7 reconnect SOC percent. D1 low/high flag bits remain unresolved.";
+CM_ SG_ 2482046976 LoadDisconnectTrigger "Confirmed enum: 0 Always, 1 BMS Voltage, 2 BMS SOC, 3 Never, 4 Voltage.";
+CM_ SG_ 2482046976 ConfigFlagsLowRaw "Unresolved D1 bits0-1.";
+CM_ SG_ 2482046976 ConfigHighFlagsRaw "Unresolved D1 bits5-7; observed high bits are normally set.";
+
+CM_ BO_ 2399338496 "DGN request. Actual CAN ID is 0x0F03<destination><requester>. D1-D2 contain the requested 17-bit DGN little-endian. Example 04 F4 requests DGN 0x1F404.";
+CM_ BO_ 2390818816 "Configuration-object write data. Actual CAN ID is 0x0E81<device><tool>. Each frame contributes eight sequential bytes to the block committed by the following 0x0E88 service.";
+CM_ BO_ 2390949888 "Pre-write query observed before object writes. Actual CAN ID is 0x0E83<device><tool>. Both arguments were zero in captures. Exact purpose remains unconfirmed.";
+CM_ BO_ 2391080960 "Object select. Actual CAN ID is 0x0E85<device><tool>. D1 selects the object. Confirmed configurator objects: 2 main device/system configuration, 3 RedVision display/UI configuration.";
+CM_ BO_ 2391146496 "Block read request. Actual CAN ID is 0x0E86<device><tool>. D1-D4 offset and D5-D8 requested length are uint32 little-endian.";
+CM_ BO_ 2391212032 "Prepare/open object for writing. Actual CAN ID is 0x0E87<device><tool>. Captures used offset 0 and second argument 0x7FFFFFFF. Exact argument semantics remain candidates.";
+CM_ BO_ 2391277568 "Commit the preceding 0x0E81 data block. Actual CAN ID is 0x0E88<device><tool>. D1-D4 destination offset; D5-D8 CRC-32C/Castagnoli of exactly the preceding block bytes.";
+CM_ BO_ 2391343104 "Close the selected configuration object. Actual CAN ID is 0x0E89<device><tool>.";
+CM_ BO_ 2391408640 "Apply/activate the written configuration. Actual CAN ID is 0x0E8A<device><tool>. Apply semantics are strongly supported by sequence position but not independently confirmed.";
+CM_ BO_ 2189426688 "Directed object-service acknowledgement. Actual CAN ID is 0x0280<requester><device>. D1=1 was busy/in progress and D1=0 complete/ready; D3 echoes the service opcode.";
+CM_ BO_ 2189492224 "Configuration-object read data. Actual CAN ID is 0x0281<requester><device>. Concatenate payloads in frame order and truncate to the byte count from 0x0284.";
+CM_ BO_ 2189688832 "Read block trailer. Actual CAN ID is 0x0284<requester><device>. D1-D4 returned byte count; D5-D8 CRC-32C/Castagnoli of exactly that many returned bytes. The same frame type is also seen after the unconfirmed 0x0E83 query.";
+CM_ SG_ 2391277568 BlockWriteCRC32C "CRC-32C/Castagnoli, reflected polynomial 0x82F63B78, init 0xFFFFFFFF, xorout 0xFFFFFFFF.";
+CM_ SG_ 2189688832 BlockTrailerCRC32C "CRC-32C/Castagnoli, reflected polynomial 0x82F63B78, init 0xFFFFFFFF, xorout 0xFFFFFFFF.";
+
+CM_ BO_ 2399142144 "Manager30 addressed configuration command. Actual ID is 0x0F0001<tool>. Configurator format is D2=0, D3=3, D4=0 and D5-D8 uint32 little-endian value.";
+CM_ BO_ 2399143936 "Battery Sensor addressed configuration command. Actual ID is 0x0F0008<tool>. Configurator format is D2=0, D3=3, D4=0 and D5-D8 uint32 little-endian value.";
+CM_ BO_ 2399151104 "TVMS1280 command. Actual ID is 0x0F0024<tool>. Commands 0x3A-0x3E set load-disconnect fields. Command 0xCB controls channel state using D4 channel and D5 state.";
+CM_ BO_ 2399154176 "TVMS Rogue command. Actual ID is 0x0F0030<tool>. Commands 0x3A-0x3E set load-disconnect fields. Command 0xCB sets on/off and 0x5A sets absolute output level using D4 channel and D5 value.";
+CM_ BO_ 2399468032 "Direct-setting acknowledgement from a configured device to tool address 0xFA. Actual ID is 0x0F04FA<device>. D1=1 was observed for accepted writes and D2 echoes the command ID.";
+CM_ SG_ 2399142144 VehicleInputTrigger "Confirmed values: 1=12 V, 3=Ignition, 5=On. Auto and 24 V remain menu-order candidates 0 and 2.";
+CM_ SG_ 2399143936 SetBatteryType "Lithium value 4 is directly observed. Values 0-3 follow the configurator menu order and remain less strongly confirmed.";
+CM_ SG_ 2399151104 Channel "TVMS1280 channel IDs: 0x04-0x0D outputs 1-10, 0x0E inverter, 0x0F master.";
+CM_ SG_ 2399154176 ChannelOnOff "TVMS Rogue channel IDs: 0x0B master, 0x0C-0x15 outputs 1-10.";
+CM_ SG_ 2399154176 ChannelLevel "TVMS Rogue channel IDs: 0x0B master, 0x0C-0x15 outputs 1-10.";
+
 VAL_ 2213611520 LoadDisconnectTrigger 0 "Always" 1 "BMSVoltage" 2 "BMSSOC" 3 "Never" 4 "Voltage" ;
+VAL_ 2482046976 LoadDisconnectTrigger 0 "Always" 1 "BMSVoltage" 2 "BMSSOC" 3 "Never" 4 "Voltage" ;
+VAL_ 2391080960 ObjectRecordIndex 2 "MainDeviceConfiguration" 3 "RedVisionDisplayUIConfiguration" ;
+VAL_ 2189426688 ServiceState 0 "CompleteReady" 1 "BusyInProgress" ;
+VAL_ 2399142144 CommandId 58 "SetLoadDisconnectTrigger" 59 "SetLoadDisconnectVoltage" 60 "SetLoadReconnectVoltage" 61 "SetLoadDisconnectSOC" 62 "SetLoadReconnectSOC" 104 "SetVehicleInputTrigger" ;
+VAL_ 2399142144 LoadDisconnectTrigger 0 "Always" 1 "BMSVoltage" 2 "BMSSOC" 3 "Never" 4 "Voltage" ;
+VAL_ 2399142144 VehicleInputTrigger 0 "Auto_Candidate" 1 "12V" 2 "24V_Candidate" 3 "Ignition" 5 "On" ;
+VAL_ 2399143936 CommandId 17 "SetBatteryType" 18 "SetConfiguredCapacity" 20 "SetMaxChargeCurrent" 21 "CalibrateSOCFull" 65 "SetLowSOCAlarm" 66 "SetLowVoltageAlarm" ;
+VAL_ 2399143936 SetBatteryType 0 "Gel_Candidate" 1 "AGM_Candidate" 2 "LeadAcid_Candidate" 3 "Calcium_Candidate" 4 "Lithium" ;
+VAL_ 2399151104 CommandId 58 "SetLoadDisconnectTrigger" 59 "SetLoadDisconnectVoltage" 60 "SetLoadReconnectVoltage" 61 "SetLoadDisconnectSOC" 62 "SetLoadReconnectSOC" 203 "SetChannelOnOff" ;
+VAL_ 2399151104 LoadDisconnectTrigger 0 "Always" 1 "BMSVoltage" 2 "BMSSOC" 3 "Never" 4 "Voltage" ;
+VAL_ 2399151104 ChannelState 0 "Off" 1 "On" ;
+VAL_ 2399154176 CommandId 58 "SetLoadDisconnectTrigger" 59 "SetLoadDisconnectVoltage" 60 "SetLoadReconnectVoltage" 61 "SetLoadDisconnectSOC" 62 "SetLoadReconnectSOC" 90 "SetLevel" 203 "SetOnOff" ;
+VAL_ 2399154176 LoadDisconnectTrigger 0 "Always" 1 "BMSVoltage" 2 "BMSSOC" 3 "Never" 4 "Voltage" ;
+VAL_ 2399154176 ChannelState 0 "Off" 1 "On" ;
+VAL_ 2399468032 ConfigAckStatus 1 "Accepted" ;
+VAL_ 2213676544 VehicleInputTrigger 0 "Auto_Candidate" 1 "12V" 2 "24V_Candidate" 3 "Ignition" 5 "On" ;
+
+
+
+CM_ "CHARGING MODE CORRECTION: Manager30 charging mode is decoded from DGN 0x1F200 D1 bit0. DGN 0x1F108 is load-disconnect configuration and must not be used for Touring/Storage state.";
+
+CM_ BO_ 2213611520 "Manager30 DGN 0x1F108 is load-disconnect configuration, not charging-mode status. D1 bits2-4 decode the load-disconnect trigger.";
+CM_ SG_ 2213611520 ConfigFlag0Raw "D1 bit0 is an unresolved configuration flag; do not decode it as ChargingMode.";
+CM_ SG_ 2213611520 ConfigFlag1Raw "Unresolved D1 bit1.";
+CM_ SG_ 2213611520 LoadDisconnectTrigger "Confirmed enum: 0 Always, 1 BMS Voltage, 2 BMS SOC, 3 Never, 4 Voltage.";
+CM_ SG_ 2213611520 ConfigHighFlagsRaw "Unresolved D1 bits5-7; observed high bits are normally set.";
+
+CM_ BO_ 2213675008 "Manager30 charging-stage and charging-mode status. ChargingMode = D1 bit0, where 0=Touring and 1=Storage. ChargingStageBase is D1 with bit0 masked off (D1 & 0xFE).";
+CM_ SG_ 2213675008 ChargingStageCode "Complete raw D1 stage/mode byte.";
+CM_ SG_ 2213675008 ChargingMode "D1 bit0. 0=Touring mode, 1=Storage mode.";
+CM_ SG_ 2213675008 ChargingStageBase "Bits1-7 with factor 2; displayed value equals D1 & 0xFE. Confirmed stage bases: 0x00 Not Charging, 0x10 Desulphation, 0x20 Soft Start, 0x30 Boost, 0x40 Absorption, 0x50 Battery Test, 0x60 Equalize, 0x70 Float, 0x80 Maintenance.";
+CM_ SG_ 2213675008 ChargerRatedCurrent_Candidate "D2 candidate rated/configured charger current. This field remains unconfirmed.";
+
+CM_ BO_ 2399207168 "Broadcast setting command from a RedVision display. Command 0x43 sets Touring/Storage mode. storage locked.csv also contains command 0x4D with value 1 and an acknowledgement from TVMS1280; this is a strong Storage-mode-lock candidate but requires a controlled lock-off capture before confirmation.";
+CM_ SG_ 2399207168 SetChargingMode "Command 0x43: 0 Touring, 1 Storage. This is a state-changing command, not a periodic status signal.";
+CM_ SG_ 2399207168 StorageModeLock_Candidate "Command 0x4D candidate: storage locked.csv contains value 1 while the system was locked to Storage mode. Confirm by toggling the lock off and capturing value 0.";
+CM_ SG_ 2399142144 SetChargingMode "Addressed Manager30 command 0x43: 0 Touring, 1 Storage.";
+
+VAL_ 2213611520 LoadDisconnectTrigger 0 "Always" 1 "BMSVoltage" 2 "BMSSOC" 3 "Never" 4 "Voltage" ;
+VAL_ 2213675008 ChargingStageCode 0 "NotCharging" 16 "Desulphation_Touring" 17 "Desulphation_Storage" 32 "SoftStart_Touring" 33 "SoftStart_Storage" 48 "Boost_Touring" 49 "Boost_Storage" 64 "Absorption_Touring" 65 "Absorption_Storage" 80 "BatteryTest_Touring" 81 "BatteryTest_Storage" 96 "Equalize_Touring" 97 "Equalize_Storage" 112 "Float_Touring" 113 "Float_Storage" 128 "Maintenance_Touring" 129 "Maintenance_Storage" ;
 VAL_ 2213675008 ChargingMode 0 "Touring" 1 "Storage" ;
 VAL_ 2213675008 ChargingStageBase 0 "NotCharging" 8 "Desulphation" 16 "SoftStart" 24 "Boost" 32 "Absorption" 40 "BatteryTest" 48 "Equalize" 56 "Float" 64 "Maintenance" ;
-VAL_ 2213676544 VehicleInputTrigger 0 "Auto" 1 "12V" 2 "24V" 3 "Ignition" 5 "On" ;
-VAL_ 2399207168 CommandId 17 "SetBatteryType" 18 "SetConfiguredCapacity" 20 "SetMaxChargeCurrent" 65 "SetLowSOCAlarm" 66 "SetLowVoltageAlarm" 67 "SetChargingMode" 104 "SetVehicleInputTrigger" ;
-VAL_ 2399154176 CommandId 203 "SetOnOff" 90 "SetLevel" ;
-VAL_ 2399151104 CommandId 203 "SetOnOff" ;
-VAL_ 2617049088 State_Plus0 0 "Off" 1 "On" 6 "FuseBlown" 10 "OutputOverTemp" 20 "OffOverride" 21 "OnOverride" 248 "Unconfigured" ;
-VAL_ 2617049088 State_Plus1 0 "Off" 1 "On" 6 "FuseBlown" 10 "OutputOverTemp" 20 "OffOverride" 21 "OnOverride" 248 "Unconfigured" ;
-VAL_ 2617049088 State_Plus2 0 "Off" 1 "On" 6 "FuseBlown" 10 "OutputOverTemp" 20 "OffOverride" 21 "OnOverride" 248 "Unconfigured" ;
-VAL_ 2617049088 State_Plus3 0 "Off" 1 "On" 6 "FuseBlown" 10 "OutputOverTemp" 20 "OffOverride" 21 "OnOverride" 248 "Unconfigured" ;
-VAL_ 2617049088 State_Plus4 0 "Off" 1 "On" 6 "FuseBlown" 10 "OutputOverTemp" 20 "OffOverride" 21 "OnOverride" 248 "Unconfigured" ;
-VAL_ 2617049088 State_Plus5 0 "Off" 1 "On" 6 "FuseBlown" 10 "OutputOverTemp" 20 "OffOverride" 21 "OnOverride" 248 "Unconfigured" ;
-VAL_ 2617049088 State_Plus6 0 "Off" 1 "On" 6 "FuseBlown" 10 "OutputOverTemp" 20 "OffOverride" 21 "OnOverride" 248 "Unconfigured" ;
+VAL_ 2399207168 CommandId 17 "SetBatteryType" 18 "SetConfiguredCapacity" 20 "SetMaxChargeCurrent" 58 "SetLoadDisconnectTrigger" 59 "SetLoadDisconnectVoltage" 60 "SetLoadReconnectVoltage" 61 "SetLoadDisconnectSOC" 62 "SetLoadReconnectSOC" 65 "SetLowSOCAlarm" 66 "SetLowVoltageAlarm" 67 "SetChargingMode" 77 "SetStorageModeLock_Candidate" 104 "SetVehicleInputTrigger" ;
+VAL_ 2399207168 SetChargingMode 0 "Touring" 1 "Storage" ;
+VAL_ 2399207168 StorageModeLock_Candidate 0 "Unlocked_Candidate" 1 "Locked_Candidate" ;
+VAL_ 2399142144 SetChargingMode 0 "Touring" 1 "Storage" ;
+
+BA_ "VFrameFormat" BO_ 2482045440 3;
+BA_ "VFrameFormat" BO_ 2482045952 3;
+BA_ "VFrameFormat" BO_ 2482044928 3;
+BA_ "VFrameFormat" BO_ 2482047488 3;
+BA_ "VFrameFormat" BO_ 2482819072 3;
+BA_ "VFrameFormat" BO_ 2482819584 3;
+BA_ "VFrameFormat" BO_ 2482820096 3;
+BA_ "VFrameFormat" BO_ 2213677568 3;
+BA_ "VFrameFormat" BO_ 2213677056 3;
+BA_ "VFrameFormat" BO_ 2213676032 3;
+BA_ "VFrameFormat" BO_ 2213675008 3;
+BA_ "VFrameFormat" BO_ 2213676544 3;
+BA_ "VFrameFormat" BO_ 2213741568 3;
+BA_ "VFrameFormat" BO_ 2214385152 3;
+BA_ "VFrameFormat" BO_ 2482143232 3;
+BA_ "VFrameFormat" BO_ 2482143744 3;
+BA_ "VFrameFormat" BO_ 2482144256 3;
+BA_ "VFrameFormat" BO_ 2617049088 3;
+BA_ "VFrameFormat" BO_ 2617049600 3;
+BA_ "VFrameFormat" BO_ 2617053696 3;
+BA_ "VFrameFormat" BO_ 2617044992 3;
+BA_ "VFrameFormat" BO_ 2549350400 3;
+BA_ "VFrameFormat" BO_ 2549350912 3;
+BA_ "VFrameFormat" BO_ 2549351168 3;
+BA_ "VFrameFormat" BO_ 2616460288 3;
+BA_ "VFrameFormat" BO_ 2616460544 3;
+BA_ "VFrameFormat" BO_ 2213808128 3;
+BA_ "VFrameFormat" BO_ 2616332032 3;
+BA_ "VFrameFormat" BO_ 2617045504 3;
+BA_ "VFrameFormat" BO_ 2549942016 3;
+BA_ "VFrameFormat" BO_ 2617054208 3;
+BA_ "VFrameFormat" BO_ 2617036288 3;
+BA_ "VFrameFormat" BO_ 2415068160 3;
+BA_ "VFrameFormat" BO_ 2415710208 3;
+BA_ "VFrameFormat" BO_ 2415710720 3;
+BA_ "VFrameFormat" BO_ 2415711232 3;
+BA_ "VFrameFormat" BO_ 2415711744 3;
+BA_ "VFrameFormat" BO_ 2189426688 3;
+BA_ "VFrameFormat" BO_ 2189492224 3;
+BA_ "VFrameFormat" BO_ 2189688832 3;
+BA_ "VFrameFormat" BO_ 2213611520 3;
+BA_ "VFrameFormat" BO_ 2390818816 3;
+BA_ "VFrameFormat" BO_ 2390949888 3;
+BA_ "VFrameFormat" BO_ 2391080960 3;
+BA_ "VFrameFormat" BO_ 2391146496 3;
+BA_ "VFrameFormat" BO_ 2391212032 3;
+BA_ "VFrameFormat" BO_ 2391277568 3;
+BA_ "VFrameFormat" BO_ 2391343104 3;
+BA_ "VFrameFormat" BO_ 2391408640 3;
+BA_ "VFrameFormat" BO_ 2399142144 3;
+BA_ "VFrameFormat" BO_ 2399143936 3;
+BA_ "VFrameFormat" BO_ 2399151104 3;
+BA_ "VFrameFormat" BO_ 2399154176 3;
+BA_ "VFrameFormat" BO_ 2399207168 3;
+BA_ "VFrameFormat" BO_ 2399338496 3;
+BA_ "VFrameFormat" BO_ 2399468032 3;
+BA_ "VFrameFormat" BO_ 2482046976 3;

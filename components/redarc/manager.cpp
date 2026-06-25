@@ -42,9 +42,7 @@ void Manager30Component::send_set_clock() {
     ESP_LOGW(TAG, "Set Time: time not yet synced");
     return;
   }
-  // Redarc weekday is 1=Mon..7=Sun; ESPHome day_of_week is 1=Sun..7=Sat.
   const uint8_t weekday = now.day_of_week == 1 ? 7 : (uint8_t) (now.day_of_week - 1);
-  // D1=((day-1)<<3)|weekday, D2=month, D3-D4=year LE, D5=hour, D6=min, D7=sec, D8=0.
   const std::vector<uint8_t> data = {
       (uint8_t) (((now.day_of_month - 1) << 3) | (weekday & 0x07)),
       (uint8_t) now.month,
@@ -100,10 +98,6 @@ void Manager30Component::send_charging_mode(uint8_t mode) {
   if (mode > 1) return;
   const std::vector<uint8_t> data = {0x43, 0x00, 0xFF, 0xFF, mode, 0x00, 0x00, 0x00};
   redarc_common::send_command(redarc_common::with_sa(0x0F00FF00UL, this->host_address_), data);
-  // Command 0x43 is the authoritative, retained Touring/Storage setting. Once
-  // observed or sent, do not let unrelated 0x1F108 configuration flags overwrite it.
-  this->charging_mode_command_seen_ = true;
-  this->publish_charging_mode_(mode);
   ESP_LOGD(TAG, "Sent charging mode %s", mode == 0 ? "Touring" : "Storage");
 }
 
@@ -133,32 +127,27 @@ void Manager30Component::handle_can_frame(uint32_t can_id, const std::vector<uin
     return;
   }
 
-  // Command 0x43 is broadcast by a RedVision display (or this bridge) and
-  // contains the retained mode setting: 0=Touring, 1=Storage. Accept any source.
-  if ((can_id & 0x1FFFFF00UL) == 0x0F00FF00UL &&
+  if (can_id == redarc_common::with_sa(0x0F00FF00UL, this->host_address_) &&
       data[0] == 0x43 && data[1] == 0x00 && data[2] == 0xFF && data[3] == 0xFF) {
-    this->charging_mode_command_seen_ = true;
     this->publish_charging_mode_(data[4] & 0x01U);
     return;
   }
 
-  // 0x1F108 is load-disconnect configuration. Its D1 bit 0 is not charging
-  // mode and must never overwrite the mode selected by command 0x43.
-
+  // DGN 0x1F200 D1 contains both values:
+  //   bit 0   = charging mode (0 Touring, 1 Storage)
+  //   bits1-7 = charging stage base (D1 & 0xFE)
+  // DGN 0x1F108 is load-disconnect configuration and must not update mode.
   if (redarc_common::rvc_matches(can_id, 0x1F200UL, this->source_address_)) {
     if (now - this->last_charging_stage_ms_ < this->filter_interval_ms_) return;
     this->last_charging_stage_ms_ = now;
     this->publish_charging_stage_(data[0]);
-    // Before a mode command has been observed since boot, D1 bit 0 is a useful
-    // startup hint. Once command 0x43 is known, keep the retained command state.
-    if (!this->charging_mode_command_seen_) this->publish_charging_mode_(data[0] & 0x01U);
+    this->publish_charging_mode_(data[0] & 0x01U);
     return;
   }
 
   if (redarc_common::rvc_matches(can_id, 0x1F206UL, this->source_address_)) {
     if (now - this->last_charger_status_ms_ < this->filter_interval_ms_) return;
     this->last_charger_status_ms_ = now;
-    // Confirmed: D1-D4 vehicle input current (raw/1000-1000 A), D5-D6 voltage (raw*0.001 V).
     if (this->vehicle_input_current_sensor_ != nullptr)
       this->vehicle_input_current_sensor_->publish_state(redarc_common::current_32_centered(redarc_common::u32_le(data, 0)));
     if (this->vehicle_input_voltage_sensor_ != nullptr)
@@ -226,10 +215,6 @@ void Manager30Component::handle_can_frame(uint32_t can_id, const std::vector<uin
     return;
   }
 
-  // Manager30 solar generation pages on DGN 0x1FCD6, received passively from the
-  // bus. D1 is the page index; D2-D3, D4-D5 and D6-D7 are little-endian Wh buckets.
-  // Page 0 starts with today, then previous days. 4 pages x 3 days = 12 days total
-  // (today + day -1..-11). Feeds the Solar Energy total.
   if (redarc_common::rvc_matches(can_id, 0x1FCD6UL, this->source_address_)) {
     const uint8_t page = data[0];
     if (page > 3) return;
@@ -244,8 +229,6 @@ void Manager30Component::handle_can_frame(uint32_t can_id, const std::vector<uin
     return;
   }
 
-  // AC input current: D1-D4 little-endian, raw/1000 - 1000 A.
-  // AC input voltage: D5-D6 little-endian, 1 V/count.
   if (redarc_common::rvc_matches(can_id, 0x1F204UL, this->source_address_)) {
     if (now - this->last_ac_ms_ < this->filter_interval_ms_) return;
     this->last_ac_ms_ = now;
@@ -267,7 +250,6 @@ void Manager30Component::publish_solar_daily_energy_(uint8_t day, uint16_t wh) {
 }
 
 void Manager30Component::publish_solar_energy_total_() {
-  // Day 0 is today; publish it on its own sensor as soon as it is known.
   if (this->solar_today_sensor_ != nullptr && this->solar_daily_known_[0])
     this->solar_today_sensor_->publish_state((float) this->solar_daily_wh_[0]);
 
@@ -285,9 +267,6 @@ void Manager30Component::publish_solar_energy_total_() {
 
 void Manager30Component::publish_solar_day_history_() {
   if (this->solar_day_history_text_sensor_ == nullptr) return;
-
-  // Today (day 0) plus the previous 11 days = 12 values, CSV in Wh; 255 marks an
-  // unknown slot. Index 0 is today, index 11 is 11 days ago.
   char buffer[96];
   size_t used = 0;
   buffer[0] = '\0';
@@ -305,7 +284,6 @@ void Manager30Component::publish_solar_day_history_() {
 }
 
 void Manager30Component::send_solar_history_request_() {
-  // RTR frame, extended ID, DLC 8, no payload (the RTR flag suppresses data on the wire).
   const std::vector<uint8_t> rtr_dlc8(8, 0x00);
   redarc_common::send_command(0x0FFCD600UL | this->host_address_, rtr_dlc8, true);
 }
@@ -317,42 +295,19 @@ void Manager30Component::publish_charging_mode_(uint8_t mode) {
 
 void Manager30Component::publish_charging_stage_(uint8_t stage) {
   if (this->charging_stage_text_sensor_ == nullptr) return;
-
-  // Bit 0 is independent; the stage is encoded in the upper bits, so each stage
-  // has an even and odd raw value with the same meaning. Mask it off (& 0xFE).
   const char *name = nullptr;
   switch (stage & 0xFE) {
-    case 0x00:
-      name = "Not Charging";
-      break;
-    case 0x10:
-      name = "Desulphation";
-      break;
-    case 0x20:
-      name = "Soft-start";
-      break;
-    case 0x30:
-      name = "Boost";
-      break;
-    case 0x40:
-      name = "Absorption";
-      break;
-    case 0x50:
-      name = "Battery Test";
-      break;
-    case 0x60:
-      name = "Equalize";
-      break;
-    case 0x70:
-      name = "Float";
-      break;
-    case 0x80:
-      name = "Maintenance";
-      break;
-    default:
-      break;
+    case 0x00: name = "Not Charging"; break;
+    case 0x10: name = "Desulphation"; break;
+    case 0x20: name = "Soft-start"; break;
+    case 0x30: name = "Boost"; break;
+    case 0x40: name = "Absorption"; break;
+    case 0x50: name = "Battery Test"; break;
+    case 0x60: name = "Equalize"; break;
+    case 0x70: name = "Float"; break;
+    case 0x80: name = "Maintenance"; break;
+    default: break;
   }
-
   if (name != nullptr) {
     this->charging_stage_text_sensor_->publish_state(name);
   } else {
