@@ -1,4 +1,4 @@
-VERSION "1.2 redarc-components-charging-stage-mode"
+VERSION "1.3 corrected-charging-mode-source"
 
 
 NS_ :
@@ -95,8 +95,16 @@ BO_ 2213676032 MGR_1F204_ACInput: 8 Manager30
  SG_ ACInputCurrent : 0|32@1+ (0.001,-1000) [-1000|1000] "A" Bridge
  SG_ ACInputVoltage : 32|16@1+ (1,0) [0|65535] "V" Bridge
 
-BO_ 2213611520 MGR_1F108_ChargingMode: 8 Manager30
- SG_ ChargingMode : 0|1@1+ (1,0) [0|1] "" Bridge
+BO_ 2213611520 MGR_1F108_LoadDisconnectConfig: 8 Manager30
+ SG_ ConfigFlag0Raw : 0|1@1+ (1,0) [0|1] "" Bridge
+ SG_ ConfigFlag1Raw : 1|1@1+ (1,0) [0|1] "" Bridge
+ SG_ LoadDisconnectTrigger : 2|3@1+ (1,0) [0|7] "" Bridge
+ SG_ ConfigHighFlagsRaw : 5|3@1+ (1,0) [0|7] "" Bridge
+ SG_ LoadDisconnectVoltage : 8|16@1+ (0.001,0) [0|65.535] "V" Bridge
+ SG_ LoadReconnectVoltage : 24|16@1+ (0.001,0) [0|65.535] "V" Bridge
+ SG_ LoadDisconnectSOC : 40|8@1+ (1,0) [0|100] "%" Bridge
+ SG_ LoadReconnectSOC : 48|8@1+ (1,0) [0|100] "%" Bridge
+ SG_ ConfigReservedD8 : 56|8@1+ (1,0) [0|255] "" Bridge
 
 BO_ 2213675008 MGR_1F200_ChargingStage: 8 Manager30
  SG_ ChargingMode : 0|1@1+ (1,0) [0|1] "" Bridge
@@ -243,14 +251,15 @@ CM_ BO_ 2482045440 "29-bit extended IDs. Receivers key on DGN=(ID>>8)&0x1FFFF an
 CM_ BO_ 2482819072 "Paginated history array. PageIndex (D1) selects the block; absolute hour index = PageIndex*7 + SlotN. Value 255 (0xFF) means no data.";
 CM_ BO_ 2482819584 "Paginated history array. Absolute day index = PageIndex*7 + SlotN. 255 = no data. Combined with the daily-high page into the SOC Daily Range entity.";
 CM_ BO_ 2482820096 "Paginated history array. Absolute day index = PageIndex*7 + SlotN. 255 = no data.";
-CM_ BO_ 2213675008 "Manager30 charging stage and operating mode on D1. ChargingMode = D1 & 0x01, where 0=Touring and 1=Storage. ChargingStageBase is bits 1-7 with factor 2, so its displayed physical value equals D1 & 0xFE. Confirmed stages: 0x00 Not Charging, 0x10 Desulphation, 0x20 Soft Start, 0x30 Boost, 0x40 Absorption, 0x50 Battery Test, 0x60 Equalize, 0x70 Float, 0x80 Maintenance. Confirmed example D1=0x70 decodes as Float/Touring; D1=0x71 decodes as Float/Storage.";
+CM_ BO_ 2213611520 "Manager30 DGN 0x1F108 is load-disconnect configuration, not charging mode. In the storage-mode transition capture D1 remained 0xEC (bit 0 clear) while command 0x43 set Storage and 0x1F200 changed to 0x21. D1 bits2-4 are the load-disconnect trigger; D2-D3 disconnect voltage, D4-D5 reconnect voltage, D6 disconnect SOC and D7 reconnect SOC.";
+CM_ BO_ 2213675008 "Manager30 charging stage on D1. ChargingStageBase is bits 1-7 with factor 2, so its displayed physical value equals D1 & 0xFE. D1 bit0 is a Touring/Storage startup hint (0=Touring, 1=Storage); retained mode is authoritative from command 0x43. Confirmed stages: 0x00 Not Charging, 0x10 Desulphation, 0x20 Soft Start, 0x30 Boost, 0x40 Absorption, 0x50 Battery Test, 0x60 Equalize, 0x70 Float, 0x80 Maintenance.";
 CM_ BO_ 2213741568 "Manager30 clock/status response. D1 bits 7-3 encode day-1; D1 bits 2-0 encode weekday (1=Monday through 7=Sunday). D2=month, D3-D4=year little-endian, D5=hour, D6=minute, D7=second, D8 is normally 0xFF. Observed from source address 0x01.";
 CM_ BO_ 2214385152 "Solar generation history, 4 pages x 3 days = 12 days. Day 0 = today, Day 1..11 = previous days, in Wh. Requested via REQ_0FFCD6 (RTR).";
 CM_ BO_ 2617049088 "DGN 0x1FD00 shared by TVMS1280 (SA 0x24) and TVMSRogue (SA 0x30). Byte array: BaseItem (D1) then State_Plus0..6 for channels BaseItem..BaseItem+6. Status codes: 0x00 Off, 0x01 On, 0x06 Fuse blown, 0x0A Output over temp, 0x14 Off override, 0x15 On override, 0xF8 Unconfigured, 0xFF no-data. TVMS1280 channel map: 0x01-0x03 Digital Inputs 1-3, 0x04-0x0D Outputs 1-10, 0x0E Inverter, 0x0F Master. TVMSRogue channel map: 0x01-0x08 Input Buttons 1-8, 0x0B Master, 0x0C-0x15 Outputs 1-10.";
 CM_ BO_ 2617049600 "DGN 0x1FD02 shared by TVMS1280 (SA 0x24) and TVMSRogue (SA 0x30), multiplexed by ItemId (D1). Item codes do not collide between the two devices, so one definition serves both.";
 CM_ BO_ 2617053696 "TVMSRogue dimmable-output levels, multiplexed by LevelPageId (D1): page 0x0C carries outputs 1-7, page 0x13 carries outputs 8-10.";
 CM_ BO_ 2617044992 "TVMS1280 inverter status. InverterState (D1) is on/off when InverterItemId (D2) == 0x0E.";
-CM_ BO_ 2399207168 "Config command from the bridge. ID = 0x0F00FF<host_address>. CommandId (D1) selects the setting; ConfigValue (D5-D6, little-endian) is the new value. Targets Manager30 and BatterySensor settings (D3=D4=0xFF).";
+CM_ BO_ 2399207168 "Config command from the bridge. ID = 0x0F00FF<host_address>. CommandId (D1) selects the setting; ConfigValue starts at D5. Command 0x43 sets charging mode: 0=Touring, 1=Storage. Targets Manager30 and BatterySensor settings (D3=D4=0xFF).";
 CM_ BO_ 2399143936 "Battery SOC full calibration. ID = 0x0F00<battery_SA><host_address>, e.g. 0x0F000822. D1=0x15, D3=0x03, D5=target percent.";
 CM_ BO_ 2399154176 "TVMSRogue output command. ID = 0x0F00<rogue_SA><host_address>. CommandId 0xCB = on/off (ChannelValue 0/1), 0x5A = absolute level (ChannelValue 0-100%). Channel 0x0B Master, 0x0C-0x15 Outputs 1-10.";
 CM_ BO_ 2399151104 "TVMS1280 output command. ID = 0x0F00<1280_SA><host_address>. CommandId 0xCB, Channel 0x04-0x0D Outputs 1-10, 0x0E Inverter, 0x0F Master, ChannelState 0/1.";
@@ -279,7 +288,9 @@ CM_ SG_ 2213676544 VehicleInputVoltage "Confirmed: V = raw/1000. Ranged 12.552-1
 CM_ BO_ 2482143744 "RedVision display mirror, ~1 Hz. DisplayVehicleCurrent (D3-D4) and ManagerOutputCurrentDisplay (D7-D8) both scale 0.1, offset -1000.";
 CM_ BO_ 2482144256 "RedVision display mirror of the Manager30 vehicle input voltage, ~1 Hz. D3-D4, scale 0.1 V. Example 0x13F28420 F1 00 7D 00 ... -> 12.5 V.";
 CM_ SG_ 2617049600 RogueInputCurrent "CONFIRMED: DGN 0x1FD02, page 0x16, D4-D5 little-endian. Rogue input current in amperes = raw * 0.001. Controlled capture rose from approximately 0.05 A to 8.781 A and returned to approximately 0.05 A.";
-
+CM_ SG_ 2213611520 ConfigFlag0Raw "D1 bit0 is a raw load-disconnect configuration flag. It is not charging mode.";
+CM_ SG_ 2213675008 ChargingMode "D1 bit0. 0=Touring mode, 1=Storage mode. Use as a startup hint; command 0x43 is retained and authoritative once observed.";
+CM_ SG_ 2213675008 ChargingStageBase "Bits 1-7 of D1 with factor 2. The physical value equals D1 & 0xFE and should be interpreted using the charging-stage enum.";
 
 
 VAL_ 2617036288 HistoryDataset 208 "HourlySOCHistory" 210 "DailyLowSOCHistory" 212 "DailyHighSOCHistory" 214 "SolarEnergyHistory" ;
@@ -288,10 +299,8 @@ VAL_ 2617036288 HistoryClearCommand 252 "ClearDelete" ;
 VAL_ 2415068160 SetClockWeekday 0 "Unknown" 1 "Monday" 2 "Tuesday" 3 "Wednesday" 4 "Thursday" 5 "Friday" 6 "Saturday" 7 "Sunday" ;
 VAL_ 2213741568 ClockFlags 0 "Unknown" 1 "Monday" 2 "Tuesday" 3 "Wednesday" 4 "Thursday" 5 "Friday" 6 "Saturday" 7 "Sunday" ;
 
-CM_ SG_ 2213675008 ChargingMode "Bit 0 of D1. 0=Touring mode, 1=Storage mode.";
-CM_ SG_ 2213675008 ChargingStageBase "Bits 1-7 of D1 with factor 2. The physical value equals D1 & 0xFE and should be interpreted using the charging-stage enum.";
 VAL_ 2482044928 BatteryType 0 "Gel" 1 "AGM" 2 "LeadAcid" 3 "Calcium" 4 "Lithium" ;
-VAL_ 2213611520 ChargingMode 0 "Touring" 1 "Storage" ;
+VAL_ 2213611520 LoadDisconnectTrigger 0 "Always" 1 "BMSVoltage" 2 "BMSSOC" 3 "Never" 4 "Voltage" ;
 VAL_ 2213675008 ChargingMode 0 "Touring" 1 "Storage" ;
 VAL_ 2213675008 ChargingStageBase 0 "NotCharging" 8 "Desulphation" 16 "SoftStart" 24 "Boost" 32 "Absorption" 40 "BatteryTest" 48 "Equalize" 56 "Float" 64 "Maintenance" ;
 VAL_ 2213676544 VehicleInputTrigger 0 "Auto" 1 "12V" 2 "24V" 3 "Ignition" 5 "On" ;
