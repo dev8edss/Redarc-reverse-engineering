@@ -117,8 +117,21 @@ Each device has a sensible default address (battery `0x08`, manager `0x01`,
 display `0x20`, Rogue `0x30`, TVMS1280 `0x24`), so the defaults will often work as-is
 and you can leave `source_address` out entirely.
 
-If a device uses a different address, you can find it on the **RedVision display**,
-where it's shown in **decimal**. Enter that number straight into the config — no
+If a device uses a different address, the easiest way to find it is the
+**device logs**: at the start of the logs (when you open the ESPHome log viewer)
+the bridge prints a table of every device it found on the bus, with each
+address shown in both decimal and hex, e.g.:
+
+```text
+Discovered devices:
+  Device Type         Address       Serial No
+  Manager30             1 (0x01)    2410143248-0004
+  BMS Battery Sensor    8 (0x08)    2409142757-0006
+  RedVision Display    32 (0x20)    ...
+```
+
+You can also read the address off the **RedVision display**, where it's shown in
+**decimal**. Either way, enter that number straight into the config — no
 conversion needed. `source_address` (and `host_address`) accept either plain
 decimal or hex with a `0x` prefix, so `source_address: 48` and
 `source_address: 0x30` mean exactly the same thing. **Two devices can't share the
