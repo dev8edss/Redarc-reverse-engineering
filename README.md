@@ -125,8 +125,8 @@ address shown in both decimal and hex, e.g.:
 ```text
 Discovered devices:
   Device Type         Address       Serial No
-  Manager30             1 (0x01)    2410143248-0004
-  BMS Battery Sensor    8 (0x08)    2409142757-0006
+  Manager30             1 (0x01)    2410######-####
+  BMS Battery Sensor    8 (0x08)    2409######-####
   RedVision Display    32 (0x20)    ...
 ```
 
