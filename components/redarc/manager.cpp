@@ -100,6 +100,10 @@ void Manager30Component::send_charging_mode(uint8_t mode) {
   if (mode > 1) return;
   const std::vector<uint8_t> data = {0x43, 0x00, 0xFF, 0xFF, mode, 0x00, 0x00, 0x00};
   redarc_common::send_command(redarc_common::with_sa(0x0F00FF00UL, this->host_address_), data);
+  // Command 0x43 is the authoritative, retained Touring/Storage setting. Once
+  // observed or sent, do not let unrelated 0x1F108 configuration flags overwrite it.
+  this->charging_mode_command_seen_ = true;
+  this->publish_charging_mode_(mode);
   ESP_LOGD(TAG, "Sent charging mode %s", mode == 0 ? "Touring" : "Storage");
 }
 
@@ -129,25 +133,25 @@ void Manager30Component::handle_can_frame(uint32_t can_id, const std::vector<uin
     return;
   }
 
-  if (can_id == redarc_common::with_sa(0x0F00FF00UL, this->host_address_) &&
+  // Command 0x43 is broadcast by a RedVision display (or this bridge) and
+  // contains the retained mode setting: 0=Touring, 1=Storage. Accept any source.
+  if ((can_id & 0x1FFFFF00UL) == 0x0F00FF00UL &&
       data[0] == 0x43 && data[1] == 0x00 && data[2] == 0xFF && data[3] == 0xFF) {
+    this->charging_mode_command_seen_ = true;
     this->publish_charging_mode_(data[4] & 0x01U);
     return;
   }
 
-  if (redarc_common::rvc_matches(can_id, 0x1F108UL, this->source_address_)) {
-    if (now - this->last_manager_status_ms_ < this->filter_interval_ms_) return;
-    this->last_manager_status_ms_ = now;
-    this->charging_mode_status_seen_ = true;
-    this->publish_charging_mode_(data[0] & 0x01U);
-    return;
-  }
+  // 0x1F108 is load-disconnect configuration. Its D1 bit 0 is not charging
+  // mode and must never overwrite the mode selected by command 0x43.
 
   if (redarc_common::rvc_matches(can_id, 0x1F200UL, this->source_address_)) {
     if (now - this->last_charging_stage_ms_ < this->filter_interval_ms_) return;
     this->last_charging_stage_ms_ = now;
     this->publish_charging_stage_(data[0]);
-    if (!this->charging_mode_status_seen_) this->publish_charging_mode_(data[0] & 0x01U);
+    // Before a mode command has been observed since boot, D1 bit 0 is a useful
+    // startup hint. Once command 0x43 is known, keep the retained command state.
+    if (!this->charging_mode_command_seen_) this->publish_charging_mode_(data[0] & 0x01U);
     return;
   }
 
