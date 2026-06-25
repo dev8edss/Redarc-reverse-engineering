@@ -1,0 +1,45 @@
+name: Assemble merged DBC
+
+on:
+  push:
+    branches:
+      - dev
+    paths:
+      - .dbc_merge/READY
+
+permissions:
+  contents: write
+
+jobs:
+  assemble:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out dev
+        uses: actions/checkout@v4
+        with:
+          ref: dev
+          fetch-depth: 0
+
+      - name: Assemble and validate DBC
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .dbc_merge/chunk_* | base64 --decode > RedVision_TVMS_components.dbc
+          echo "50137ba76c07f5c01797f0856fa17f719ead27a240bbabb4e11c8f29091c16f8  RedVision_TVMS_components.dbc" | sha256sum --check --strict
+          grep -q 'BO_ 2213675008 MGR_1F200_ChargingStageMode' RedVision_TVMS_components.dbc
+          grep -q 'SG_ ChargingMode : 0|1@1+' RedVision_TVMS_components.dbc
+          grep -q 'BO_ 2213611520 MGR_1F108_LoadDisconnectConfig' RedVision_TVMS_components.dbc
+
+      - name: Commit merged DBC
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add RedVision_TVMS_components.dbc
+          if git diff --cached --quiet; then
+            echo "DBC already current"
+            exit 0
+          fi
+          git commit -m "Merge v15 DBC and correct 0x1F200 charging mode"
+          git push origin HEAD:dev
