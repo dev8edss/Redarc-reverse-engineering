@@ -27,9 +27,32 @@ void Manager30ClearSolarHistoryButton::press_action() {
   if (this->parent_ != nullptr) this->parent_->clear_solar_history();
 }
 
+void Manager30ToggleStorageLockButton::press_action() {
+  if (this->parent_ != nullptr) this->parent_->toggle_storage_mode_lock();
+}
+
 void Manager30Component::clear_solar_history() {
   redarc_common::send_clear_history(this->host_address_, 0xD6);
   ESP_LOGI(TAG, "Sent clear solar history");
+}
+
+void Manager30Component::toggle_storage_mode_lock() {
+  // The lock has no confirmed periodic readback. Track command 0x4D broadcasts
+  // seen on the bus; before the first observed state, treat the system as
+  // unlocked so the first press sends lock=1 rather than an unsafe unlock.
+  if (!this->storage_mode_lock_known_) {
+    ESP_LOGW(TAG, "Storage-mode lock state unknown; assuming unlocked for first toggle");
+  }
+  this->send_storage_mode_lock_(!this->storage_mode_locked_);
+}
+
+void Manager30Component::send_storage_mode_lock_(bool locked) {
+  const std::vector<uint8_t> data = {
+      0x4D, 0x00, 0xFF, 0xFF, (uint8_t) (locked ? 1 : 0), 0x00, 0x00, 0x00};
+  redarc_common::send_command(redarc_common::with_sa(0x0F00FF00UL, this->host_address_), data);
+  this->storage_mode_locked_ = locked;
+  this->storage_mode_lock_known_ = true;
+  ESP_LOGI(TAG, "Sent storage-mode lock %s", locked ? "LOCKED" : "UNLOCKED");
 }
 
 void Manager30Component::send_set_clock() {
@@ -83,6 +106,7 @@ void Manager30Component::dump_config() {
   LOG_SELECT("  ", "Charging Mode", this->charging_mode_select_);
   LOG_BUTTON("  ", "Set Time", this->set_clock_button_);
   LOG_BUTTON("  ", "Delete Solar History", this->clear_solar_history_button_);
+  LOG_BUTTON("  ", "Toggle Storage Mode Lock", this->toggle_storage_lock_button_);
   ESP_LOGCONFIG(TAG, "  Solar history poll interval: %u ms", (unsigned) this->solar_history_poll_interval_ms_);
   LOG_TEXT_SENSOR("  ", "Solar Day 1-12 History", this->solar_day_history_text_sensor_);
 }
@@ -132,6 +156,17 @@ void Manager30Component::handle_can_frame(uint32_t can_id, const std::vector<uin
   if (can_id == redarc_common::with_sa(0x0F00FF00UL, this->host_address_) &&
       data[0] == 0x43 && data[1] == 0x00 && data[2] == 0xFF && data[3] == 0xFF) {
     this->publish_charging_mode_(data[4] & 0x01U);
+    return;
+  }
+
+  // Storage-mode lock is a broadcast command (0x4D) and may be sent by either
+  // RedVision display or this bridge, so accept any source address in the ID.
+  if ((can_id & 0x1FFFFF00UL) == 0x0F00FF00UL &&
+      data[0] == 0x4D && data[1] == 0x00 && data[2] == 0xFF && data[3] == 0xFF) {
+    this->storage_mode_locked_ = (data[4] & 0x01U) != 0;
+    this->storage_mode_lock_known_ = true;
+    ESP_LOGD(TAG, "Observed storage-mode lock %s from SA 0x%02X",
+             this->storage_mode_locked_ ? "LOCKED" : "UNLOCKED", (unsigned) (can_id & 0xFFU));
     return;
   }
 

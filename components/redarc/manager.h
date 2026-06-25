@@ -52,6 +52,15 @@ class Manager30ClearSolarHistoryButton : public button::Button {
   Manager30Component *parent_{nullptr};
 };
 
+class Manager30ToggleStorageLockButton : public button::Button {
+ public:
+  void set_parent(Manager30Component *parent) { this->parent_ = parent; }
+
+ protected:
+  void press_action() override;
+  Manager30Component *parent_{nullptr};
+};
+
 class Manager30Component : public Component {
  public:
   void set_source_address(uint8_t source_address) { this->source_address_ = source_address; }
@@ -61,8 +70,10 @@ class Manager30Component : public Component {
   void set_time_source(time::RealTimeClock *t) { this->time_source_ = t; }
   void set_set_clock_button(Manager30SetClockButton *b) { this->set_clock_button_ = b; }
   void set_clear_solar_history_button(Manager30ClearSolarHistoryButton *b) { this->clear_solar_history_button_ = b; }
+  void set_toggle_storage_lock_button(Manager30ToggleStorageLockButton *b) { this->toggle_storage_lock_button_ = b; }
   void send_set_clock();
   void clear_solar_history();
+  void toggle_storage_mode_lock();
   void set_output_current_sensor(sensor::Sensor *s) { this->output_current_sensor_ = s; }
   void set_battery_voltage_sensor(sensor::Sensor *s) { this->battery_voltage_sensor_ = s; }
   void set_source_device_current_sensor(sensor::Sensor *s) { this->source_device_current_sensor_ = s; }
@@ -92,6 +103,7 @@ class Manager30Component : public Component {
   void send_charging_mode(uint8_t mode);
 
  protected:
+  void send_storage_mode_lock_(bool locked);
   void publish_charging_mode_(uint8_t mode);
   void publish_charging_stage_(uint8_t stage);
   void publish_solar_daily_energy_(uint8_t day, uint16_t wh);
@@ -110,6 +122,8 @@ class Manager30Component : public Component {
   uint32_t last_charging_stage_ms_{0};
   uint32_t last_clock_ms_{0};
   bool charging_mode_status_seen_{false};
+  bool storage_mode_lock_known_{false};
+  bool storage_mode_locked_{false};
   redarc_battery_sensor::BatterySensorComponent *battery_sensor_{nullptr};
   sensor::Sensor *output_current_sensor_{nullptr};
   sensor::Sensor *battery_voltage_sensor_{nullptr};
@@ -137,6 +151,7 @@ class Manager30Component : public Component {
   time::RealTimeClock *time_source_{nullptr};
   Manager30SetClockButton *set_clock_button_{nullptr};
   Manager30ClearSolarHistoryButton *clear_solar_history_button_{nullptr};
+  Manager30ToggleStorageLockButton *toggle_storage_lock_button_{nullptr};
 };
 
 }  // namespace redarc_manager
