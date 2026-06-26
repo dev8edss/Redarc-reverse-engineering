@@ -51,6 +51,12 @@ class RedarcCanDispatcher {
   void add_listener(std::function<void(uint32_t, const std::vector<uint8_t> &)> cb) {
     this->listeners_.push_back(std::move(cb));
   }
+  void add_logger_connected_listener(std::function<void()> cb) {
+    this->logger_connected_listeners_.push_back(std::move(cb));
+  }
+  void notify_logger_connected() {
+    for (auto &cb : this->logger_connected_listeners_) cb();
+  }
   void dispatch(uint32_t can_id, const std::vector<uint8_t> &data, bool rtr = false) {
     log_can_frame("CAN_RX", can_id, data, rtr);
     if (rtr) return;
@@ -59,6 +65,7 @@ class RedarcCanDispatcher {
  private:
   canbus::Canbus *canbus_{nullptr};
   std::vector<std::function<void(uint32_t, const std::vector<uint8_t> &)>> listeners_;
+  std::vector<std::function<void()>> logger_connected_listeners_;
 };
 
 class RedarcCommonComponent : public Component {
@@ -147,10 +154,10 @@ class RedarcCommonComponent : public Component {
     this->devices_.push_back(dev);
   }
 
-  // Print the discovered devices once. A short delay (re-scheduled on each
-  // connect, so it fires only once) lets the list fill in and the log stream
-  // settle before we print.
+  // Notify interested REDARC device components immediately, then print the
+  // discovered devices after a short delay so the log stream can settle.
   void on_logger_connected_() {
+    RedarcCanDispatcher::instance().notify_logger_connected();
     this->set_timeout("redarc_discovery_print", 3000, [this]() { this->log_discovered_devices_(); });
   }
 
