@@ -33,6 +33,7 @@ class TVMSRogueLight : public light::LightOutput {
   void set_parent(TVMSRogueComponent *parent) { this->parent_ = parent; }
   void set_output_number(uint8_t output_number) { this->output_number_ = output_number; }
   void set_channel(uint8_t channel) { this->channel_ = channel; }
+  void set_dimmable(bool dimmable) { this->dimmable_ = dimmable; }
 
   light::LightTraits get_traits() override;
   void setup_state(light::LightState *state) override;
@@ -41,12 +42,14 @@ class TVMSRogueLight : public light::LightOutput {
 
   uint8_t output_number() const { return this->output_number_; }
   uint8_t channel() const { return this->channel_; }
+  bool is_dimmable() const { return this->dimmable_; }
 
  protected:
   TVMSRogueComponent *parent_{nullptr};
   light::LightState *state_{nullptr};
   uint8_t output_number_{1};
   uint8_t channel_{0x0C};
+  bool dimmable_{false};
   uint8_t last_sent_percent_{0xFF};
   float last_nonzero_level_percent_{100.0f};
 };
@@ -66,6 +69,9 @@ class TVMSRogueComponent : public Component {
   void set_level_sensor(uint8_t output, sensor::Sensor *s) { if (output >= 1 && output <= 10) this->level_sensors_[output] = s; }
   void set_button_sensor(uint8_t input, binary_sensor::BinarySensor *s) { if (input >= 1 && input <= 8) this->button_sensors_[input] = s; }
   void set_output_status_text_sensor(text_sensor::TextSensor *s) { this->output_status_text_sensor_ = s; }
+  void set_output_dimmable(uint8_t output, bool dimmable) {
+    if (output >= 1 && output <= 10) this->configured_dimmable_[output] = dimmable;
+  }
 
   void set_true_off_threshold(float v) { this->true_off_threshold_percent_ = v; }
 
@@ -85,6 +91,10 @@ class TVMSRogueComponent : public Component {
   void send_on_(uint8_t channel);
   void send_off_(uint8_t channel);
   void send_level_(uint8_t channel, uint8_t percent);
+  void on_logger_connected_();
+  void request_output_configuration_();
+  void validate_output_configuration_();
+  void handle_output_configuration_frame_(const std::vector<uint8_t> &data);
 
   void publish_channel_(uint8_t channel, bool state);
   void set_feedback_level_(uint8_t output_number, float level);
@@ -108,6 +118,11 @@ class TVMSRogueComponent : public Component {
   std::array<binary_sensor::BinarySensor *, 11> button_sensors_{};
   std::array<bool, 11> button_states_{};
   std::array<bool, 11> button_state_known_{};
+  std::array<bool, 11> configured_dimmable_{};
+  std::array<bool, 11> reported_dimmable_{};
+  std::array<bool, 11> reported_dimmable_known_{};
+  std::array<uint8_t, 11> reported_config_raw_{};
+  bool output_config_request_pending_{false};
   sensor::Sensor *tank1_sensor_{nullptr};
   sensor::Sensor *tank2_sensor_{nullptr};
   sensor::Sensor *input_voltage_sensor_{nullptr};
