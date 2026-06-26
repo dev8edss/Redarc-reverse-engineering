@@ -129,8 +129,7 @@ async def to_code(config):
     })
     cg.add(var.set_output_status_text_sensor(ts))
 
-    # Output switches (channels 0x04–0x0D)
-    # Digital input binary sensors (candidate decode from channel status 0x01..0x03)
+    # Digital input state from DGN 0x1FD00 channels 0x01..0x03.
     for i in range(1, 4):
         bs = cg.new_Pvariable(config[f"digital_input_{i}_id"])
         bs_cfg = {
@@ -143,12 +142,12 @@ async def to_code(config):
         await binary_sensor.register_binary_sensor(bs, bs_cfg)
         cg.add(var.set_digital_input_sensor(i, bs))
 
+    # Output switches, channels 0x04..0x0D.
     for i in range(10):
         sw = cg.new_Pvariable(config[f"output_{i}_id"])
         cg.add(sw.set_parent(var))
         cg.add(sw.set_output_number(i))
         cg.add(sw.set_channel(0x04 + i))
-        cg.add(sw.set_is_inverter(False))
         sw_cfg = {
             CONF_ID: config[f"output_{i}_id"],
             CONF_NAME: f"{p} Output {i + 1}",
@@ -160,12 +159,9 @@ async def to_code(config):
         await switch.register_switch(sw, sw_cfg)
         cg.add(var.register_output_switch(sw))
 
-    # Inverter switch (channel 0x0E)
     inv = cg.new_Pvariable(config["inverter_id"])
     cg.add(inv.set_parent(var))
-    cg.add(inv.set_output_number(0))
     cg.add(inv.set_channel(0x0E))
-    cg.add(inv.set_is_inverter(True))
     inv_cfg = {
         CONF_ID: config["inverter_id"],
         CONF_NAME: f"{p} Inverter",
@@ -177,12 +173,9 @@ async def to_code(config):
     await switch.register_switch(inv, inv_cfg)
     cg.add(var.register_inverter_switch(inv))
 
-    # Master switch (channel 0x0F)
     master = cg.new_Pvariable(config["master_id"])
     cg.add(master.set_parent(var))
-    cg.add(master.set_output_number(0))
     cg.add(master.set_channel(0x0F))
-    cg.add(master.set_is_inverter(False))
     master_cfg = {
         CONF_ID: config["master_id"],
         CONF_NAME: f"{p} Master",
