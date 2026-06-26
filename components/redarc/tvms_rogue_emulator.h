@@ -60,8 +60,11 @@ class TVMSRogueEmulatorComponent : public Component {
   void send_manufacturing_date_();
   void send_product_name_();
   void send_unique_identifier_();
-  void send_programming_ack_(uint8_t requester, uint8_t opcode);
-  bool is_ignored_programming_opcode_(uint8_t opcode) const;
+
+  void send_service_ack_(uint8_t requester, uint8_t opcode);
+  void send_empty_block_trailer_(uint8_t requester);
+  void send_object_read_block_(uint8_t requester, const std::vector<uint8_t> &request);
+  static uint32_t crc32c_(const uint8_t *data, size_t length);
 
   uint8_t source_address_{0x30};
   uint32_t identity_interval_ms_{1000};
@@ -76,6 +79,8 @@ class TVMSRogueEmulatorComponent : public Component {
   std::string product_name_{"TVMS Rogue"};
   std::array<uint8_t, 7> unique_identifier_{{0, 0, 0, 0, 0, 0, 1}};
   uint8_t unique_identifier_record_index_{0};
+
+  uint8_t selected_object_{0xFF};
 };
 
 }  // namespace redarc_tvms_rogue_emulator
