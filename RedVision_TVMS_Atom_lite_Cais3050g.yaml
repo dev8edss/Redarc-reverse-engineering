@@ -1,9 +1,4 @@
 # RedVision / TVMS CAN bridge — device config to flash.
-#
-# Comment key:
-#   [required]  must be present
-#   [optional]  can be omitted; the default (shown) is used
-#   one of ...  exactly one of the listed keys is required
 
 substitutions:
   device_name: redvision_can_bridge
@@ -37,54 +32,42 @@ wifi:
 
 captive_portal:
 
-external_components:  # [required] pulls the `redarc` component from GitHub
+external_components:
   - source:
       type: git
       url: https://github.com/dev8edss/Redarc-reverse-engineering
-      ref: dev         # branch: `main` for stable, `dev` for latest
+      ref: dev
     refresh: 0s
     components:
       - redarc
 
-# The whole bridge is the single `redarc:` component. Include only the device
-# sub-blocks for hardware on your bus; delete the rest.
 redarc:
-  # CAN interface — one of `canbus:` (built-in esp32_can) or `canbus_id:` (an
-  # external canbus, e.g. mcp2515) is required. An empty `canbus:` uses the
-  # defaults: tx_pin GPIO22, rx_pin GPIO19, bit_rate 250KBPS, can_id 0x7FE,
-  # use_extended_id true, rx_queue_len 64 (override any of them here).
   canbus:
 
-  # [optional] host_address: "0xFF"           # this ESP32's source address for commands (default 0xFF)
-  # [optional] filter_interval: 5s            # publish throttle, inherited by all devices
-  # [optional] history_poll_interval: 60s     # SOC + solar history poll (0s disables), inherited
-  # [optional] time_id: <id>                  # reference an external time:; otherwise a HA time
-                                               # source is auto-added (set `time: false` to disable it and the Manager Set Time button)
+  # host_address: "0xFF"
+  # filter_interval: 5s
+  # history_poll_interval: 60s
 
-  # Each device block is [optional]. Per device: `id:` is [optional] (auto, but it
-  # becomes the entity name prefix, so set it); `source_address:` is [optional]
-  # (per-type default shown) and required only when setting 2nd+ device of a type.
   battery_sensor:
     - id: Battery
-      source_address: 0x08                   # [optional] default 0x08
+      source_address: 0x08
 
   manager:
     - id: Manager30
-      source_address: 0x01                   # [optional] default 0x01
-      battery_sensor_id: Battery             # [optional] lets the Manager compute device current
+      source_address: 0x01
+      battery_sensor_id: Battery
 
   redvision_display:
     - id: Redvision1
-      source_address: 0x20                   # [optional] default 0x20
+      source_address: 0x20
     - id: Redvision2
-      source_address: 0x21                   # [required here] 2nd display needs a distinct address
+      source_address: 0x21
 
   tvms_rogue:
     - id: TVMS_Rogue
-      source_address: 0x30                   # [optional] default 0x30
-      dimmable_outputs: [2, 3, 4, 5, 6, 7, 10]
-      transition_length: 0s                  # [optional] fade time for listed dimmable outputs
+      source_address: 0x30
+      transition_length: 0s  # fade time for outputs discovered as dimmable
 
   tvms_1280:
     - id: TVMS1280
-      source_address: 0x24                   # [optional] default 0x24
+      source_address: 0x24
