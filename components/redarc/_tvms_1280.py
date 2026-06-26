@@ -135,7 +135,7 @@ async def to_code(config):
         bs = cg.new_Pvariable(config[f"digital_input_{i}_id"])
         bs_cfg = {
             CONF_ID: config[f"digital_input_{i}_id"],
-            CONF_NAME: f"{p} Digital Input {i}",
+            CONF_NAME: f"{p} Input {i}",
             CONF_DISABLED_BY_DEFAULT: False,
             CONF_ICON: "",
             CONF_ENTITY_CATEGORY: ENTITY_CATEGORY_DIAGNOSTIC,
