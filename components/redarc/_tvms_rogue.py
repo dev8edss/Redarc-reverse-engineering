@@ -11,8 +11,6 @@ from esphome.const import (
     STATE_CLASS_MEASUREMENT,
 )
 
-# Resolve restore mode via ESPHome's own mapping so the correct C++ enum name
-# is used regardless of ESPHome version (RESTORE_DEFAULT_OFF removed in 2026.5.x).
 try:
     _RESTORE_MODE_OFF = (
         light.RESTORE_MODES.get("RESTORE_DEFAULT_OFF")
@@ -39,6 +37,7 @@ CONF_HOST_ADDRESS = "host_address"
 CONF_FILTER_INTERVAL = "filter_interval"
 CONF_TRUE_OFF_THRESHOLD = "true_off_threshold"
 CONF_TRANSITION_LENGTH = "transition_length"
+CONF_DIMMABLE_OUTPUTS = "dimmable_outputs"
 
 tvms_rogue_ns = cg.esphome_ns.namespace("redarc_tvms_rogue")
 TVMSRogueComponent = tvms_rogue_ns.class_("TVMSRogueComponent", cg.Component)
@@ -57,7 +56,14 @@ _BSClass = _bs_ns.class_("BinarySensor")
 _ts_ns = cg.esphome_ns.namespace("text_sensor")
 _TSClass = _ts_ns.class_("TextSensor")
 
-# Auto-generated IDs for sensors and lights.
+
+def _validate_dimmable_outputs(value):
+    values = cv.ensure_list(cv.int_range(min=1, max=10))(value)
+    if len(values) != len(set(values)):
+        raise cv.Invalid("dimmable_outputs must not contain duplicate output numbers")
+    return values
+
+
 _AUTO_IDS = {}
 for _i in range(1, 11):
     _AUTO_IDS[cv.GenerateID(f"light_out_{_i}")] = cv.declare_id(TVMSRogueLight)
@@ -80,6 +86,7 @@ SCHEMA = cv.Schema(
         cv.Optional(CONF_FILTER_INTERVAL): cv.positive_time_period_milliseconds,
         cv.Optional(CONF_TRUE_OFF_THRESHOLD, default=1.5): cv.float_range(min=0.0, max=10.0),
         cv.Optional(CONF_TRANSITION_LENGTH, default="0s"): cv.positive_time_period_milliseconds,
+        cv.Optional(CONF_DIMMABLE_OUTPUTS, default=[]): _validate_dimmable_outputs,
         **_AUTO_IDS,
     }
 ).extend(cv.COMPONENT_SCHEMA)
@@ -116,8 +123,8 @@ async def to_code(config):
     cg.add(var.set_true_off_threshold(config[CONF_TRUE_OFF_THRESHOLD]))
 
     p = config[CONF_ID].id.replace("_", " ")
+    dimmable_outputs = set(config[CONF_DIMMABLE_OUTPUTS])
 
-    # Sensors
     s = await _make_sensor(config["tank1_id"], f"{p} Tank 1",
                            unit="%", state_class=STATE_CLASS_MEASUREMENT, decimals=0)
     cg.add(var.set_tank1_sensor(s))
@@ -145,14 +152,12 @@ async def to_code(config):
     })
     cg.add(var.set_output_status_text_sensor(ts))
 
-    # Output level sensors
     for i in range(1, 11):
         ls = await _make_sensor(config[f"level_sensor_{i}"], f"{p} Output {i} Level",
                                 unit="%", state_class=STATE_CLASS_MEASUREMENT, decimals=0,
                                 entity_category=ENTITY_CATEGORY_DIAGNOSTIC)
         cg.add(var.set_level_sensor(i, ls))
 
-    # Physical input/button state binary sensors
     for i in range(1, 9):
         bs = cg.new_Pvariable(config[f"button_sensor_{i}"])
         bs_cfg = {
@@ -165,7 +170,6 @@ async def to_code(config):
         await binary_sensor.register_binary_sensor(bs, bs_cfg)
         cg.add(var.set_button_sensor(i, bs))
 
-    # Master switch (channel 0x0B)
     master = cg.new_Pvariable(config["master_id"])
     cg.add(master.set_parent(var))
     master_cfg = {
@@ -179,13 +183,17 @@ async def to_code(config):
     await switch.register_switch(master, master_cfg)
     cg.add(var.register_master_switch(master))
 
-    # Lights
+    # All Rogue outputs remain Home Assistant light entities. Outputs listed in
+    # dimmable_outputs expose brightness; all others expose ON/OFF only.
     for i in range(1, 11):
-        channel = 0x0B + i  # 0x0C .. 0x15
+        channel = 0x0B + i
+        is_dimmable = i in dimmable_outputs
         light_out = cg.new_Pvariable(config[f"light_out_{i}"])
         cg.add(light_out.set_parent(var))
         cg.add(light_out.set_output_number(i))
         cg.add(light_out.set_channel(channel))
+        cg.add(light_out.set_dimmable(is_dimmable))
+        cg.add(var.set_output_dimmable(i, is_dimmable))
         cg.add(var.register_light(light_out))
         light_cfg = {
             CONF_ID: config[f"light_state_{i}"],
