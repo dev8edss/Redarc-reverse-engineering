@@ -38,7 +38,6 @@ CONF_TIME = "time"
 CONF_HOST_ADDRESS = "host_address"
 CONF_FILTER_INTERVAL = "filter_interval"
 CONF_HISTORY_POLL_INTERVAL = "history_poll_interval"
-CONF_TRANSITION_LENGTH = "transition_length"
 CONF_SOURCE_ADDRESS = "source_address"
 
 # Nested device keys. Every device type is optional and accepts either a single
@@ -80,6 +79,7 @@ def _validate_unique_source_addresses(config):
                 )
             seen[source_address] = device[CONF_ID]
     return config
+
 
 ns = cg.esphome_ns.namespace("redarc_common")
 RedarcCommonComponent = ns.class_("RedarcCommonComponent", cg.Component)
@@ -226,7 +226,6 @@ CONFIG_SCHEMA = cv.All(
         cv.Optional(CONF_HOST_ADDRESS, default=0xFF): cv.hex_uint8_t,
         cv.Optional(CONF_FILTER_INTERVAL, default="5s"): cv.positive_time_period_milliseconds,
         cv.Optional(CONF_HISTORY_POLL_INTERVAL, default="60s"): zero_or_positive_time_period_milliseconds,
-        cv.Optional(CONF_TRANSITION_LENGTH, default="0s"): cv.positive_time_period_milliseconds,
         cv.Optional(CONF_BATTERY_SENSOR): _device_list(_battery_sensor.SCHEMA),
         cv.Optional(CONF_MANAGER): _device_list(_manager.SCHEMA),
         cv.Optional(CONF_REDVISION_DISPLAY): _device_list(_redvision_display.SCHEMA),
@@ -278,13 +277,11 @@ async def to_code(config):
 
     filter_interval = config[CONF_FILTER_INTERVAL]
     history_poll = config[CONF_HISTORY_POLL_INTERVAL]
-    transition_length = config[CONF_TRANSITION_LENGTH]
 
     # Devices inherit the top-level filter_interval (all devices), host_address
-    # (command-sending devices), history_poll_interval (the SOC/solar poll
-    # intervals), and transition_length (the Rogue light transition) unless they
-    # explicitly override them, so each only has to be configured once.
-    def _inherit(device_config, host=False, soc_history=False, solar_history=False, transition=False):
+    # (command-sending devices), and history_poll_interval (SOC/solar polling).
+    # Rogue transition_length is intentionally configured only in tvms_rogue.
+    def _inherit(device_config, host=False, soc_history=False, solar_history=False):
         device_config.setdefault(CONF_FILTER_INTERVAL, filter_interval)
         if host:
             device_config.setdefault(CONF_HOST_ADDRESS, host_address)
@@ -292,8 +289,6 @@ async def to_code(config):
             device_config.setdefault(_battery_sensor.CONF_SOC_HISTORY_POLL_INTERVAL, history_poll)
         if solar_history:
             device_config.setdefault(_manager.CONF_SOLAR_HISTORY_POLL_INTERVAL, history_poll)
-        if transition:
-            device_config.setdefault(_tvms_rogue.CONF_TRANSITION_LENGTH, transition_length)
         return device_config
 
     # Battery sensors are built first so managers can reference them by id.
@@ -308,6 +303,6 @@ async def to_code(config):
             _inherit(device_config)
         await _redvision_display.to_code(config[CONF_REDVISION_DISPLAY])
     for device_config in config.get(CONF_TVMS_ROGUE) or []:
-        await _tvms_rogue.to_code(_inherit(device_config, host=True, transition=True))
+        await _tvms_rogue.to_code(_inherit(device_config, host=True))
     for device_config in config.get(CONF_TVMS_1280) or []:
         await _tvms_1280.to_code(_inherit(device_config, host=True))
