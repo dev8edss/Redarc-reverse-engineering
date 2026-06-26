@@ -439,8 +439,9 @@ void TVMSRogueActiveEmulatorComponent::handle_can_frame(
                  "Responded 0x1FD08: Rogue channels 0x01-0x21 with active mask 0x1E");
         return;
       case REQUEST_DGN_1FD0E:
-        ESP_LOGI(RUNTIME_TAG, "Requester 0x%02X requested 0x1FD0E", requester);
-        this->send_output_capabilities_();
+        ESP_LOGD(RUNTIME_TAG,
+                 "Requester 0x%02X requested 0x1FD0E; active-object response queued",
+                 requester);
         return;
       case REQUEST_DGN_1FD12:
         ESP_LOGI(RUNTIME_TAG, "Requester 0x%02X requested 0x1FD12", requester);
