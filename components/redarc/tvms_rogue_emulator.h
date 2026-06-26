@@ -120,5 +120,12 @@ class TVMSRogueEmulatorComponent : public Component {
   std::string last_output_status_;
 };
 
+class TVMSRogueActiveEmulatorComponent : public TVMSRogueEmulatorComponent {
+ public:
+  void setup() override;
+  void dump_config() override;
+  void handle_can_frame(uint32_t can_id, const std::vector<uint8_t> &data);
+};
+
 }  // namespace redarc_tvms_rogue_emulator
 }  // namespace esphome
