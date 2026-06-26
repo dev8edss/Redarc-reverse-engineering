@@ -1,4 +1,5 @@
 #include "tvms_rogue_emulator.h"
+#include "tvms_rogue_object2_baseline.h"
 
 #include <algorithm>
 
@@ -30,22 +31,22 @@ static constexpr uint16_t REQUEST_DGN_1F405 = 0xF405;
 
 static constexpr uint8_t MAIN_CONFIGURATION_OBJECT = 0x02;
 
-// Minimal, read-only object 2. It contains a valid object header, a 28-byte
-// object length, a valid whole-object CRC-32C and an empty root structure. This
-// lets a configurator finish its read transaction without exposing or accepting
-// any programmable Rogue settings yet.
-static constexpr std::array<uint8_t, 28> EMPTY_CONFIGURATION_OBJECT{{
-    0x08, 0x00, 0x00, 0x04,
-    0x1C, 0x00, 0x00, 0x00,
-    0x73, 0xBB, 0x1F, 0x3F,
-    0x08, 0x00, 0x00, 0x03,
-    0x01, 0x00, 0x00, 0x00,
-    0x18, 0x00, 0x00, 0x00,
-    0x10, 0x00, 0x00, 0x03,
-}};
+// Known fields within the captured Rogue object-2 template. Everything else is
+// returned byte-for-byte as captured from the real Rogue.
+static constexpr size_t OBJECT_SERIAL_SUFFIX_TAGGED_OFFSET = 0x0088;
+static constexpr size_t OBJECT_SERIAL_PREFIX_OFFSET = 0x00A0;
+static constexpr size_t OBJECT_PRODUCT_NAME_HEADER_OFFSET = 0x00A8;
+static constexpr size_t OBJECT_PRODUCT_NAME_DATA_OFFSET = 0x00AC;
+static constexpr size_t OBJECT_PRODUCT_NAME_CAPACITY = 12;
 }  // namespace
 
 void TVMSRogueEmulatorComponent::setup() {
+  if (!this->load_configuration_object_()) {
+    ESP_LOGE(TAG, "Failed to load the captured Rogue configuration object");
+    this->mark_failed();
+    return;
+  }
+
   redarc_common::RedarcCanDispatcher::instance().add_listener(
       [this](uint32_t id, const std::vector<uint8_t> &data) { this->handle_can_frame(id, data); });
 
@@ -65,7 +66,12 @@ void TVMSRogueEmulatorComponent::dump_config() {
   ESP_LOGCONFIG(TAG, "  Manufacturing date: %02u/%02u/%04u", (unsigned) this->manufacturing_day_,
                 (unsigned) this->manufacturing_month_, (unsigned) this->manufacturing_year_);
   ESP_LOGCONFIG(TAG, "  Firmware/version records: %u", (unsigned) this->version_records_.size());
-  ESP_LOGCONFIG(TAG, "  Object 2 reads: valid empty read-only configuration");
+  ESP_LOGCONFIG(TAG, "  Object 2 template: captured real Rogue configuration (%u bytes)",
+                (unsigned) this->configuration_object_.size());
+  if (this->configuration_object_.size() >= 12) {
+    ESP_LOGCONFIG(TAG, "  Object 2 CRC-32C: 0x%08lX",
+                  (unsigned long) redarc_common::u32_le(this->configuration_object_, 8));
+  }
   ESP_LOGCONFIG(TAG, "  Programming writes: acknowledged and ignored");
 }
 
@@ -142,6 +148,98 @@ void TVMSRogueEmulatorComponent::send_unique_identifier_() {
   this->send_frame_(redarc_common::with_sa(ID_DEVICE_UNIQUE_IDENTIFIER, this->source_address_), data);
 }
 
+int8_t TVMSRogueEmulatorComponent::base64_value_(char value) {
+  if (value >= 'A' && value <= 'Z') return value - 'A';
+  if (value >= 'a' && value <= 'z') return value - 'a' + 26;
+  if (value >= '0' && value <= '9') return value - '0' + 52;
+  if (value == '+') return 62;
+  if (value == '/') return 63;
+  return -1;
+}
+
+bool TVMSRogueEmulatorComponent::load_configuration_object_() {
+  this->configuration_object_.clear();
+  this->configuration_object_.reserve(ROGUE_OBJECT2_BASELINE_LENGTH);
+
+  uint32_t accumulator = 0;
+  int bits = -8;
+  for (const char *cursor = ROGUE_OBJECT2_BASELINE_BASE64; *cursor != '\0'; cursor++) {
+    if (*cursor == '=') break;
+    const int8_t decoded = this->base64_value_(*cursor);
+    if (decoded < 0) continue;
+    accumulator = (accumulator << 6) | (uint8_t) decoded;
+    bits += 6;
+    if (bits >= 0) {
+      this->configuration_object_.push_back((uint8_t) ((accumulator >> bits) & 0xFFU));
+      bits -= 8;
+    }
+  }
+
+  if (this->configuration_object_.size() != ROGUE_OBJECT2_BASELINE_LENGTH) {
+    ESP_LOGE(TAG, "Decoded Rogue object length %u does not match expected %u",
+             (unsigned) this->configuration_object_.size(),
+             (unsigned) ROGUE_OBJECT2_BASELINE_LENGTH);
+    this->configuration_object_.clear();
+    return false;
+  }
+
+  const uint32_t declared_length = redarc_common::u32_le(this->configuration_object_, 4);
+  if (declared_length != this->configuration_object_.size()) {
+    ESP_LOGE(TAG, "Rogue object header length %lu does not match decoded size %u",
+             (unsigned long) declared_length, (unsigned) this->configuration_object_.size());
+    this->configuration_object_.clear();
+    return false;
+  }
+
+  this->patch_configuration_object_();
+  return true;
+}
+
+void TVMSRogueEmulatorComponent::write_u32_le_(std::vector<uint8_t> &target, size_t offset,
+                                                uint32_t value) {
+  if (offset + 4 > target.size()) return;
+  target[offset] = (uint8_t) (value & 0xFFU);
+  target[offset + 1] = (uint8_t) ((value >> 8) & 0xFFU);
+  target[offset + 2] = (uint8_t) ((value >> 16) & 0xFFU);
+  target[offset + 3] = (uint8_t) ((value >> 24) & 0xFFU);
+}
+
+void TVMSRogueEmulatorComponent::patch_configuration_object_() {
+  if (this->configuration_object_.size() < ROGUE_OBJECT2_BASELINE_LENGTH) return;
+
+  // Keep the captured channel/system structure intact while making the Rogue
+  // module entry agree with the identity configured for the emulator.
+  this->write_u32_le_(this->configuration_object_, OBJECT_SERIAL_PREFIX_OFFSET,
+                      this->serial_prefix_);
+  this->write_u32_le_(this->configuration_object_, OBJECT_SERIAL_SUFFIX_TAGGED_OFFSET,
+                      ((uint32_t) this->serial_suffix_ * 4U) + 1U);
+
+  if (this->product_name_.size() <= OBJECT_PRODUCT_NAME_CAPACITY) {
+    this->write_u32_le_(this->configuration_object_, OBJECT_PRODUCT_NAME_HEADER_OFFSET,
+                        0x01000000UL | (uint32_t) this->product_name_.size());
+    std::fill(this->configuration_object_.begin() + OBJECT_PRODUCT_NAME_DATA_OFFSET,
+              this->configuration_object_.begin() + OBJECT_PRODUCT_NAME_DATA_OFFSET +
+                  OBJECT_PRODUCT_NAME_CAPACITY,
+              0x00);
+    std::copy(this->product_name_.begin(), this->product_name_.end(),
+              this->configuration_object_.begin() + OBJECT_PRODUCT_NAME_DATA_OFFSET);
+  } else {
+    ESP_LOGW(TAG,
+             "product_name is longer than the 12-byte slot in the captured object; "
+             "DGN 0x1F403 uses the configured name but object 2 keeps 'TVMS Rogue'");
+  }
+
+  this->update_configuration_crc_();
+}
+
+void TVMSRogueEmulatorComponent::update_configuration_crc_() {
+  if (this->configuration_object_.size() < 12) return;
+  this->write_u32_le_(this->configuration_object_, 8, 0);
+  const uint32_t crc = this->crc32c_(this->configuration_object_.data(),
+                                     this->configuration_object_.size());
+  this->write_u32_le_(this->configuration_object_, 8, crc);
+}
+
 uint32_t TVMSRogueEmulatorComponent::crc32c_(const uint8_t *data, size_t length) {
   uint32_t crc = 0xFFFFFFFFUL;
   for (size_t i = 0; i < length; i++) {
@@ -172,14 +270,16 @@ void TVMSRogueEmulatorComponent::send_object_read_block_(uint8_t requester,
 
   const uint8_t *object_data = nullptr;
   size_t object_length = 0;
-  if (this->selected_object_ == MAIN_CONFIGURATION_OBJECT) {
-    object_data = EMPTY_CONFIGURATION_OBJECT.data();
-    object_length = EMPTY_CONFIGURATION_OBJECT.size();
+  if (this->selected_object_ == MAIN_CONFIGURATION_OBJECT &&
+      !this->configuration_object_.empty()) {
+    object_data = this->configuration_object_.data();
+    object_length = this->configuration_object_.size();
   }
 
   size_t returned_length = 0;
   if (object_data != nullptr && offset < object_length && requested_length > 0) {
-    returned_length = std::min<size_t>((size_t) requested_length, object_length - (size_t) offset);
+    returned_length = std::min<size_t>((size_t) requested_length,
+                                       object_length - (size_t) offset);
   }
 
   const uint32_t data_id = ID_SERVICE_DATA_BASE | ((uint32_t) requester << 8) | this->source_address_;
