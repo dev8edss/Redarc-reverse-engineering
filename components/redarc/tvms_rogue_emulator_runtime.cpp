@@ -35,6 +35,7 @@ static constexpr uint8_t MAIN_CONFIGURATION_OBJECT = 0x02;
 static constexpr uint8_t CHANNEL_MASTER = 0x0B;
 static constexpr uint8_t CHANNEL_OUTPUT_1 = 0x0C;
 static constexpr uint8_t CHANNEL_OUTPUT_10 = 0x15;
+static constexpr uint8_t HOLD_DIM_STEP_PERCENT = 2;
 
 uint32_t next_random_value() {
   static uint32_t state = 0x6D2B79F5UL;
@@ -46,6 +47,10 @@ uint8_t clamp_percent(float value) {
   if (value <= 0.0f) return 0;
   if (value >= 100.0f) return 100;
   return (uint8_t) std::lround(value);
+}
+
+std::string hold_dim_interval_name(uint8_t output) {
+  return "rogue_hold_dim_" + std::to_string(output);
 }
 }  // namespace
 
@@ -123,6 +128,7 @@ void TVMSRogueActiveEmulatorComponent::dump_config() {
   ESP_LOGCONFIG(RUNTIME_TAG, "  Active output/status emulation: enabled");
   ESP_LOGCONFIG(RUNTIME_TAG, "  Active channel inventory DGN 0x1FD08: enabled");
   ESP_LOGCONFIG(RUNTIME_TAG, "  Padded object block reads: enabled");
+  ESP_LOGCONFIG(RUNTIME_TAG, "  Screen hold dimming: continuous 5-second full-scale ramp");
   ESP_LOGCONFIG(RUNTIME_TAG, "  Status interval: %u ms", (unsigned) this->status_interval_ms_);
   ESP_LOGCONFIG(RUNTIME_TAG, "  Random sensor interval: %u ms",
                 (unsigned) this->random_update_interval_ms_);
@@ -134,6 +140,7 @@ void TVMSRogueActiveEmulatorComponent::dump_config() {
 
 void TVMSRogueEmulatorComponent::set_output_from_home_assistant(uint8_t output,
                                                                 float percent) {
+  this->cancel_interval(hold_dim_interval_name(output));
   this->set_output_level_(output, clamp_percent(percent), "Home Assistant");
 }
 
@@ -170,6 +177,7 @@ void TVMSRogueEmulatorComponent::set_master_state_(bool state, const char *origi
 
   if (!state) {
     for (uint8_t output = 1; output <= 10; output++) {
+      this->cancel_interval(hold_dim_interval_name(output));
       if (this->output_levels_[output] == 0) continue;
       this->output_levels_[output] = 0;
       if (this->level_sensors_[output] != nullptr)
@@ -361,11 +369,6 @@ void TVMSRogueActiveEmulatorComponent::handle_can_frame(
 
   if (destination != this->source_address_) return;
 
-  // The real Rogue always satisfies the requested 0E86 block length. When a
-  // request extends past the declared object length, it pads the remainder with
-  // 0xFF and calculates the block CRC across the complete requested block.
-  // This matters for the final offset 0x1200 request: object 2 contains 64 bytes
-  // there, but the app requests and expects a full 256-byte response.
   if ((service & 0xFF00U) == SERVICE_OBJECT_PREFIX &&
       (service & 0x00FFU) == 0x86U && data.size() >= 8 &&
       this->selected_object_ == MAIN_CONFIGURATION_OBJECT) {
@@ -464,6 +467,7 @@ void TVMSRogueActiveEmulatorComponent::handle_can_frame(
         this->set_master_state_(state, "CAN command 0xCB");
       } else if (channel >= CHANNEL_OUTPUT_1 && channel <= CHANNEL_OUTPUT_10) {
         const uint8_t output = channel - CHANNEL_MASTER;
+        this->cancel_interval(hold_dim_interval_name(output));
         uint8_t level = state ? this->output_levels_[output] : 0;
         if (state && level == 0) level = 100;
         this->set_output_level_(output, level, "CAN command 0xCB");
@@ -477,7 +481,9 @@ void TVMSRogueActiveEmulatorComponent::handle_can_frame(
     if (command == 0x5A && data[1] == 0x01 && data[2] == 0xFF) {
       const uint8_t channel = data[3];
       if (channel >= CHANNEL_OUTPUT_1 && channel <= CHANNEL_OUTPUT_10) {
-        this->set_output_level_(channel - CHANNEL_MASTER,
+        const uint8_t output = channel - CHANNEL_MASTER;
+        this->cancel_interval(hold_dim_interval_name(output));
+        this->set_output_level_(output,
                                 std::min<uint8_t>(data[4], 100),
                                 "CAN command 0x5A");
       } else {
@@ -498,21 +504,64 @@ void TVMSRogueActiveEmulatorComponent::handle_can_frame(
     const uint8_t direction = data[2];
     if (channel >= CHANNEL_OUTPUT_1 && channel <= CHANNEL_OUTPUT_10) {
       const uint8_t output = channel - CHANNEL_MASTER;
-      if (direction == 0x01) {
-        const uint8_t level = this->output_levels_[output] > 5
-                                  ? this->output_levels_[output] - 5 : 0;
-        this->set_output_level_(output, level, "Legacy dim-down");
-      } else if (direction == 0x64) {
-        const uint8_t level = std::min<uint8_t>(100, this->output_levels_[output] + 5);
-        this->set_output_level_(output, level, "Legacy dim-up");
+      const std::string interval_name = hold_dim_interval_name(output);
+
+      if (direction == 0x01 || direction == 0x64) {
+        const int8_t step = direction == 0x01
+                                ? -(int8_t) HOLD_DIM_STEP_PERCENT
+                                : (int8_t) HOLD_DIM_STEP_PERCENT;
+        const uint8_t full_scale_seconds =
+            data.size() >= 4 && data[3] > 0 ? data[3] : 5;
+        const uint32_t step_interval_ms = std::max<uint32_t>(
+            20U, (uint32_t) full_scale_seconds * 20U);
+
+        this->cancel_interval(interval_name);
+        ESP_LOGI(RUNTIME_TAG,
+                 "Screen hold dim %s started for output %u at %u%%: %u%% every %lums",
+                 step < 0 ? "DOWN" : "UP", (unsigned) output,
+                 (unsigned) this->output_levels_[output],
+                 (unsigned) HOLD_DIM_STEP_PERCENT,
+                 (unsigned long) step_interval_ms);
+
+        this->set_interval(interval_name, step_interval_ms,
+                           [this, output, step, interval_name]() {
+          const int current = this->output_levels_[output];
+          int next = current + step;
+          if (next < 0) next = 0;
+          if (next > 100) next = 100;
+
+          if (next == current) {
+            this->cancel_interval(interval_name);
+            ESP_LOGI(RUNTIME_TAG,
+                     "Screen hold dim reached %s limit for output %u",
+                     step < 0 ? "LOWER" : "UPPER", (unsigned) output);
+            return;
+          }
+
+          this->set_output_level_(output, (uint8_t) next,
+                                  step < 0 ? "Screen hold dim-down"
+                                           : "Screen hold dim-up");
+
+          if (next == 0 || next == 100) {
+            this->cancel_interval(interval_name);
+            ESP_LOGI(RUNTIME_TAG,
+                     "Screen hold dim reached %u%% for output %u",
+                     (unsigned) next, (unsigned) output);
+          }
+        });
       } else if (direction == 0xFF) {
-        ESP_LOGI(RUNTIME_TAG, "Legacy dim release for output %u", (unsigned) output);
+        this->cancel_interval(interval_name);
+        ESP_LOGI(RUNTIME_TAG,
+                 "Screen hold dim released for output %u at %u%%",
+                 (unsigned) output,
+                 (unsigned) this->output_levels_[output]);
       } else {
-        ESP_LOGI(RUNTIME_TAG, "Unknown legacy dim direction 0x%02X for output %u",
+        ESP_LOGI(RUNTIME_TAG,
+                 "Unknown screen dim direction 0x%02X for output %u",
                  direction, (unsigned) output);
       }
     } else {
-      ESP_LOGI(RUNTIME_TAG, "Ignored legacy dim for channel 0x%02X", channel);
+      ESP_LOGI(RUNTIME_TAG, "Ignored screen dim for channel 0x%02X", channel);
     }
     return;
   }
