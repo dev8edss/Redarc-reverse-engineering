@@ -135,19 +135,14 @@ void Manager30Component::handle_can_frame(uint32_t can_id, const std::vector<uin
     }
   }
 
-  // DGN 0x1F108 is the preferred charging-mode source. Once seen, the stage byte
-  // is no longer allowed to overwrite mode as charging stages change.
-  if (redarc_common::rvc_matches(can_id, 0x1F108UL, this->source_address_)) {
-    this->charging_mode_status_seen_ = true;
-    this->publish_charging_mode_(data[0] & 0x01U);
-    return;
-  }
-
-  // DGN 0x1F200 D1 carries charging stage in bits 1-7. Bit 0 is retained only as
-  // a fallback mode source for older captures/devices that do not transmit 0x1F108.
+  // DGN 0x1F200 D1 carries both confirmed values:
+  //   bits 1-7 = charging stage base (D1 & 0xFE)
+  //   bit 0    = charging mode (0 Touring, 1 Storage)
+  // DGN 0x1F108 is not used for mode because it can remain fixed and overwrite
+  // valid mode changes from the command/status path.
   if (redarc_common::rvc_matches(can_id, 0x1F200UL, this->source_address_)) {
     this->publish_charging_stage_(data[0]);
-    if (!this->charging_mode_status_seen_) this->publish_charging_mode_(data[0] & 0x01U);
+    this->publish_charging_mode_(data[0] & 0x01U);
     return;
   }
 
