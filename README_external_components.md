@@ -1,14 +1,46 @@
 # Redarc / RedVision ESPHome External Component
 
-This repository ships the RedVision / TVMS CAN bridge as one ESPHome external
-component named `redarc`.
+The repository exposes one ESPHome external component named `redarc`. It owns or
+references the CAN bus, creates the shared time source, receives extended CAN
+frames and dispatches them to nested device components.
 
-The component owns or references the CAN bus, creates the Home Assistant time
-source used by Manager30 clock commands, receives every extended CAN frame, and
-dispatches frames to nested device blocks. No YAML `on_frame:` automation is
-required.
+No YAML `on_frame:` automation is required.
 
-## Component structure
+## Source configuration
+
+Stable branch:
+
+```yaml
+external_components:
+  - source:
+      type: git
+      url: https://github.com/dev8edss/Redarc-reverse-engineering
+      ref: main
+    components:
+      - redarc
+```
+
+Development branch:
+
+```yaml
+external_components:
+  - source:
+      type: git
+      url: https://github.com/dev8edss/Redarc-reverse-engineering
+      ref: dev
+    refresh: 0s
+    components:
+      - redarc
+```
+
+Use **Clean Build Files** after schema or C++ changes. The external-component
+cache can also be removed manually:
+
+```bash
+rm -rf /data/external_components/*
+```
+
+## Current nested schema
 
 ```yaml
 redarc:
@@ -38,105 +70,26 @@ redarc:
   tvms_rogue:
     - id: TVMS_Rogue
       source_address: 0x30
-      dimmable_outputs: [2, 3, 4, 5, 6, 7, 10]
       transition_length: 3s
+      true_off_threshold: 1.5
 
   tvms_1280:
     - id: TVMS1280
       source_address: 0x24
 ```
 
-| Sub-block | Purpose |
-|---|---|
-| Top level | Shared `host_address`, `filter_interval`, `history_poll_interval`, CAN setup and passive device discovery |
-| `canbus` | Internal `esp32_can` interface; alternatively use `canbus_id` for an externally declared CAN platform |
-| `time` | Internal Home Assistant time source; enabled by default, `time: false` disables it and the Manager Set Time button |
-| `battery_sensor` | Battery current, voltage, temperature, SOC, configuration and history |
-| `manager` | Manager30 charging, solar, AC, vehicle input, history and clock functions |
-| `redvision_display` | RedVision display/rebroadcast values; accepts a list for multiple displays |
-| `tvms_rogue` | Rogue light outputs, dimming configuration, master, inputs, tanks, voltage/current and output diagnostics |
-| `tvms_1280` | Relay outputs, inverter, master, digital inputs, tanks, temperatures and voltage inputs |
+The previous `dimmable_outputs` option has been removed. Rogue capability is now
+read from the module at runtime.
 
-`transition_length` is not a top-level option. It belongs only in a
+`transition_length` is not a shared top-level setting. It belongs only inside a
 `tvms_rogue` entry.
 
-## External-component source
+## CAN setup
 
-Stable branch:
-
-```yaml
-external_components:
-  - source:
-      type: git
-      url: https://github.com/dev8edss/Redarc-reverse-engineering
-      ref: main
-    components:
-      - redarc
-```
-
-Development branch:
+The internal `redarc: canbus:` block builds an `esp32_can` interface. For an
+external CAN platform, declare it normally and reference it with `canbus_id`:
 
 ```yaml
-external_components:
-  - source:
-      type: git
-      url: https://github.com/dev8edss/Redarc-reverse-engineering
-      ref: dev
-    refresh: 0s
-    components:
-      - redarc
-```
-
-Use `refresh: 0s` only while testing. If ESPHome continues to validate against an
-old schema, use **Clean Build Files** or remove the external-component cache:
-
-```bash
-rm -rf /data/external_components/*
-```
-
-## ESPHome compatibility
-
-The current Python component uses ESPHome's current schema classes, including:
-
-```python
-canbus.CanbusComponent
-switch.switch_schema(...)
-```
-
-Older names such as `canbus.Canbus` and `switch.SWITCH_SCHEMA` must not be used.
-
-## CAN bus setup
-
-### Internal ESP32 CAN
-
-The normal M5Stack Atom CAN-base configuration is nested inside `redarc:`:
-
-```yaml
-redarc:
-  canbus:
-    tx_pin: GPIO22
-    rx_pin: GPIO19
-    bit_rate: 250KBPS
-    can_id: 0x7FE
-    use_extended_id: true
-    mode: NORMAL
-    rx_queue_len: 64
-```
-
-Use `NORMAL` when commands, configuration requests or history requests must be
-transmitted. `LISTENONLY` is suitable only for passive monitoring.
-
-### External CAN platforms
-
-An external platform such as MCP2515 can be declared normally and referenced by
-`canbus_id`:
-
-```yaml
-spi:
-  clk_pin: GPIO18
-  mosi_pin: GPIO23
-  miso_pin: GPIO19
-
 canbus:
   - platform: mcp2515
     id: rv_can
@@ -149,71 +102,129 @@ redarc:
   canbus_id: rv_can
 ```
 
-MCP2515 support remains untested on physical hardware.
+External MCP2515 hardware remains untested.
 
-## Device discovery and logger-connected actions
+Use `NORMAL` mode for control and active requests. `LISTENONLY` cannot request
+Rogue capabilities, history pages or other command-driven data.
 
-The bridge passively collects DGN `0x1F404` identity broadcasts. When an ESPHome
-API client or log viewer connects, it prints the discovered-device table after a
-short delay:
+## Device discovery
 
-```text
-Discovered devices:
-  Device Type         Address       Serial No
-  Manager30             1 (0x01)    ...
-  BMS Battery Sensor    8 (0x08)    ...
-  RedVision Display    32 (0x20)    ...
-  TVMS Rogue           48 (0x30)    ...
-```
-
-The same logger-connected event notifies device components that need an active
-validation action. A configured Rogue uses this event to request its output
-configuration and compare it with YAML.
+The common component passively records DGN `0x1F404` identity broadcasts. When
+an API client connects it prints a device/address table. This behavior is
+independent of Rogue output-capability discovery.
 
 ## TVMS Rogue
 
-### YAML configuration
+### Runtime capability discovery
 
-```yaml
-redarc:
-  tvms_rogue:
-    - id: TVMS_Rogue
-      source_address: 0x30
-      dimmable_outputs: [2, 3, 4, 5, 6, 7, 10]
-      transition_length: 3s
-      true_off_threshold: 1.5
+All ten outputs are compiled as light entities. They initially use ON/OFF mode.
+One second after component setup, the Rogue sends this request:
+
+```text
+CAN ID: 0x0F03<rogue address><host address>
+Data:   0E FD 00 00 00 00 00 00
 ```
 
-Rogue-specific settings:
+Example for Rogue `0x30` and host `0xFF`:
+
+```text
+0F0330FF  0E FD 00 00 00 00 00 00
+```
+
+The Rogue replies with DGN `0x1FD0E`, one record for each output. The component
+maps D1 channels `0x0C` through `0x15` to Outputs 1 through 10 and interprets D2
+bit 7 as the programmed dimmable capability.
+
+For each response:
+
+- bit 7 set → `light::ColorMode::BRIGHTNESS`
+- bit 7 clear → `light::ColorMode::ON_OFF`
+
+The component updates:
+
+- the output's internal `dimmable_` flag
+- the dynamic `LightTraits`
+- `current_values.color_mode`
+- `remote_values.color_mode`
+- command behavior for that output
+
+A changed output is logged:
+
+```text
+[I][redarc_tvms_rogue]: Output 1 changed to Non-Dimmable
+[I][redarc_tvms_rogue]: Output 10 changed to Dimmable
+```
+
+After one or more changes:
+
+```text
+[I][redarc_tvms_rogue]: Updated 2 Rogue output capabilities; reconnect Home Assistant to refresh light controls
+```
+
+ESPHome behavior changes immediately. Home Assistant normally learns the revised
+supported light modes when its native API connection reconnects or the ESPHome
+integration is reloaded.
+
+If no record arrives:
+
+```text
+[W][redarc_tvms_rogue]: No Rogue dimming configuration response received
+```
+
+Partial responses produce a warning with the received count.
+
+### Diagnostic recheck button
+
+Each Rogue creates a diagnostic button:
+
+```text
+TVMS Rogue Recheck Dimmable Outputs
+```
+
+Generated ID for `id: TVMS_Rogue`:
+
+```cpp
+id(TVMS_Rogue_recheck_dimmable_outputs)
+```
+
+The button calls the same configuration request used at startup. It is intended
+for use after changing output programming through the RedVision system.
+
+The button updates ESPHome behavior immediately. Reload or reconnect the Home
+Assistant ESPHome integration if the brightness control displayed in HA must be
+added or removed.
+
+### Light behavior
+
+Dimmable outputs:
+
+- advertise BRIGHTNESS mode
+- accept brightness commands
+- use the configured `transition_length`
+- send changed integer percentages during transitions
+- send a real OFF command at `true_off_threshold`
+
+Non-dimmable outputs:
+
+- advertise ON_OFF mode
+- do not expose brightness after Home Assistant refreshes capabilities
+- send only ON and OFF commands
+- ignore transition percentage stepping
+
+DGN `0x1FD12` remains the actual output level/state feedback source for every
+output.
+
+### Rogue settings
 
 | Setting | Default | Purpose |
 |---|---:|---|
-| `source_address` | `0x30` | Rogue CAN source address |
+| `source_address` | `0x30` | Rogue CAN address |
 | `host_address` | inherited | Bridge source address used for commands and requests |
-| `filter_interval` | inherited | Throttle for slow diagnostic sensors |
-| `dimmable_outputs` | `[]` | Output numbers `1`–`10` that expose brightness controls |
-| `transition_length` | `0s` | ESPHome transition duration for listed dimmable outputs |
-| `true_off_threshold` | `1.5` | Percentage at or below which a dimmable output is sent a real OFF command |
+| `filter_interval` | inherited | Slow diagnostic publish throttle |
+| `transition_length` | `0s` | Fade duration for outputs discovered as dimmable |
+| `true_off_threshold` | `1.5` | Percentage at which fade-out becomes a real OFF command |
 
-Duplicate entries in `dimmable_outputs` are rejected. Values outside `1`–`10`
-are rejected.
-
-### Home Assistant entity behaviour
-
-All ten Rogue channels remain Home Assistant `light` entities:
-
-- Listed outputs use the `BRIGHTNESS` light mode.
-- Unlisted outputs use the `ON_OFF` light mode and have no brightness slider.
-- Unlisted outputs never send the absolute-level command; they send only Rogue
-  ON and OFF commands.
-- `transition_length` applies only to listed dimmable outputs.
-- The diagnostic `Output N Level` sensor continues to publish the real CAN level
-  for every output.
-
-This keeps one consistent `light.tvms_rogue_output_N` style domain while avoiding
-brightness controls on outputs programmed as non-dimmable.
-
-### Output channel map
+### Rogue channel map
 
 | Output | Channel |
 |---:|---:|
@@ -228,214 +239,61 @@ brightness controls on outputs programmed as non-dimmable.
 | 9 | `0x14` |
 | 10 | `0x15` |
 
-### Commands and feedback
+### Rogue frames
 
-The exact CAN identifier includes the configured Rogue and host addresses. The
-examples below use Rogue source `0x30` and RedVision host `0x20` where applicable.
-
-| Purpose | CAN ID / DGN | Decode/use |
+| Purpose | DGN / command | Use |
 |---|---:|---|
-| Set output level | command group `0x0F00` | `5A 01 FF <channel> <percent 00-64> 00 00 00` |
-| ON command | command group `0x0F00` | `CB 00 FF <channel> 01 00 00 00` |
-| OFF command | command group `0x0F00` | `CB 00 FF <channel> 00 00 00 00` |
-| Actual output level | DGN `0x1FD12` | `D1=base channel`, following bytes are `0`–`100%` levels |
-| Input/master/output status | DGN `0x1FD00` | Paginated channel status and fault values |
-| Tank/input electrical values | DGN `0x1FD02` | Tank page and grouped input voltage/current page |
-| Output configuration | DGN `0x1FD0E` | One record per output when explicitly requested |
-| Output/dimming activity | DGN `0x1FD14` | Runtime activity only; not used as the static dimming capability source |
-
-### Transition behaviour
-
-For dimmable outputs, ESPHome's transition engine updates the light's interpolated
-`current_values`. The component sends changed integer percentage steps to the
-Rogue and deduplicates repeated percentages. During fade-out it sends stepped
-levels until `true_off_threshold`, followed by one real OFF command.
-
-CAN level feedback does not replace the final Home Assistant target while an
-ESPHome transition is active. After the transition completes, DGN `0x1FD12`
-remains authoritative for actual hardware state and brightness.
-
-For non-dimmable outputs, transitions and percentage commands are bypassed.
-
-### Dimming configuration validation
-
-When a log viewer connects, the Rogue component sends a configuration request:
-
-```text
-Request CAN ID: 0x0F03<rogue address><host address>
-Request data:   0E FD 00 00 00 00 00 00
-```
-
-For Rogue `0x30` and bridge host `0xFF`, this is:
-
-```text
-0F0330FF  0E FD 00 00 00 00 00 00
-```
-
-The Rogue replies with DGN `0x1FD0E` records. The validator maps D1 channels
-`0x0C`–`0x15` to Outputs 1–10 and currently interprets D2 bit 7 as the programmed
-dimmable flag.
-
-The request is used only to validate YAML. It does not dynamically alter light
-traits because Home Assistant entity capabilities are selected at compile time.
-
-Matching configuration:
-
-```text
-[I][redarc_tvms_rogue]: Rogue dimming configuration matches YAML for 10 reported outputs
-```
-
-Per-output mismatch:
-
-```text
-[I][redarc_tvms_rogue]: Output 1 dimming mismatch: YAML=Non-Dimmable Rogue=Dimmable
-[I][redarc_tvms_rogue]: Output 10 dimming mismatch: YAML=Dimmable Rogue=Non-Dimmable
-```
-
-Mismatch lines are informational. Missing or incomplete responses remain warnings:
-
-```text
-[W][redarc_tvms_rogue]: No DGN 0x1FD0E response; Rogue dimming configuration could not be validated
-[W][redarc_tvms_rogue]: Received Rogue configuration for 7/10 outputs; validation is incomplete
-```
-
-No response is expected in `LISTENONLY` mode because the request cannot be sent.
-
-### Rogue input electrical values
-
-DGN `0x1FD02`, page/item `0x16`, is currently decoded as:
-
-```text
-D2-D3 little-endian / 1000 = input voltage in volts
-D4-D5 little-endian / 1000 = input current in amps
-```
-
-These values are exposed as Rogue Input Voltage and Rogue Input Current sensors.
-
-### Rogue output status values
-
-DGN `0x1FD00` output status values currently include:
-
-| Value | Meaning |
-|---:|---|
-| `0x00` | Off |
-| `0x01` | On |
-| `0x06` | Fuse blown |
-| `0x0A` | Over temperature |
-| `0x14` | Off override |
-| `0x15` | On override |
-| `0xF8` | Unconfigured |
-| `0xFF` | No data |
-
-These runtime values must not be used as the static dimming-capability flag.
+| Set level | command `0x5A` | Absolute `0`–`100%` level for dimmable outputs |
+| ON/OFF | command `0xCB` | Binary output command |
+| Output state/level | DGN `0x1FD12` | Actual hardware level feedback |
+| Output/input status | DGN `0x1FD00` | Inputs, master, output state and fault codes |
+| Tank/electrical data | DGN `0x1FD02` | Tank and input voltage/current pages |
+| Output configuration | DGN `0x1FD0E` | Requested static output capability records |
+| Dimming activity | DGN `0x1FD14` | Runtime activity only; not the capability source |
 
 ## TVMS1280
 
-The project labels TVMS1280 relay outputs as Outputs 1–10. Their channels are
-`0x04`–`0x0D`; the inverter is channel `0x0E`.
-
-| Purpose | DGN / command | Decode/use |
-|---|---:|---|
-| Output ON/OFF command | command group `0x0F00` | `CB 00 FF <channel> <00/01> 00 00 00` |
-| Output/input/master feedback | DGN `0x1FD00` | Paginated channel-state array |
-| Tank/temperature/voltage pages | DGN `0x1FD02` | Multiplexed diagnostic pages |
-| Inverter companion status | DGN `0x1FCF0` | Inverter feedback path |
-
-Effective output-state handling recognises normal ON/OFF plus override/master-off
-states. Local commands are published optimistically and then reconciled from CAN
-feedback. Digital inputs publish only when their state changes.
+TVMS1280 exposes Outputs 1–10 as switches, plus inverter and master switches.
+Digital inputs and feedback are change-published. Effective output status handles
+normal, override and master-off states.
 
 ## Manager30
 
-| Purpose | DGN / command | Decode/use |
-|---|---:|---|
-| Output current and battery voltage | DGN `0x1F20A` | Manager output/load values |
-| Solar current and voltage | DGN `0x1F208` | Live solar values; power is current × voltage |
-| AC and vehicle input candidates | DGN `0x1F204` | Input current/voltage fields |
-| Solar energy/yield | DGN `0x1FCD6` | Wh history/yield data |
-| Charging stage and mode | DGN `0x1F200` | Stage `D1 & 0xFE`; mode `D1 bit0`, `0=Touring`, `1=Storage` |
-| Charging-mode command | command `0x43` | Mode byte `0=Touring`, `1=Storage` |
+Manager30 charging mode is updated from the `0x43` command path and DGN
+`0x1F200` bit 0. DGN `0x1F108` is not used as the authoritative mode source
+because it can remain fixed.
 
-DGN `0x1F108` is not used as the authoritative charging-mode source because it
-can remain fixed and overwrite valid changes. Charging mode is updated from the
-`0x43` command path and DGN `0x1F200`.
-
-Confirmed charging-stage bases:
-
-| Base | Stage |
-|---:|---|
-| `0x00` | Not Charging |
-| `0x10` | Desulphation |
-| `0x20` | Soft-start |
-| `0x30` | Boost |
-| `0x40` | Absorption |
-| `0x50` | Battery Test |
-| `0x60` | Equalize |
-| `0x70` | Float |
-| `0x80` | Maintenance |
-
-## Battery sensor
-
-| Purpose | DGN | Decode/use |
-|---|---:|---|
-| Current, voltage and temperature | `0x1F102` | Core shunt readings |
-| SOC | `0x1F104` | State of charge percentage |
-
-Battery history sensors avoid forced duplicate updates and publish when new data
-is received.
-
-## RedVision display rebroadcasts
-
-The display component handles DGN `0x1F280` and `0x1F282` independently, with a
-separate throttle timestamp for each page. This prevents one page from suppressing
-the other and allows the first valid page to publish immediately.
-
-## Stable generated entity IDs
-
-When a device block has an explicit `id:`, generated child IDs use that prefix:
+Charging stage uses:
 
 ```text
+stage_base = D1 & 0xFE
+```
+
+Confirmed bases are Not Charging, Desulphation, Soft-start, Boost, Absorption,
+Battery Test, Equalize, Float and Maintenance.
+
+## Stable generated IDs
+
+With explicit device IDs, generated child entities use stable prefixes:
+
+```cpp
 id(TVMS_Rogue_output_1)
 id(TVMS_Rogue_output_1_level).state
 id(TVMS_Rogue_input_8).state
+id(TVMS_Rogue_recheck_dimmable_outputs).press()
 id(TVMS1280_output_1).turn_on()
 id(Manager30_solar_power).state
 ```
 
-Renaming the Home Assistant entity in the HA UI does not change the ESPHome
-compile-time ID.
-
-## RJ45 pinout
-
-Measured REDARC RJ45 signals:
-
-| RJ45 pin | Function | Status |
-|---:|---|---|
-| 4 | CAN L | Confirmed |
-| 5 | CAN H | Confirmed |
-| 7 | 12–30 V supply | User-confirmed for current hardware design |
-| 8 | Ground | Confirmed |
-
-Do not connect bus voltage directly to an ESP32 input. Use a correctly rated,
-protected regulator or isolated power design.
-
 ## Development checklist
 
-After changing the component on `dev`:
-
-1. Commit and push the repository.
-2. Keep the device's external component on `ref: dev`.
-3. Run **Clean Build Files** or clear `/data/external_components/*`.
+1. Commit changes on `dev`.
+2. Keep the ESPHome source on `ref: dev`.
+3. Clean build files and the external-component cache.
 4. Validate and compile.
-5. Flash and open the ESPHome logs.
-6. Confirm the discovered-device table and Rogue dimming validation output.
-7. Remove `refresh: 0s` or select a normal refresh interval after testing.
+5. Flash the device in CAN `NORMAL` mode.
+6. Confirm the startup capability request and response count.
+7. Confirm Home Assistant controls after an API reconnect.
 
-## Current limitations
-
-- Full ESPHome compilation is not performed by repository-side edits; validate
-  changes with the target ESPHome version before moving `dev` to `main`.
-- Rogue dimming capability is configured in YAML. DGN `0x1FD0E` validates the
-  list but cannot change entity traits at runtime.
-- The `0x1FD0E` validation requires transmit-capable `NORMAL` CAN mode.
-- External CAN platforms such as MCP2515 remain untested on real hardware.
+A full target ESPHome compile is still required before merging changes from
+`dev` to `main`.
