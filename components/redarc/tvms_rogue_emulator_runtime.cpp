@@ -16,10 +16,13 @@ static constexpr uint32_t ID_OUTPUT_CAPABILITIES = 0x17FD0E00UL;
 static constexpr uint32_t ID_OUTPUT_LEVELS = 0x1BFD1200UL;
 static constexpr uint32_t ID_OUTPUT_ACTIVITY = 0x1BFD1400UL;
 static constexpr uint32_t ID_DIRECT_ACK_BASE = 0x0F040000UL;
+static constexpr uint32_t ID_SERVICE_DATA_BASE = 0x02810000UL;
+static constexpr uint32_t ID_SERVICE_TRAILER_BASE = 0x02840000UL;
 
 static constexpr uint16_t SERVICE_DGN_REQUEST = 0x0F03;
 static constexpr uint16_t SERVICE_DIRECT_COMMAND = 0x0F00;
 static constexpr uint16_t SERVICE_LEGACY_DIM = 0x0F05;
+static constexpr uint16_t SERVICE_OBJECT_PREFIX = 0x0E00;
 
 static constexpr uint16_t REQUEST_DGN_1FD00 = 0xFD00;
 static constexpr uint16_t REQUEST_DGN_1FD02 = 0xFD02;
@@ -28,6 +31,7 @@ static constexpr uint16_t REQUEST_DGN_1FD0E = 0xFD0E;
 static constexpr uint16_t REQUEST_DGN_1FD12 = 0xFD12;
 static constexpr uint16_t REQUEST_DGN_1FD14 = 0xFD14;
 
+static constexpr uint8_t MAIN_CONFIGURATION_OBJECT = 0x02;
 static constexpr uint8_t CHANNEL_MASTER = 0x0B;
 static constexpr uint8_t CHANNEL_OUTPUT_1 = 0x0C;
 static constexpr uint8_t CHANNEL_OUTPUT_10 = 0x15;
@@ -118,6 +122,7 @@ void TVMSRogueActiveEmulatorComponent::dump_config() {
   TVMSRogueEmulatorComponent::dump_config();
   ESP_LOGCONFIG(RUNTIME_TAG, "  Active output/status emulation: enabled");
   ESP_LOGCONFIG(RUNTIME_TAG, "  Active channel inventory DGN 0x1FD08: enabled");
+  ESP_LOGCONFIG(RUNTIME_TAG, "  Padded object block reads: enabled");
   ESP_LOGCONFIG(RUNTIME_TAG, "  Status interval: %u ms", (unsigned) this->status_interval_ms_);
   ESP_LOGCONFIG(RUNTIME_TAG, "  Random sensor interval: %u ms",
                 (unsigned) this->random_update_interval_ms_);
@@ -355,6 +360,60 @@ void TVMSRogueActiveEmulatorComponent::handle_can_frame(
   const uint8_t requester = (uint8_t) (id & 0xFFU);
 
   if (destination != this->source_address_) return;
+
+  // The real Rogue always satisfies the requested 0E86 block length. When a
+  // request extends past the declared object length, it pads the remainder with
+  // 0xFF and calculates the block CRC across the complete requested block.
+  // This matters for the final offset 0x1200 request: object 2 contains 64 bytes
+  // there, but the app requests and expects a full 256-byte response.
+  if ((service & 0xFF00U) == SERVICE_OBJECT_PREFIX &&
+      (service & 0x00FFU) == 0x86U && data.size() >= 8 &&
+      this->selected_object_ == MAIN_CONFIGURATION_OBJECT) {
+    const uint32_t offset = redarc_common::u32_le(data, 0);
+    const uint32_t requested_length = redarc_common::u32_le(data, 4);
+
+    std::vector<uint8_t> block((size_t) requested_length, 0xFF);
+    if (offset < this->configuration_object_.size()) {
+      const size_t available = this->configuration_object_.size() - (size_t) offset;
+      const size_t copy_length = std::min<size_t>(block.size(), available);
+      std::copy_n(this->configuration_object_.begin() + offset, copy_length,
+                  block.begin());
+    }
+
+    const uint32_t data_id = ID_SERVICE_DATA_BASE |
+                             ((uint32_t) requester << 8) |
+                             this->source_address_;
+    for (size_t block_offset = 0; block_offset < block.size(); block_offset += 8) {
+      std::vector<uint8_t> frame(8, 0xFF);
+      const size_t chunk = std::min<size_t>(8, block.size() - block_offset);
+      std::copy_n(block.begin() + block_offset, chunk, frame.begin());
+      this->send_frame_(data_id, frame);
+    }
+
+    const uint32_t block_crc = this->crc32c_(
+        block.empty() ? nullptr : block.data(), block.size());
+    const uint32_t trailer_id = ID_SERVICE_TRAILER_BASE |
+                                ((uint32_t) requester << 8) |
+                                this->source_address_;
+    this->send_frame_(
+        trailer_id,
+        {
+            (uint8_t) (requested_length & 0xFFU),
+            (uint8_t) ((requested_length >> 8) & 0xFFU),
+            (uint8_t) ((requested_length >> 16) & 0xFFU),
+            (uint8_t) ((requested_length >> 24) & 0xFFU),
+            (uint8_t) (block_crc & 0xFFU),
+            (uint8_t) ((block_crc >> 8) & 0xFFU),
+            (uint8_t) ((block_crc >> 16) & 0xFFU),
+            (uint8_t) ((block_crc >> 24) & 0xFFU),
+        });
+
+    ESP_LOGI(RUNTIME_TAG,
+             "Padded object %u read offset=%lu requested=%lu returned=%lu",
+             (unsigned) this->selected_object_, (unsigned long) offset,
+             (unsigned long) requested_length, (unsigned long) block.size());
+    return;
+  }
 
   if (service == SERVICE_DGN_REQUEST && data.size() >= 2) {
     const uint16_t requested_dgn = (uint16_t) data[0] | ((uint16_t) data[1] << 8);
