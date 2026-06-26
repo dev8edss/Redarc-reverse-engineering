@@ -229,7 +229,7 @@ Every entity gets a stable id derived from its device block's `id:`, in the form
 to them directly in your own YAML — no extra config, no C++:
 
 ```text
-id(TVMS_Rogue_button_sensor_8).state     # bool: physical button 8 pressed
+id(TVMS_Rogue_input_8).state             # bool: physical input/button 8 pressed
 id(TVMS1280_output_1).turn_on();         # switch output 1 on
 id(TVMS1280_output_1).toggle();          # toggle output 1
 id(Manager30_solar_power).state          # float: solar watts
@@ -237,10 +237,12 @@ id(TVMS_Rogue_light_state_3)             # Rogue dimmable output 3 (a light)
 ```
 
 The id suffix matches the entity: e.g. `Manager30_output_current`,
-`Battery_soc`, `TVMS1280_output_1`…`output_10`, `TVMS1280_digital_input_1`,
-`TVMS_Rogue_button_sensor_1`…`8`, `TVMS_Rogue_light_state_1`…`10`,
-`TVMS_Rogue_master`, `Manager30_charging_mode_select`. (Watch the boot logs or
-ESPHome's generated code if you're unsure of an exact suffix.)
+`Battery_soc`, `TVMS1280_output_1`…`output_10`, `TVMS1280_input_1`…`3`,
+`TVMS_Rogue_input_1`…`8`, `TVMS_Rogue_light_state_1`…`10`,
+`TVMS_Rogue_master`, `Manager30_charging_mode`. The entity-kind word is dropped
+from selects/numbers/buttons (e.g. `Manager30_charging_mode`,
+`Battery_max_charge_current`, `Manager30_set_clock`). Watch the boot logs or
+ESPHome's generated code if you're unsure of an exact suffix.
 
 **Example — Rogue button 8 toggles TVMS1280 output 1** (the cross-device link),
 done entirely in your device YAML:
@@ -251,7 +253,7 @@ interval:
     then:
       - lambda: |-
           static bool last = false;
-          const bool now = id(TVMS_Rogue_button_sensor_8).state;
+          const bool now = id(TVMS_Rogue_input_8).state;
           if (now && !last) id(TVMS1280_output_1).toggle();
           last = now;
 ```

@@ -105,6 +105,6 @@ interval:
     then:
       - lambda: |-
           static bool last = false;
-          const bool now = id(TVMS_Rogue_button_sensor_8).state;
+          const bool now = id(TVMS_Rogue_input_8).state;
           if (now && !last) id(TVMS1280_output_1).toggle();
           last = now;

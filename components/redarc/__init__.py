@@ -154,6 +154,17 @@ def _derive_entity_ids(config):
             continue
         if isinstance(value, ID) and value.is_declaration and not value.is_manual:
             suffix = key[:-3] if key.endswith("_id") else key
+            # Drop the entity-kind word from the end so ids read naturally
+            # (charging_mode_select -> charging_mode, set_clock_button -> set_clock).
+            for kind in ("_select", "_number", "_button"):
+                if suffix.endswith(kind):
+                    suffix = suffix[: -len(kind)]
+                    break
+            # Normalise physical inputs to <device>_input_N on both devices.
+            if suffix.startswith("button_sensor_"):
+                suffix = "input_" + suffix[len("button_sensor_"):]
+            elif suffix.startswith("digital_input_"):
+                suffix = "input_" + suffix[len("digital_input_"):]
             value.id = f"{prefix}_{suffix}"
             value.is_manual = True
     return config
