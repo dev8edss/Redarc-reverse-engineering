@@ -29,7 +29,13 @@ class TVMSRogueEmulatorComponent : public Component {
   void set_random_update_interval_ms(uint32_t v) { random_update_interval_ms_ = v; }
   void set_randomize_inputs(bool v) { randomize_inputs_ = v; }
   void set_serial_prefix(uint32_t v) { serial_prefix_ = v; }
-  void set_serial_suffix(uint16_t v) { serial_suffix_ = v; }
+  void set_serial_suffix(uint16_t v) {
+    (void) v;
+    // Object offset 0x88 is not a serial-suffix field. The captured Rogue
+    // structure requires the encoded byte produced by suffix 0x0013 (0x4D).
+    // Keep this captured suffix until the actual object field is decoded.
+    serial_suffix_ = 0x0013;
+  }
   void set_device_subtype(uint8_t v) { device_subtype_ = v; }
   void add_version_record(uint16_t p, uint8_t a, uint8_t b, uint8_t i) { version_records_.push_back({p, a, b, i}); }
   void set_manufacturing_date(uint8_t d, uint8_t m, uint16_t y) { manufacturing_day_ = d; manufacturing_month_ = m; manufacturing_year_ = y; }
@@ -88,7 +94,7 @@ class TVMSRogueEmulatorComponent : public Component {
   uint32_t random_update_interval_ms_{5000};
   bool randomize_inputs_{true};
   uint32_t serial_prefix_{0};
-  uint16_t serial_suffix_{1};
+  uint16_t serial_suffix_{0x0013};
   uint8_t device_subtype_{0};
 
   std::vector<VersionRecord> version_records_;
