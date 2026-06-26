@@ -1,6 +1,6 @@
 import esphome.codegen as cg
 import esphome.config_validation as cv
-from esphome.components import binary_sensor, light, sensor, switch, text_sensor
+from esphome.components import binary_sensor, button, light, sensor, switch, text_sensor
 from esphome.const import (
     CONF_ACCURACY_DECIMALS, CONF_DEFAULT_TRANSITION_LENGTH, CONF_DEVICE_CLASS,
     CONF_DISABLED_BY_DEFAULT, CONF_EFFECTS, CONF_ENTITY_CATEGORY,
@@ -37,12 +37,14 @@ CONF_HOST_ADDRESS = "host_address"
 CONF_FILTER_INTERVAL = "filter_interval"
 CONF_TRUE_OFF_THRESHOLD = "true_off_threshold"
 CONF_TRANSITION_LENGTH = "transition_length"
-CONF_DIMMABLE_OUTPUTS = "dimmable_outputs"
 
 tvms_rogue_ns = cg.esphome_ns.namespace("redarc_tvms_rogue")
 TVMSRogueComponent = tvms_rogue_ns.class_("TVMSRogueComponent", cg.Component)
 TVMSRogueLight = tvms_rogue_ns.class_("TVMSRogueLight", light.LightOutput)
 TVMSRogueSwitch = tvms_rogue_ns.class_("TVMSRogueSwitch", switch.Switch)
+TVMSRogueRecheckDimmingButton = tvms_rogue_ns.class_(
+    "TVMSRogueRecheckDimmingButton", button.Button
+)
 
 _sensor_ns = cg.esphome_ns.namespace("sensor")
 _SensorClass = _sensor_ns.class_("Sensor")
@@ -55,14 +57,6 @@ _bs_ns = cg.esphome_ns.namespace("binary_sensor")
 _BSClass = _bs_ns.class_("BinarySensor")
 _ts_ns = cg.esphome_ns.namespace("text_sensor")
 _TSClass = _ts_ns.class_("TextSensor")
-
-
-def _validate_dimmable_outputs(value):
-    values = cv.ensure_list(cv.int_range(min=1, max=10))(value)
-    if len(values) != len(set(values)):
-        raise cv.Invalid("dimmable_outputs must not contain duplicate output numbers")
-    return values
-
 
 _AUTO_IDS = {}
 for _i in range(1, 11):
@@ -77,6 +71,7 @@ _AUTO_IDS[cv.GenerateID("input_voltage_id")] = cv.declare_id(_SensorClass)
 _AUTO_IDS[cv.GenerateID("input_current_id")] = cv.declare_id(_SensorClass)
 _AUTO_IDS[cv.GenerateID("master_id")] = cv.declare_id(TVMSRogueSwitch)
 _AUTO_IDS[cv.GenerateID("output_status_id")] = cv.declare_id(_TSClass)
+_AUTO_IDS[cv.GenerateID("recheck_dimming_button_id")] = cv.declare_id(TVMSRogueRecheckDimmingButton)
 
 SCHEMA = cv.Schema(
     {
@@ -86,7 +81,6 @@ SCHEMA = cv.Schema(
         cv.Optional(CONF_FILTER_INTERVAL): cv.positive_time_period_milliseconds,
         cv.Optional(CONF_TRUE_OFF_THRESHOLD, default=1.5): cv.float_range(min=0.0, max=10.0),
         cv.Optional(CONF_TRANSITION_LENGTH, default="0s"): cv.positive_time_period_milliseconds,
-        cv.Optional(CONF_DIMMABLE_OUTPUTS, default=[]): _validate_dimmable_outputs,
         **_AUTO_IDS,
     }
 ).extend(cv.COMPONENT_SCHEMA)
@@ -123,7 +117,6 @@ async def to_code(config):
     cg.add(var.set_true_off_threshold(config[CONF_TRUE_OFF_THRESHOLD]))
 
     p = config[CONF_ID].id.replace("_", " ")
-    dimmable_outputs = set(config[CONF_DIMMABLE_OUTPUTS])
 
     s = await _make_sensor(config["tank1_id"], f"{p} Tank 1",
                            unit="%", state_class=STATE_CLASS_MEASUREMENT, decimals=0)
@@ -183,17 +176,23 @@ async def to_code(config):
     await switch.register_switch(master, master_cfg)
     cg.add(var.register_master_switch(master))
 
-    # All Rogue outputs remain Home Assistant light entities. Outputs listed in
-    # dimmable_outputs expose brightness; all others expose ON/OFF only.
+    recheck = await button.new_button({
+        CONF_ID: config["recheck_dimming_button_id"],
+        CONF_NAME: f"{p} Recheck Dimmable Outputs",
+        CONF_DISABLED_BY_DEFAULT: False,
+        CONF_ICON: "mdi:lightbulb-auto-outline",
+        CONF_ENTITY_CATEGORY: ENTITY_CATEGORY_DIAGNOSTIC,
+    })
+    cg.add(recheck.set_parent(var))
+
+    # All outputs start as ON/OFF lights. The Rogue's 0x1FD0E response updates
+    # each output to BRIGHTNESS or ON_OFF at runtime.
     for i in range(1, 11):
         channel = 0x0B + i
-        is_dimmable = i in dimmable_outputs
         light_out = cg.new_Pvariable(config[f"light_out_{i}"])
         cg.add(light_out.set_parent(var))
         cg.add(light_out.set_output_number(i))
         cg.add(light_out.set_channel(channel))
-        cg.add(light_out.set_dimmable(is_dimmable))
-        cg.add(var.set_output_dimmable(i, is_dimmable))
         cg.add(var.register_light(light_out))
         light_cfg = {
             CONF_ID: config[f"light_state_{i}"],
