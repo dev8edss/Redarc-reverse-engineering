@@ -109,7 +109,7 @@ void TVMSRogueActiveEmulatorComponent::setup() {
 
   this->set_interval("rogue_emulator_identity", this->identity_interval_ms_, [this]() {
     this->send_identity_();
-    ESP_LOGI(RUNTIME_TAG, "Broadcast identity 0x1F404");
+    ESP_LOGD(RUNTIME_TAG, "Broadcast identity 0x1F404");
   });
 
   this->set_interval("rogue_emulator_status", this->status_interval_ms_, [this]() {
@@ -296,7 +296,7 @@ void TVMSRogueEmulatorComponent::send_channel_status_() {
                     {0x18, 0xF8, 0xF8, 0xF8, 0xF8, 0xF8, 0xF8, 0xF8});
   this->send_frame_(redarc_common::with_sa(ID_CHANNEL_STATUS, this->source_address_),
                     {0x1F, 0xF8, 0xF8, 0xF8, 0xFF, 0xFF, 0xFF, 0xFF});
-  ESP_LOGI(RUNTIME_TAG, "Broadcast 0x1FD00 channel status pages");
+  ESP_LOGD(RUNTIME_TAG, "Broadcast 0x1FD00 channel status pages");
 }
 
 void TVMSRogueEmulatorComponent::send_output_levels_() {
@@ -310,7 +310,7 @@ void TVMSRogueEmulatorComponent::send_output_levels_() {
                     {0x1A, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00});
   this->send_frame_(redarc_common::with_sa(ID_OUTPUT_LEVELS, this->source_address_),
                     {0x21, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF});
-  ESP_LOGI(RUNTIME_TAG, "Broadcast 0x1FD12 output levels");
+  ESP_LOGD(RUNTIME_TAG, "Broadcast 0x1FD12 output levels");
 }
 
 void TVMSRogueEmulatorComponent::send_sensor_values_() {
@@ -323,7 +323,7 @@ void TVMSRogueEmulatorComponent::send_sensor_values_() {
                      (uint8_t) (input_current_ma_ & 0xFFU),
                      (uint8_t) ((input_current_ma_ >> 8) & 0xFFU),
                      0xFF, 0xFF, 0xFF});
-  ESP_LOGI(RUNTIME_TAG, "Broadcast 0x1FD02 tank, voltage and current values");
+  ESP_LOGD(RUNTIME_TAG, "Broadcast 0x1FD02 tank, voltage and current values");
 }
 
 void TVMSRogueEmulatorComponent::send_output_capabilities_() {
@@ -331,7 +331,7 @@ void TVMSRogueEmulatorComponent::send_output_capabilities_() {
     this->send_frame_(redarc_common::with_sa(ID_OUTPUT_CAPABILITIES, this->source_address_),
                       {channel, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00});
   }
-  ESP_LOGI(RUNTIME_TAG, "Broadcast 0x1FD0E: all 10 outputs are dimmable");
+  ESP_LOGD(RUNTIME_TAG, "Broadcast 0x1FD0E: all 10 outputs are dimmable");
 }
 
 void TVMSRogueEmulatorComponent::send_output_activity_() {
@@ -339,11 +339,11 @@ void TVMSRogueEmulatorComponent::send_output_activity_() {
                     {0x0C, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00});
   this->send_frame_(redarc_common::with_sa(ID_OUTPUT_ACTIVITY, this->source_address_),
                     {0x13, 0x00, 0x00, 0x00, 0xFF, 0xFF, 0xFF, 0xFF});
-  ESP_LOGI(RUNTIME_TAG, "Broadcast 0x1FD14 output activity");
+  ESP_LOGD(RUNTIME_TAG, "Broadcast 0x1FD14 output activity");
 }
 
 void TVMSRogueEmulatorComponent::send_all_status_(const char *reason) {
-  ESP_LOGI(RUNTIME_TAG, "Sending complete virtual Rogue status (%s)", reason);
+  ESP_LOGD(RUNTIME_TAG, "Sending complete virtual Rogue status (%s)", reason);
   this->send_channel_status_();
   this->send_output_levels_();
   this->send_sensor_values_();
