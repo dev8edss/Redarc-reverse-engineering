@@ -1,16 +1,22 @@
 # TVMS Rogue object-2 to CAN DGN mapping
 
-This document maps the TVMS Rogue configuration object to the CAN DGNs used by RedVision Configurator. It distinguishes confirmed object-derived fields from live status fields and generic requests for which a real Rogue remains silent.
+This document maps the TVMS Rogue configuration object to the CAN DGNs used by
+RedVision Configurator. It distinguishes confirmed object-derived fields from
+live status fields and generic requests for which a real Rogue remains silent.
 
 ## Confidence terms
 
-- **Confirmed**: reproduced by the typed object and a real Rogue CAN response, or isolated by a controlled setting change.
-- **Structure confirmed**: framing and item positions are known; one or more value enums remain unknown.
-- **Candidate**: supported by correlation but needs a one-setting controlled capture.
+- **Confirmed**: reproduced by the typed object and a real Rogue CAN response,
+  or isolated by a controlled setting change.
+- **Structure confirmed**: framing and item positions are known; one or more
+  value enums remain unknown.
+- **Candidate**: supported by correlation but needs a one-setting controlled
+  capture.
 
 ## Configuration object transport
 
-Object 2 is transferred through the directed `0E85/0E86/0281/0284/0E89` service and written through `0E87/0E81/0E88/0E89/0E8A`.
+Object 2 is transferred through the directed `0E85/0E86/0281/0284/0E89`
+service and written through `0E87/0E81/0E88/0E89/0E8A`.
 
 - `0E85`: select object.
 - `0E86`: D1-D4 offset LE32, D5-D8 requested byte count LE32.
@@ -18,7 +24,8 @@ Object 2 is transferred through the directed `0E85/0E86/0281/0284/0E89` service 
 - `0284`: D1-D4 returned count, D5-D8 CRC-32C.
 - `0E81`: sequential write bytes.
 - `0E88`: D1-D4 destination offset, D5-D8 block CRC-32C.
-- Whole-object header: magic `08 00 00 04`, length LE32, CRC-32C with the CRC word zeroed.
+- Whole-object header: magic `08 00 00 04`, length LE32, CRC-32C with the CRC
+  word zeroed.
 
 ## Typed object format
 
@@ -30,7 +37,8 @@ Object 2 is transferred through the directed `0E85/0E86/0281/0284/0E89` service 
 | Container | `04` | container words |
 | Byte blob | `05` | binary bytes |
 
-Immediate integer encoding is `stored = value * 4 + 1`. Four-byte aligned values that point to a valid node header are object offsets.
+Immediate integer encoding is `stored = value * 4 + 1`. Four-byte aligned
+values that point to a valid node header are object offsets.
 
 ## DGN 0x1F108 — load-disconnect configuration
 
@@ -91,7 +99,8 @@ Rogue[2] -> channel map -> channel -> record[1] string
 - D2: zero-based segment index.
 - D3-D8: six ASCII bytes.
 - Unused bytes are `FF`.
-- The real device emits `(length // 6) + 1` segments, including an empty terminator when the text length is an exact multiple of six.
+- The real device emits `(length // 6) + 1` segments, including an empty
+  terminator when the text length is an exact multiple of six.
 
 ## DGN 0x1FD06 — sensor alarm/range configuration
 
@@ -110,7 +119,8 @@ Frame layout:
 Channels emitted by the Rogue:
 
 - `09`, `0A`: tank alarm map at channel record key 5 -> key 7 -> keys 1..3.
-- `16`, `17`: analogue range/alarm map at channel record key 8 -> key 1 -> keys 1..3.
+- `16`, `17`: analogue range/alarm map at channel record key 8 -> key 1 ->
+  keys 1..3.
 
 Alarm mode enum:
 
@@ -146,7 +156,8 @@ Channel classes:
 | `17` | `02` | input current | `0065` |
 | `18-21` | `0B` | remote input | `FFFF` |
 
-The enabled field must come from object key 2; it must not be inferred from the channel range. A disabled physical output therefore returns `00 00` in D7-D8.
+The enabled field must come from object key 2; it must not be inferred from the
+channel range. A disabled physical output therefore returns `00 00` in D7-D8.
 
 ## DGN 0x1FD0E — output capabilities/control mode
 
@@ -182,7 +193,11 @@ Encoding:
 - D2-D3: two configuration bytes.
 - D4-D8: `FF`.
 
-The current real Rogue returns `00 00` for all eight inputs even when the object contains non-zero enable and electrical-type values. Therefore D2-D3 are **not** the nested input enable/key-4 pair. Until a controlled real-Rogue capture changes one electrical profile and reads this DGN, the emulator should reproduce the known `00 00` response rather than invent a mapping.
+The current real Rogue returns `00 00` for all eight inputs even when the object
+contains non-zero enable and electrical-type values. Therefore D2-D3 are **not**
+the nested input enable/key-4 pair. Until a controlled real-Rogue capture changes
+one electrical profile and reads this DGN, the emulator should reproduce the
+known `00 00` response rather than invent a mapping.
 
 ## DGN 0x1FD0C — sensor engineering metadata
 
@@ -197,14 +212,16 @@ Current Rogue frames:
 17 61 00 00 00 00 60 EA
 ```
 
-This is stable sensor-format/range metadata, separate from alarm thresholds in `1FD06`. Current evidence supports:
+This is stable sensor-format/range metadata, separate from alarm thresholds in
+`1FD06`. Current evidence supports:
 
 - D1: channel.
 - D2: format/engineering code (`64` tank-percent, `61` analogue).
 - D3-D6: zero in the current configuration.
 - D7-D8: maximum/range value (`100` for tanks, `60000` for analogue channels).
 
-The exact enum names for `61` and `64` still require a second device or controlled sensor-profile capture.
+The exact enum names for `61` and `64` still require a second device or
+controlled sensor-profile capture.
 
 ## DGN 0x1FD07 — sensor validity/status array
 
@@ -213,14 +230,17 @@ The exact enum names for `61` and `64` still require a second device or controll
 - D1: base item.
 - D2-D8: one status byte for base item through base+6.
 
-Current Rogue pages:
+Current Rogue pages in the available complete configuration captures:
 
 ```text
-09 FD FD FF FF FF FF FF
+09 FF FF FF FF FF FF FF
 16 FF FF FF FF FF FF FF
 ```
 
-Observed codes include `FC`, `FD`, and `FF` across TVMS devices. These appear to represent unavailable/unconfigured/validity states, but exact names require controlled disconnect/reconfigure captures.
+Other TVMS-device captures contain `FC` and `FD`, but no controlled Rogue capture
+yet proves their names. Treat the bytes as validity/status values and retain the
+real Rogue's current all-`FF` response until disconnect/reconfigure tests isolate
+each state.
 
 ## DGN 0x1FD08 — active-channel inventory
 
@@ -232,13 +252,17 @@ Current Rogue payload:
 21 FF FF 1E FF FF FF FF
 ```
 
-The first byte correlates with the highest channel/item (`0x21`). The meaning of D2-D8, especially `1E`, is not proven and must not be labelled an active mask without a controlled channel-count/configuration capture.
+The first byte correlates with the highest channel/item (`0x21`). The meaning of
+D2-D8, especially `1E`, is not proven and must not be labelled an active mask
+without a controlled channel-count/configuration capture.
 
 ## Runtime DGNs
 
 ### 0x1FD00 — channel state array
 
-**Structure confirmed.** D1 is a base channel and D2-D8 are seven channel-state bytes. `00`/`01` are off/on. Real captures also contain `24`, `F8`, and `FF`; their exact inactive/unavailable meanings are not fully resolved.
+**Structure confirmed.** D1 is a base channel and D2-D8 are seven channel-state
+bytes. `00`/`01` are off/on. Real captures also contain `24`, `F8`, and `FF`;
+their exact inactive/unavailable meanings are not fully resolved.
 
 ### 0x1FD02 — sensor values
 
@@ -249,11 +273,25 @@ The first byte correlates with the highest channel/item (`0x21`). The meaning of
 
 ### 0x1FD12 — output level array
 
-**Confirmed.** D1 is base channel and D2-D8 are seven raw percentages. Physical outputs occupy channels `0C..15`.
+**Confirmed.** D1 is base channel and D2-D8 are seven raw percentages. Physical
+outputs occupy channels `0C..15`.
 
 ### 0x1FD14 — output activity/secondary state
 
-**Paging structure confirmed; semantic values unresolved.** D1 is base output channel, D2-D8 are per-output activity/secondary values. Controlled hold-dimming captures are required to name all states.
+**Hold-dimming state confirmed; other activity values unresolved.** D1 is the
+base output channel and D2-D8 are per-output activity values. In the controlled
+real-versus-emulator hold-dimming capture, the selected output changes from
+`00` to `02` for the complete held ramp and returns to `00` on release. Both dim
+up and dim down use `02`; direction is carried by the `0F05` command, not this
+status DGN.
+
+| Value | Meaning | Confidence |
+|---:|---|---|
+| `00` | idle | confirmed |
+| `02` | hold-dimming/ramp active | confirmed |
+
+Further controlled transient, override and protected/fault tests are required
+to name any additional values.
 
 ## Device identity DGNs
 
@@ -267,14 +305,16 @@ The first byte correlates with the highest channel/item (`0x21`). The meaning of
 
 ## Generic probes for which a real Rogue is silent
 
-The Configurator asks all devices for several capability DGNs. In the real Rogue capture there is no reply to:
+The Configurator asks all devices for several capability DGNs. In the real Rogue
+capture there is no reply to:
 
 - `1F40A`
 - `1F207`
 - `1F205`
 - `1F20F`
 
-Silence is the correct Rogue behaviour and the emulator should not fabricate responses merely because the requests appear in the log.
+Silence is the correct Rogue behaviour and the emulator should not fabricate
+responses merely because the requests appear in the log.
 
 ## Remaining controlled captures
 
@@ -284,4 +324,5 @@ To finish the unresolved enums rather than guess:
 2. Disconnect/reconnect one tank and one analogue input while logging `1FD07`.
 3. Change one tank sender profile and inspect `1FD0C` and object key changes.
 4. Enable/disable one channel at a time and inspect `1FD08`.
-5. Hold-dim a single output and correlate `1FD14` values with start, active, release, and limits.
+5. Hold-dim a single output and correlate `1FD14` values with start, active,
+   release, and limits.
