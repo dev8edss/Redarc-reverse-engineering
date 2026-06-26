@@ -92,6 +92,7 @@ class Manager30Component : public Component {
   void send_charging_mode(uint8_t mode);
 
  protected:
+  void publish_vehicle_input_trigger_(uint16_t raw_value);
   void publish_charging_mode_(uint8_t mode);
   void publish_charging_stage_(uint8_t stage);
   void publish_solar_daily_energy_(uint8_t day, uint16_t wh);
@@ -106,8 +107,12 @@ class Manager30Component : public Component {
   uint32_t last_solar_ms_{0};
   uint32_t last_ac_ms_{0};
   uint32_t last_charger_status_ms_{0};
-  uint32_t last_charging_stage_ms_{0};
   uint32_t last_clock_ms_{0};
+  bool charging_mode_status_seen_{false};
+  bool charging_mode_known_{false};
+  uint8_t charging_mode_{0};
+  bool charging_stage_known_{false};
+  uint8_t charging_stage_base_{0};
   redarc_battery_sensor::BatterySensorComponent *battery_sensor_{nullptr};
   sensor::Sensor *output_current_sensor_{nullptr};
   sensor::Sensor *battery_voltage_sensor_{nullptr};
