@@ -13,6 +13,7 @@ from . import (
     _redvision_display,
     _tvms_1280,
     _tvms_rogue,
+    _tvms_rogue_emulator,
 )
 
 CODEOWNERS = ["@dev8edss"]
@@ -47,6 +48,7 @@ CONF_BATTERY_SENSOR = "battery_sensor"
 CONF_MANAGER = "manager"
 CONF_REDVISION_DISPLAY = "redvision_display"
 CONF_TVMS_ROGUE = "tvms_rogue"
+CONF_TVMS_ROGUE_EMULATOR = "tvms_rogue_emulator"
 CONF_TVMS_1280 = "tvms_1280"
 
 DEVICE_KEYS = (
@@ -54,6 +56,7 @@ DEVICE_KEYS = (
     CONF_MANAGER,
     CONF_REDVISION_DISPLAY,
     CONF_TVMS_ROGUE,
+    CONF_TVMS_ROGUE_EMULATOR,
     CONF_TVMS_1280,
 )
 
@@ -230,6 +233,7 @@ CONFIG_SCHEMA = cv.All(
         cv.Optional(CONF_MANAGER): _device_list(_manager.SCHEMA),
         cv.Optional(CONF_REDVISION_DISPLAY): _device_list(_redvision_display.SCHEMA),
         cv.Optional(CONF_TVMS_ROGUE): _device_list(_tvms_rogue.SCHEMA),
+        cv.Optional(CONF_TVMS_ROGUE_EMULATOR): _device_list(_tvms_rogue_emulator.SCHEMA),
         cv.Optional(CONF_TVMS_1280): _device_list(_tvms_1280.SCHEMA),
     }).extend(cv.COMPONENT_SCHEMA),
     cv.has_exactly_one_key(CONF_CANBUS, CONF_CANBUS_ID),
@@ -304,5 +308,7 @@ async def to_code(config):
         await _redvision_display.to_code(config[CONF_REDVISION_DISPLAY])
     for device_config in config.get(CONF_TVMS_ROGUE) or []:
         await _tvms_rogue.to_code(_inherit(device_config, host=True))
+    for device_config in config.get(CONF_TVMS_ROGUE_EMULATOR) or []:
+        await _tvms_rogue_emulator.to_code(device_config)
     for device_config in config.get(CONF_TVMS_1280) or []:
         await _tvms_1280.to_code(_inherit(device_config, host=True))
