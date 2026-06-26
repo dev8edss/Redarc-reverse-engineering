@@ -20,6 +20,10 @@ void TVMSRogueSwitch::write_state(bool state) {
   this->publish_state(state);
 }
 
+void TVMSRogueRecheckDimmingButton::press_action() {
+  if (this->parent_ != nullptr) this->parent_->recheck_dimmable_outputs();
+}
+
 light::LightTraits TVMSRogueLight::get_traits() {
   auto traits = light::LightTraits();
   if (this->dimmable_) {
@@ -30,8 +34,27 @@ light::LightTraits TVMSRogueLight::get_traits() {
   return traits;
 }
 
+void TVMSRogueLight::apply_color_mode_() {
+  if (this->state_ == nullptr) return;
+  const auto mode = this->dimmable_ ? light::ColorMode::BRIGHTNESS : light::ColorMode::ON_OFF;
+  this->state_->current_values.set_color_mode(mode);
+  this->state_->remote_values.set_color_mode(mode);
+  if (!this->dimmable_) {
+    this->state_->current_values.set_brightness(1.0f);
+    this->state_->remote_values.set_brightness(1.0f);
+  }
+}
+
+void TVMSRogueLight::set_dimmable(bool dimmable) {
+  if (this->dimmable_ == dimmable) return;
+  this->dimmable_ = dimmable;
+  this->apply_color_mode_();
+  if (this->state_ != nullptr) this->state_->publish_state();
+}
+
 void TVMSRogueLight::setup_state(light::LightState *state) {
   this->state_ = state;
+  this->apply_color_mode_();
 }
 
 void TVMSRogueLight::publish_feedback_level(float level_percent) {
@@ -53,8 +76,12 @@ void TVMSRogueLight::publish_feedback_level(float level_percent) {
     const float retained_brightness = this->last_nonzero_level_percent_ / 100.0f;
     this->state_->current_values.set_brightness(on ? level_percent / 100.0f : retained_brightness);
     this->state_->remote_values.set_brightness(on ? level_percent / 100.0f : retained_brightness);
+  } else {
+    this->state_->current_values.set_brightness(1.0f);
+    this->state_->remote_values.set_brightness(1.0f);
   }
 
+  this->apply_color_mode_();
   this->state_->publish_state();
 }
 
@@ -63,8 +90,6 @@ void TVMSRogueLight::write_state(light::LightState *state) {
 
   const bool target_on = state->remote_values.is_on();
 
-  // Non-dimmable Rogue channels remain light entities, but expose only ON/OFF
-  // and never send absolute-level commands or transition steps.
   if (!this->dimmable_) {
     const uint8_t requested = target_on ? 100U : 0U;
     if (requested == this->last_sent_percent_) return;
@@ -77,8 +102,6 @@ void TVMSRogueLight::write_state(light::LightState *state) {
     return;
   }
 
-  // ESPHome updates current_values on every transition step. remote_values is the
-  // final requested target and using it for brightness would make transitions instant.
   bool current_on = false;
   float current_brightness = 0.0f;
   state->current_values_as_binary(&current_on);
@@ -125,8 +148,11 @@ void TVMSRogueComponent::setup() {
   this->output_command_id_ = 0x0F000000UL | ((uint32_t) sa << 8) | ha;
   redarc_common::RedarcCanDispatcher::instance().add_listener(
       [this](uint32_t id, const std::vector<uint8_t> &data) { this->handle_can_frame(id, data); });
-  redarc_common::RedarcCanDispatcher::instance().add_logger_connected_listener(
-      [this]() { this->on_logger_connected_(); });
+
+  // Wait until the shared CAN component has completed setup, then discover the
+  // programmed capability of every Rogue output.
+  this->set_timeout("rogue_output_config_startup", 1000,
+                    [this]() { this->request_output_configuration_(); });
 }
 
 void TVMSRogueComponent::dump_config() {
@@ -136,16 +162,8 @@ void TVMSRogueComponent::dump_config() {
   LOG_SENSOR("  ", "Input Current", this->input_current_sensor_);
   LOG_TEXT_SENSOR("  ", "Output Status", this->output_status_text_sensor_);
   LOG_SWITCH("  ", "Master", this->master_switch_);
+  ESP_LOGCONFIG(TAG, "  Dimming capability discovery: DGN 0x1FD0E at startup");
   ESP_LOGCONFIG(TAG, "  True-off threshold: %.1f%%", this->true_off_threshold_percent_);
-
-  std::string configured;
-  for (uint8_t output = 1; output <= 10; output++) {
-    if (!this->configured_dimmable_[output]) continue;
-    if (!configured.empty()) configured += ",";
-    configured += std::to_string(output);
-  }
-  if (configured.empty()) configured = "none";
-  ESP_LOGCONFIG(TAG, "  Dimmable outputs: %s", configured.c_str());
 }
 
 void TVMSRogueComponent::register_light(TVMSRogueLight *light) {
@@ -177,20 +195,20 @@ void TVMSRogueComponent::send_level_(uint8_t channel, uint8_t percent) {
   this->send_frame_(this->output_command_id_, {0x5A, 0x01, 0xFF, channel, percent, 0x00, 0x00, 0x00});
 }
 
-void TVMSRogueComponent::on_logger_connected_() {
-  this->set_timeout("rogue_output_config_request", 300, [this]() { this->request_output_configuration_(); });
+void TVMSRogueComponent::recheck_dimmable_outputs() {
+  ESP_LOGI(TAG, "Rechecking Rogue dimmable outputs");
+  this->request_output_configuration_();
 }
 
 void TVMSRogueComponent::request_output_configuration_() {
   this->reported_dimmable_known_.fill(false);
-  this->reported_dimmable_.fill(false);
-  this->reported_config_raw_.fill(0xFF);
   this->output_config_request_pending_ = true;
+  this->output_config_changes_ = 0;
 
   const uint32_t request_id =
       0x0F030000UL | ((uint32_t) this->source_address_ << 8) | this->host_address_;
   this->send_frame_(request_id, {0x0E, 0xFD, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00});
-  ESP_LOGI(TAG, "Requested Rogue output configuration (DGN 0x1FD0E)");
+  ESP_LOGI(TAG, "Requested Rogue dimming configuration");
 
   this->set_timeout("rogue_output_config_validate", 2500,
                     [this]() { this->validate_output_configuration_(); });
@@ -202,39 +220,41 @@ void TVMSRogueComponent::handle_output_configuration_frame_(const std::vector<ui
   if (channel < ROGUE_ITEM_OUTPUT_1 || channel > ROGUE_ITEM_OUTPUT_10) return;
 
   const uint8_t output = channel - ROGUE_ITEM_MASTER;
-  this->reported_config_raw_[output] = data[1];
-  this->reported_dimmable_[output] = (data[1] & 0x80U) != 0;
+  const bool dimmable = (data[1] & 0x80U) != 0;
   this->reported_dimmable_known_[output] = true;
+
+  auto *light = this->lights_[output];
+  if (light == nullptr || light->is_dimmable() == dimmable) return;
+
+  light->set_dimmable(dimmable);
+  this->output_config_changes_++;
+  ESP_LOGI(TAG, "Output %u changed to %s", (unsigned) output,
+           dimmable ? "Dimmable" : "Non-Dimmable");
 }
 
 void TVMSRogueComponent::validate_output_configuration_() {
   this->output_config_request_pending_ = false;
   uint8_t received = 0;
-  uint8_t mismatches = 0;
-
   for (uint8_t output = 1; output <= 10; output++) {
-    if (!this->reported_dimmable_known_[output]) continue;
-    received++;
-    if (this->reported_dimmable_[output] == this->configured_dimmable_[output]) continue;
-    mismatches++;
-    ESP_LOGI(TAG,
-             "Output %u dimming mismatch: YAML=%s Rogue=%s",
-             (unsigned) output,
-             this->configured_dimmable_[output] ? "Dimmable" : "Non-Dimmable",
-             this->reported_dimmable_[output] ? "Dimmable" : "Non-Dimmable");
+    if (this->reported_dimmable_known_[output]) received++;
   }
 
   if (received == 0) {
-    ESP_LOGW(TAG, "No DGN 0x1FD0E response; Rogue dimming configuration could not be validated");
+    ESP_LOGW(TAG, "No Rogue dimming configuration response received");
     return;
   }
   if (received < 10) {
-    ESP_LOGW(TAG, "Received Rogue configuration for %u/10 outputs; validation is incomplete",
+    ESP_LOGW(TAG, "Received Rogue dimming configuration for %u/10 outputs",
              (unsigned) received);
   }
-  if (mismatches == 0) {
-    ESP_LOGI(TAG, "Rogue dimming configuration matches YAML for %u reported outputs",
+
+  if (this->output_config_changes_ == 0) {
+    ESP_LOGI(TAG, "Rogue dimming configuration unchanged for %u reported outputs",
              (unsigned) received);
+  } else {
+    ESP_LOGI(TAG,
+             "Updated %u Rogue output capabilities; reconnect Home Assistant to refresh light controls",
+             (unsigned) this->output_config_changes_);
   }
 }
 
