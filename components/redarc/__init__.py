@@ -134,16 +134,57 @@ def _time_schema(value):
     return homeassistant_time.CONFIG_SCHEMA({} if value is None else value)
 
 
+# Explicit id-suffix overrides so every entity's derived object id matches its
+# Home Assistant name (so id(...) references and the HA entity_id line up). The
+# value is the slug of the entity's friendly name; keyed by the schema key.
+# Entities whose key already slugifies to their name don't need an entry.
+_ID_OVERRIDES = {
+    # Manager30
+    "source_device_current_id": "device_current",      # "Device Current"
+    "solar_energy_id": "solar_energy_total",            # "Solar Energy Total"
+    "solar_today_id": "solar_energy_today",             # "Solar Energy Today"
+    "solar_day_history_id": "solar_day_1_12_history",   # "Solar Day 1-12 History"
+    "clock_date_id": "can_date",                        # "CAN Date"
+    "clock_time_id": "can_time",                        # "CAN Time"
+    "clock_datetime_id": "can_date_time",               # "CAN Date Time"
+    "set_clock_button_id": "set_time",                  # "Set Time"
+    "clear_solar_history_button_id": "delete_solar_history",  # "Delete Solar History"
+    # Battery
+    "soc_calibration_button_id": "calibrate_soc_full",         # "Calibrate SOC Full"
+    "clear_hourly_soc_button_id": "delete_hourly_soc_history", # "Delete Hourly SOC History"
+    "clear_daily_soc_button_id": "delete_daily_soc_history",   # "Delete Daily SOC History"
+    # TVMS Rogue
+    "tank1_id": "tank_1",                              # "Tank 1"
+    "tank2_id": "tank_2",                              # "Tank 2"
+    # TVMS1280
+    "temp1_id": "temperature_1",                       # "Temperature 1"
+    "temp2_id": "temperature_2",                       # "Temperature 2"
+    "voltage_input1_id": "voltage_input_1",            # "Voltage Input 1"
+    "voltage_input2_id": "voltage_input_2",            # "Voltage Input 2"
+}
+# Rogue indexed entities: output level sensors and the dimmable light states.
+for _i in range(1, 11):
+    _ID_OVERRIDES[f"level_sensor_{_i}"] = f"output_{_i}_level"  # "Output N Level"
+    _ID_OVERRIDES[f"light_state_{_i}"] = f"output_{_i}"         # "Output N" (light)
+# TVMS1280 output switches are declared 0-indexed (output_0_id..output_9_id) but
+# named "Output 1".."Output 10"; map the id to the 1-based name so
+# TVMS1280_output_1 is "Output 1" (channel 0x04), not "Output 2".
+for _i in range(10):
+    _ID_OVERRIDES[f"output_{_i}_id"] = f"output_{_i + 1}"
+
+
 def _derive_entity_ids(config):
     """Give every auto-generated sub-entity of a device a stable id derived from
     the device block's id (e.g. id: Manager30 -> Manager30_solar_power), so the
     entities can be referenced directly from user YAML, e.g.
 
-        id(TVMS_Rogue_button_sensor_8).state
+        id(TVMS_Rogue_input_8).state
         id(TVMS1280_output_1).turn_on();
 
-    The id suffix is the schema key (with a trailing "_id" stripped). Only runs
-    when the device block has an explicit id:; otherwise the auto ids are kept.
+    The id suffix is the entity's HA name slug: _ID_OVERRIDES is consulted first,
+    otherwise it's the schema key (trailing "_id" and entity-kind word stripped).
+    Only runs when the device block has an explicit id:; otherwise the auto ids
+    are kept.
     """
     parent = config.get(CONF_ID)
     if parent is None or parent.id is None:
@@ -153,18 +194,20 @@ def _derive_entity_ids(config):
         if key == CONF_ID:
             continue
         if isinstance(value, ID) and value.is_declaration and not value.is_manual:
-            suffix = key[:-3] if key.endswith("_id") else key
-            # Drop the entity-kind word from the end so ids read naturally
-            # (charging_mode_select -> charging_mode, set_clock_button -> set_clock).
-            for kind in ("_select", "_number", "_button"):
-                if suffix.endswith(kind):
-                    suffix = suffix[: -len(kind)]
-                    break
-            # Normalise physical inputs to <device>_input_N on both devices.
-            if suffix.startswith("button_sensor_"):
-                suffix = "input_" + suffix[len("button_sensor_"):]
-            elif suffix.startswith("digital_input_"):
-                suffix = "input_" + suffix[len("digital_input_"):]
+            suffix = _ID_OVERRIDES.get(key)
+            if suffix is None:
+                suffix = key[:-3] if key.endswith("_id") else key
+                # Drop the entity-kind word from the end so ids read naturally
+                # (charging_mode_select -> charging_mode, set_clock_button -> set_clock).
+                for kind in ("_select", "_number", "_button"):
+                    if suffix.endswith(kind):
+                        suffix = suffix[: -len(kind)]
+                        break
+                # Normalise physical inputs to <device>_input_N on both devices.
+                if suffix.startswith("button_sensor_"):
+                    suffix = "input_" + suffix[len("button_sensor_"):]
+                elif suffix.startswith("digital_input_"):
+                    suffix = "input_" + suffix[len("digital_input_"):]
             value.id = f"{prefix}_{suffix}"
             value.is_manual = True
     return config

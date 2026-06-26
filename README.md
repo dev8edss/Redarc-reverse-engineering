@@ -233,16 +233,17 @@ id(TVMS_Rogue_input_8).state             # bool: physical input/button 8 pressed
 id(TVMS1280_output_1).turn_on();         # switch output 1 on
 id(TVMS1280_output_1).toggle();          # toggle output 1
 id(Manager30_solar_power).state          # float: solar watts
-id(TVMS_Rogue_light_state_3)             # Rogue dimmable output 3 (a light)
+id(TVMS_Rogue_output_3)                  # Rogue dimmable output 3 (a light)
 ```
 
-The id suffix matches the entity: e.g. `Manager30_output_current`,
-`Battery_soc`, `TVMS1280_output_1`…`output_10`, `TVMS1280_input_1`…`3`,
-`TVMS_Rogue_input_1`…`8`, `TVMS_Rogue_light_state_1`…`10`,
-`TVMS_Rogue_master`, `Manager30_charging_mode`. The entity-kind word is dropped
-from selects/numbers/buttons (e.g. `Manager30_charging_mode`,
-`Battery_max_charge_current`, `Manager30_set_clock`). Watch the boot logs or
-ESPHome's generated code if you're unsure of an exact suffix.
+Every id suffix matches that entity's name in Home Assistant: e.g.
+`Manager30_output_current`, `Battery_soc`, `TVMS1280_output_1`…`output_10`,
+`TVMS1280_input_1`…`3`, `TVMS_Rogue_input_1`…`8` (physical buttons),
+`TVMS_Rogue_output_1`…`10` (dimmable lights), `TVMS_Rogue_master`,
+`Manager30_charging_mode`, `Manager30_set_time`,
+`Battery_calibrate_soc_full`. The entity-kind word (select/number/button) is
+dropped. Watch the boot logs or ESPHome's generated code if you're unsure of an
+exact suffix.
 
 **Example — Rogue button 8 toggles TVMS1280 output 1** (the cross-device link),
 done entirely in your device YAML:
