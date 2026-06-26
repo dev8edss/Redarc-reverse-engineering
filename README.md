@@ -4,8 +4,9 @@ Bring your **REDARC RedVision / TVMS** RV power system into **Home Assistant**.
 
 This is firmware for a small ESP32 board that plugs into your REDARC CAN bus. It
 reads everything the system is doing — battery, charger, solar, water tanks,
-temperatures and lighting — and shows it in Home Assistant as normal sensors and
-switches. It can also send commands back to switch and dim your TVMS outputs.
+temperatures and lighting — and shows it in Home Assistant as normal sensors,
+lights and switches. It can also send commands back to switch and dim your TVMS
+outputs.
 
 Everything it reports was worked out by listening to the real bus traffic. If you
 want the technical detail behind the decoding, see
@@ -107,6 +108,8 @@ base. Power the Atom from **USB** (or a proper regulated 5 V supply).
      tvms_rogue:
        - id: TVMS_Rogue
          source_address: 0x30
+         dimmable_outputs: [2, 3, 4, 5, 6, 7, 10]
+         transition_length: 3s
 
      tvms_1280:
        - id: TVMS1280
@@ -117,10 +120,36 @@ Each device has a sensible default address (battery `0x08`, manager `0x01`,
 display `0x20`, Rogue `0x30`, TVMS1280 `0x24`), so the defaults will often work as-is
 and you can leave `source_address` out entirely.
 
+### Configure Rogue dimming
+
+All ten Rogue outputs remain Home Assistant `light` entities. Only outputs listed
+under `dimmable_outputs` expose a brightness slider and use `transition_length`.
+Every unlisted output is still a light entity, but it is ON/OFF only and sends only
+the Rogue ON and OFF commands.
+
+```yaml
+redarc:
+  tvms_rogue:
+    - id: TVMS_Rogue
+      source_address: 0x30
+      dimmable_outputs: [2, 3, 4, 5, 6, 7, 10]
+      transition_length: 3s
+```
+
+Important points:
+
+- Output numbers must be between `1` and `10` and cannot be repeated.
+- `dimmable_outputs` defaults to `[]`; no output is assumed dimmable unless listed.
+- `transition_length` belongs only inside the `tvms_rogue` block.
+- `transition_length` affects only outputs listed in `dimmable_outputs`.
+- Non-dimmable outputs continue to report their actual ON/OFF state from Rogue
+  output-level feedback.
+
+### Device discovery and Rogue validation logs
+
 If a device uses a different address, the easiest way to find it is the
-**device logs**: at the start of the logs (when you open the ESPHome log viewer)
-the bridge prints a table of every device it found on the bus, with each
-address shown in both decimal and hex, e.g.:
+**device logs**. When you open the ESPHome log viewer, the bridge prints a table
+of every device it found on the bus, with each address shown in decimal and hex:
 
 ```text
 Discovered devices:
@@ -130,25 +159,50 @@ Discovered devices:
   RedVision Display    32 (0x20)    ...
 ```
 
-You can also read the address off the **RedVision display**, where it's shown in
-**decimal**. Either way, enter that number straight into the config — no
-conversion needed. `source_address` (and `host_address`) accept either plain
-decimal or hex with a `0x` prefix, so `source_address: 48` and
-`source_address: 0x30` mean exactly the same thing. **Two devices can't share the
-same address**, so if you run two of the same type, the second one must have its
-own address.
+At the same logger connection, each configured Rogue requests output
+configuration DGN `0x1FD0E` and compares the Rogue's programmed dimmable flags
+with the YAML `dimmable_outputs` list. This validation is informational and does
+not change the Home Assistant entity capabilities selected by YAML.
 
-### Handy settings
+A matching configuration logs:
 
-These live on the `redarc:` block and apply to every device (override inside a
-device block only if it needs to differ):
+```text
+[I][redarc_tvms_rogue]: Rogue dimming configuration matches YAML for 10 reported outputs
+```
+
+A mismatch is printed at INFO level for each affected output:
+
+```text
+[I][redarc_tvms_rogue]: Output 1 dimming mismatch: YAML=Non-Dimmable Rogue=Dimmable
+[I][redarc_tvms_rogue]: Output 10 dimming mismatch: YAML=Dimmable Rogue=Non-Dimmable
+```
+
+If the Rogue does not return configuration records, ESPHome logs a warning that
+the dimming list could not be validated. The YAML configuration remains active.
+The validation request requires CAN `NORMAL` mode; it cannot transmit in
+`LISTENONLY` mode.
+
+You can also read the address off the **RedVision display**, where it is shown in
+**decimal**. Enter that number straight into the config — no conversion needed.
+`source_address` and `host_address` accept either plain decimal or hex with a
+`0x` prefix, so `source_address: 48` and `source_address: 0x30` mean the same
+thing. **Two devices cannot share the same address**, so if you run two of the
+same type, the second one must have its own address.
+
+### Handy shared settings
+
+These live on the top-level `redarc:` block and apply to the appropriate devices:
 
 | Setting | Default | What it does |
 |---|---|---|
 | `host_address` | `0xFF` | This bridge's address; used when sending commands |
-| `filter_interval` | `5s` | How often values are published (throttle) |
+| `filter_interval` | `5s` | How often throttled values are published |
 | `history_poll_interval` | `60s` | How often battery SOC / solar history is fetched (`0s` = off) |
-| `time` | on | Adds a Home Assistant clock + the Manager's "Set Time" button. Use `time: false` to turn off |
+| `time` | on | Adds a Home Assistant clock and the Manager's Set Time button. Use `time: false` to disable it |
+
+Rogue-only settings such as `dimmable_outputs`, `transition_length` and
+`true_off_threshold` belong inside each `tvms_rogue` entry, not on the top-level
+`redarc:` block.
 
 > Using an external CAN board (like an MCP2515) instead of the M5Stack base is
 > possible but **untested** — see
@@ -196,17 +250,17 @@ The screens rebroadcast a few readings, handy as a cross-check:
 
 - Battery Current, Device Current, Manager Output Current (as shown on the display)
 
-### TVMS Rogue (dimmable lighting)
+### TVMS Rogue
 
 | Entity | What it is |
 |---|---|
-| Output 1–10 | Dimmable **lights** |
-| Output 1–10 Level *(diagnostic)* | Real hardware brightness |
-| Input Button 1–8 *(diagnostic)* | Physical wall-button state |
+| Output 1–10 | Home Assistant **lights**; listed outputs are dimmable, unlisted outputs are ON/OFF only |
+| Output 1–10 Level *(diagnostic)* | Actual hardware output percentage from CAN feedback |
+| Input 1–8 *(diagnostic)* | Physical input/button state |
 | Master | Module master **switch** |
 | Tank 1 / Tank 2 | Water tank levels |
 | Input Voltage / Current | Module input |
-| Output Status *(diagnostic)* | Reports faults (fuse blown, over temp, etc.) |
+| Output Status *(diagnostic)* | Reports faults such as fuse blown or over temperature |
 
 ### TVMS1280 (relays / inverter)
 
@@ -233,19 +287,19 @@ id(TVMS_Rogue_input_8).state             # bool: physical input/button 8 pressed
 id(TVMS1280_output_1).turn_on();         # switch output 1 on
 id(TVMS1280_output_1).toggle();          # toggle output 1
 id(Manager30_solar_power).state          # float: solar watts
-id(TVMS_Rogue_output_3)                  # Rogue dimmable output 3 (a light)
+id(TVMS_Rogue_output_3)                  # Rogue output 3 light entity
 ```
 
 Every id suffix matches that entity's name in Home Assistant: e.g.
 `Manager30_output_current`, `Battery_soc`, `TVMS1280_output_1`…`output_10`,
-`TVMS1280_input_1`…`3`, `TVMS_Rogue_input_1`…`8` (physical buttons),
-`TVMS_Rogue_output_1`…`10` (dimmable lights), `TVMS_Rogue_master`,
+`TVMS1280_input_1`…`3`, `TVMS_Rogue_input_1`…`8` (physical inputs),
+`TVMS_Rogue_output_1`…`10` (light entities), `TVMS_Rogue_master`,
 `Manager30_charging_mode`, `Manager30_set_time`,
 `Battery_calibrate_soc_full`. The entity-kind word (select/number/button) is
-dropped. Watch the boot logs or ESPHome's generated code if you're unsure of an
+dropped. Watch the boot logs or ESPHome's generated code if you are unsure of an
 exact suffix.
 
-**Example — Rogue button 8 toggles TVMS1280 output 1** (the cross-device link),
+**Example — Rogue input 8 toggles TVMS1280 output 1** (the cross-device link),
 done entirely in your device YAML:
 
 ```yaml
@@ -266,10 +320,15 @@ have an explicit `id:` for the derived ids to exist.)
 
 ## Troubleshooting
 
-- **No control / can't switch anything.** You're in `LISTENONLY` mode. Switch to
-  `NORMAL` to send commands.
-- **History charts on the example dashboard are empty / error.** They need the
-  **ApexCharts Card** from HACS. Install it.
+- **No control / cannot switch anything.** You are in `LISTENONLY` mode. Switch
+  to `NORMAL` to send commands.
+- **A Rogue output has the wrong brightness controls.** Update that Rogue's
+  `dimmable_outputs` list and rebuild. Entity capabilities are selected at compile
+  time; the `0x1FD0E` validation reports mismatches but does not alter entities.
+- **No Rogue configuration validation response.** Confirm the CAN bus is in
+  `NORMAL` mode and that `source_address` and `host_address` are correct.
+- **History charts on the example dashboard are empty or erroring.** They need
+  the **ApexCharts Card** from HACS.
 - **Entity names look different in Home Assistant.** HA remembers any entity you
   rename in its own UI, which can drift from the names here.
 
