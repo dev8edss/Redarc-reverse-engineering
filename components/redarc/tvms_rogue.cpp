@@ -20,14 +20,41 @@ void TVMSRogueSwitch::write_state(bool state) {
   this->publish_state(state);
 }
 
+void TVMSRogueRecheckDimmingButton::press_action() {
+  if (this->parent_ != nullptr) this->parent_->recheck_dimmable_outputs();
+}
+
 light::LightTraits TVMSRogueLight::get_traits() {
   auto traits = light::LightTraits();
-  traits.set_supported_color_modes({light::ColorMode::BRIGHTNESS});
+  if (this->dimmable_) {
+    traits.set_supported_color_modes({light::ColorMode::BRIGHTNESS});
+  } else {
+    traits.set_supported_color_modes({light::ColorMode::ON_OFF});
+  }
   return traits;
+}
+
+void TVMSRogueLight::apply_color_mode_() {
+  if (this->state_ == nullptr) return;
+  const auto mode = this->dimmable_ ? light::ColorMode::BRIGHTNESS : light::ColorMode::ON_OFF;
+  this->state_->current_values.set_color_mode(mode);
+  this->state_->remote_values.set_color_mode(mode);
+  if (!this->dimmable_) {
+    this->state_->current_values.set_brightness(1.0f);
+    this->state_->remote_values.set_brightness(1.0f);
+  }
+}
+
+void TVMSRogueLight::set_dimmable(bool dimmable) {
+  if (this->dimmable_ == dimmable) return;
+  this->dimmable_ = dimmable;
+  this->apply_color_mode_();
+  if (this->state_ != nullptr) this->state_->publish_state();
 }
 
 void TVMSRogueLight::setup_state(light::LightState *state) {
   this->state_ = state;
+  this->apply_color_mode_();
 }
 
 void TVMSRogueLight::publish_feedback_level(float level_percent) {
@@ -37,69 +64,81 @@ void TVMSRogueLight::publish_feedback_level(float level_percent) {
   if (level_percent > 100.0f) level_percent = 100.0f;
 
   const bool on = level_percent > 0.5f;
-  const float brightness = on ? level_percent / 100.0f : 0.0f;
+  this->last_sent_percent_ = on ? (this->dimmable_ ? (uint8_t) std::round(level_percent) : 100U) : 0U;
 
-  // This is bus feedback from the RedVision/TVMS side. Update the frontend state
-  // directly so we do not echo a physical-display button press back onto the CAN bus.
+  if (this->dimmable_ && this->state_->is_transformer_active()) return;
+
   this->state_->current_values.set_state(on);
-  this->state_->current_values.set_brightness(brightness);
   this->state_->remote_values.set_state(on);
-  this->state_->remote_values.set_brightness(brightness);
-  this->state_->publish_state();
-}
 
-void TVMSRogueLight::publish_target_level(float level_percent) {
-  if (this->state_ == nullptr) return;
+  if (this->dimmable_) {
+    if (on) this->last_nonzero_level_percent_ = level_percent;
+    const float retained_brightness = this->last_nonzero_level_percent_ / 100.0f;
+    this->state_->current_values.set_brightness(on ? level_percent / 100.0f : retained_brightness);
+    this->state_->remote_values.set_brightness(on ? level_percent / 100.0f : retained_brightness);
+  } else {
+    this->state_->current_values.set_brightness(1.0f);
+    this->state_->remote_values.set_brightness(1.0f);
+  }
 
-  if (level_percent < 0.0f) level_percent = 0.0f;
-  if (level_percent > 100.0f) level_percent = 100.0f;
-
-  const bool on = level_percent > 0.5f;
-  const float brightness = on ? level_percent / 100.0f : 0.0f;
-
-  // This is the HA-requested target. The Rogue now supports an absolute level
-  // command, so feedback should reconcile quickly after the CAN frame is sent.
-  this->state_->current_values.set_state(on);
-  this->state_->current_values.set_brightness(brightness);
-  this->state_->remote_values.set_state(on);
-  this->state_->remote_values.set_brightness(brightness);
+  this->apply_color_mode_();
   this->state_->publish_state();
 }
 
 void TVMSRogueLight::write_state(light::LightState *state) {
   if (this->parent_ == nullptr) return;
 
-  // Use the requested frontend target, not current_values. current_values may still
-  // contain the previous OFF feedback when HA sends a plain turn_on command.
-  bool binary = state->remote_values.is_on();
-  float brightness = state->remote_values.get_brightness();
+  const bool target_on = state->remote_values.is_on();
 
-  if (!binary) {
-    this->publish_target_level(0.0f);
+  if (!this->dimmable_) {
+    const uint8_t requested = target_on ? 100U : 0U;
+    if (requested == this->last_sent_percent_) return;
+    this->last_sent_percent_ = requested;
+    if (target_on) {
+      this->parent_->set_target(this->output_number_, this->channel_, 100.0f);
+    } else {
+      this->parent_->turn_off(this->output_number_, this->channel_);
+    }
+    return;
+  }
+
+  bool current_on = false;
+  float current_brightness = 0.0f;
+  state->current_values_as_binary(&current_on);
+  state->current_values_as_brightness(&current_brightness);
+
+  const float target_brightness = state->remote_values.get_brightness();
+
+  if (target_on && target_brightness <= 0.0f) {
+    uint8_t percent = (uint8_t) std::round(this->last_nonzero_level_percent_);
+    if (percent < 1) percent = 100;
+    if (percent > 100) percent = 100;
+    if (percent == this->last_sent_percent_) return;
+    this->last_sent_percent_ = percent;
+    this->parent_->set_target(this->output_number_, this->channel_, (float) percent);
+    return;
+  }
+
+  float current_percent = current_on ? current_brightness * 100.0f : 0.0f;
+
+  if (!target_on && (!current_on || current_percent <= this->parent_->true_off_threshold())) {
+    if (this->last_sent_percent_ == 0) return;
+    this->last_sent_percent_ = 0;
     this->parent_->turn_off(this->output_number_, this->channel_);
     return;
   }
 
-  float target_percent = brightness * 100.0f;
+  if (target_on && current_percent <= this->parent_->true_off_threshold()) return;
 
-  // A plain HA turn_on can arrive as ON with brightness still at 0 because our
-  // feedback publisher correctly reported the real Rogue output as OFF/0%. Do
-  // not translate that into another OFF command; use current feedback if known,
-  // otherwise request full ON.
-  if (target_percent <= 0.0f) {
-    float current = this->parent_->level(this->output_number_);
-    if (!std::isnan(current) && current > this->parent_->true_off_threshold()) {
-      target_percent = current;
-    } else {
-      target_percent = 100.0f;
-    }
-  }
+  if (current_percent > 100.0f) current_percent = 100.0f;
+  uint8_t percent = (uint8_t) std::round(current_percent);
+  if (percent < 1) percent = 1;
+  if (percent > 100) percent = 100;
+  if (percent == this->last_sent_percent_) return;
 
-  if (target_percent > 100.0f) target_percent = 100.0f;
-  if (target_percent < this->parent_->true_off_threshold()) target_percent = this->parent_->true_off_threshold();
-
-  this->publish_target_level(target_percent);
-  this->parent_->set_target(this->output_number_, this->channel_, target_percent);
+  this->last_sent_percent_ = percent;
+  if (target_on) this->last_nonzero_level_percent_ = current_percent;
+  this->parent_->set_target(this->output_number_, this->channel_, (float) percent);
 }
 
 void TVMSRogueComponent::setup() {
@@ -109,15 +148,21 @@ void TVMSRogueComponent::setup() {
   this->output_command_id_ = 0x0F000000UL | ((uint32_t) sa << 8) | ha;
   redarc_common::RedarcCanDispatcher::instance().add_listener(
       [this](uint32_t id, const std::vector<uint8_t> &data) { this->handle_can_frame(id, data); });
+
+  // Wait until the shared CAN component has completed setup, then discover the
+  // programmed capability of every Rogue output.
+  this->set_timeout("rogue_output_config_startup", 1000,
+                    [this]() { this->request_output_configuration_(); });
 }
 
 void TVMSRogueComponent::dump_config() {
   ESP_LOGCONFIG(TAG, "TVMS Rogue SA=0x%02X HA=0x%02X", this->source_address_, this->host_address_);
-  ESP_LOGCONFIG(TAG, "  Output cmd: 0x%08X  DGN: 0x1FD00, 0x1FD02, 0x1FD12", this->output_command_id_);
+  ESP_LOGCONFIG(TAG, "  Output cmd: 0x%08X  DGN: 0x1FD00, 0x1FD02, 0x1FD0E, 0x1FD12", this->output_command_id_);
   LOG_SENSOR("  ", "Input Voltage", this->input_voltage_sensor_);
   LOG_SENSOR("  ", "Input Current", this->input_current_sensor_);
   LOG_TEXT_SENSOR("  ", "Output Status", this->output_status_text_sensor_);
   LOG_SWITCH("  ", "Master", this->master_switch_);
+  ESP_LOGCONFIG(TAG, "  Dimming capability discovery: DGN 0x1FD0E at startup");
   ESP_LOGCONFIG(TAG, "  True-off threshold: %.1f%%", this->true_off_threshold_percent_);
 }
 
@@ -150,6 +195,69 @@ void TVMSRogueComponent::send_level_(uint8_t channel, uint8_t percent) {
   this->send_frame_(this->output_command_id_, {0x5A, 0x01, 0xFF, channel, percent, 0x00, 0x00, 0x00});
 }
 
+void TVMSRogueComponent::recheck_dimmable_outputs() {
+  ESP_LOGI(TAG, "Rechecking Rogue dimmable outputs");
+  this->request_output_configuration_();
+}
+
+void TVMSRogueComponent::request_output_configuration_() {
+  this->reported_dimmable_known_.fill(false);
+  this->output_config_request_pending_ = true;
+  this->output_config_changes_ = 0;
+
+  const uint32_t request_id =
+      0x0F030000UL | ((uint32_t) this->source_address_ << 8) | this->host_address_;
+  this->send_frame_(request_id, {0x0E, 0xFD, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00});
+  ESP_LOGI(TAG, "Requested Rogue dimming configuration");
+
+  this->set_timeout("rogue_output_config_validate", 2500,
+                    [this]() { this->validate_output_configuration_(); });
+}
+
+void TVMSRogueComponent::handle_output_configuration_frame_(const std::vector<uint8_t> &data) {
+  if (!this->output_config_request_pending_ || data.size() < 2) return;
+  const uint8_t channel = data[0];
+  if (channel < ROGUE_ITEM_OUTPUT_1 || channel > ROGUE_ITEM_OUTPUT_10) return;
+
+  const uint8_t output = channel - ROGUE_ITEM_MASTER;
+  const bool dimmable = (data[1] & 0x80U) != 0;
+  this->reported_dimmable_known_[output] = true;
+
+  auto *light = this->lights_[output];
+  if (light == nullptr || light->is_dimmable() == dimmable) return;
+
+  light->set_dimmable(dimmable);
+  this->output_config_changes_++;
+  ESP_LOGI(TAG, "Output %u changed to %s", (unsigned) output,
+           dimmable ? "Dimmable" : "Non-Dimmable");
+}
+
+void TVMSRogueComponent::validate_output_configuration_() {
+  this->output_config_request_pending_ = false;
+  uint8_t received = 0;
+  for (uint8_t output = 1; output <= 10; output++) {
+    if (this->reported_dimmable_known_[output]) received++;
+  }
+
+  if (received == 0) {
+    ESP_LOGW(TAG, "No Rogue dimming configuration response received");
+    return;
+  }
+  if (received < 10) {
+    ESP_LOGW(TAG, "Received Rogue dimming configuration for %u/10 outputs",
+             (unsigned) received);
+  }
+
+  if (this->output_config_changes_ == 0) {
+    ESP_LOGI(TAG, "Rogue dimming configuration unchanged for %u reported outputs",
+             (unsigned) received);
+  } else {
+    ESP_LOGI(TAG,
+             "Updated %u Rogue output capabilities; reconnect Home Assistant to refresh light controls",
+             (unsigned) this->output_config_changes_);
+  }
+}
+
 void TVMSRogueComponent::send_master(bool state) {
   if (state) {
     this->send_on_(ROGUE_ITEM_MASTER);
@@ -161,7 +269,6 @@ void TVMSRogueComponent::send_master(bool state) {
 
 void TVMSRogueComponent::turn_off(uint8_t output_number, uint8_t channel) {
   if (output_number < 1 || output_number > 10) return;
-
   this->send_off_(channel);
   ESP_LOGI(TAG, "Output %u channel 0x%02X OFF", output_number, channel);
 }
@@ -190,6 +297,11 @@ void TVMSRogueComponent::handle_can_frame(uint32_t can_id, const std::vector<uin
 
   const uint32_t now = millis();
 
+  if (redarc_common::rvc_matches(can_id, 0x1FD0EUL, this->source_address_)) {
+    this->handle_output_configuration_frame_(data);
+    return;
+  }
+
   if (redarc_common::rvc_matches(can_id, 0x1FD02UL, this->source_address_)) {
     if (data[0] == ROGUE_ITEM_TANK_1) {
       if (now - this->last_tank_ms_ >= this->filter_interval_ms_) {
@@ -198,7 +310,6 @@ void TVMSRogueComponent::handle_can_frame(uint32_t can_id, const std::vector<uin
         if (this->tank2_sensor_ != nullptr) this->tank2_sensor_->publish_state((float) data[2]);
       }
     } else if (data[0] == ROGUE_ITEM_INPUT_VOLTAGE) {
-      // Input page: D2-D3 voltage, D4-D5 current, both little-endian, raw / 1000.
       if (now - this->last_input_voltage_ms_ >= this->filter_interval_ms_) {
         this->last_input_voltage_ms_ = now;
         if (this->input_voltage_sensor_ != nullptr) {
@@ -219,7 +330,6 @@ void TVMSRogueComponent::handle_can_frame(uint32_t can_id, const std::vector<uin
   }
 
   if (can_id == this->output_command_id_) {
-    // Output command events are not throttled; they reflect requested state changes.
     if (data[0] == 0xCB && data[2] == 0xFF) {
       const uint8_t channel = data[3];
       this->publish_channel_(channel, data[4] != 0);
@@ -270,11 +380,6 @@ void TVMSRogueComponent::publish_channel_(uint8_t channel, bool state) {
 void TVMSRogueComponent::handle_channel_status_frame_(const std::vector<uint8_t> &data) {
   if (data.size() < 8) return;
 
-  // DGN 0x1FD00 is a paginated byte-state array. D1 is the base item ID and
-  // D2-D8 are states for base..base+6. Status codes: 0x00 off, 0x01 on, 0x06
-  // fuse blown, 0x0A over temp, 0x14/0x15 off/on override, 0xF8 unconfigured,
-  // 0xFF no-data. Only 0x00/0x01 drive button/master state; non-normal codes
-  // are summarised in the Output Status text sensor.
   const uint8_t base_channel = data[0];
   bool output_seen = false;
   for (uint8_t i = 1; i <= 7; i++) {
@@ -299,7 +404,7 @@ void TVMSRogueComponent::publish_output_status_() {
   std::string summary;
   for (uint8_t i = 0; i < this->output_state_.size(); i++) {
     const char *st = redarc_common::output_status_name(this->output_state_[i]);
-    if (st == nullptr) continue;  // 0x00/0x01/0xFF: normal or no-data
+    if (st == nullptr) continue;
     if (!summary.empty()) summary += ", ";
     summary += "Output " + std::to_string(i + 1) + " " + st;
   }

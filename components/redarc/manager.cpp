@@ -73,6 +73,7 @@ void Manager30Component::dump_config() {
   LOG_TEXT_SENSOR("  ", "CAN Date", this->clock_date_text_sensor_);
   LOG_TEXT_SENSOR("  ", "CAN Time", this->clock_time_text_sensor_);
   LOG_TEXT_SENSOR("  ", "CAN Date Time", this->clock_datetime_text_sensor_);
+  ESP_LOGCONFIG(TAG, "  CAN clock publish: every REDARC minute at second 00");
   LOG_TEXT_SENSOR("  ", "Charging Stage", this->charging_stage_text_sensor_);
   LOG_SENSOR("  ", "Vehicle Input Current", this->vehicle_input_current_sensor_);
   LOG_SENSOR("  ", "Vehicle Input Voltage", this->vehicle_input_voltage_sensor_);
@@ -158,8 +159,6 @@ void Manager30Component::handle_can_frame(uint32_t can_id, const std::vector<uin
   }
 
   if (redarc_common::rvc_matches(can_id, 0x1F304UL, this->source_address_)) {
-    if (now - this->last_clock_ms_ < this->filter_interval_ms_) return;
-    this->last_clock_ms_ = now;
     const uint8_t raw_day_flags = data[0];
     const uint8_t day = (raw_day_flags >> 3) + 1U;
     const uint8_t month = data[1];
@@ -167,23 +166,34 @@ void Manager30Component::handle_can_frame(uint32_t can_id, const std::vector<uin
     const uint8_t hour = data[4];
     const uint8_t minute = data[5];
     const uint8_t second = data[6];
-    if (year >= 2000 && year <= 2100 && month >= 1 && month <= 12 && day >= 1 && day <= 31 &&
-        hour <= 23 && minute <= 59 && second <= 59) {
-      char date[11];
-      char time[9];
-      char datetime[20];
-      std::snprintf(date, sizeof(date), "%04u-%02u-%02u", (unsigned) year, (unsigned) month, (unsigned) day);
-      std::snprintf(time, sizeof(time), "%02u:%02u:%02u", (unsigned) hour, (unsigned) minute, (unsigned) second);
-      std::snprintf(datetime, sizeof(datetime), "%04u-%02u-%02u %02u:%02u:%02u",
-                    (unsigned) year, (unsigned) month, (unsigned) day,
-                    (unsigned) hour, (unsigned) minute, (unsigned) second);
-      if (this->clock_date_text_sensor_ != nullptr) this->clock_date_text_sensor_->publish_state(date);
-      if (this->clock_time_text_sensor_ != nullptr) this->clock_time_text_sensor_->publish_state(time);
-      if (this->clock_datetime_text_sensor_ != nullptr) this->clock_datetime_text_sensor_->publish_state(datetime);
-    } else {
+
+    if (year < 2000 || year > 2100 || month < 1 || month > 12 || day < 1 || day > 31 ||
+        hour > 23 || minute > 59 || second > 59) {
       ESP_LOGD(TAG, "Ignored invalid CAN clock payload: %02X %02X %02X %02X %02X %02X %02X %02X",
                data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7]);
+      return;
     }
+
+    // Publish to Home Assistant exactly on the REDARC minute boundary. Multiple
+    // 0x1F304 frames received while second is 00 are collapsed into one update.
+    if (second != 0) return;
+    const uint32_t minute_key =
+        (((((uint32_t) year * 13U + month) * 32U + day) * 24U + hour) * 60U + minute);
+    if (this->clock_minute_known_ && this->last_clock_minute_key_ == minute_key) return;
+    this->clock_minute_known_ = true;
+    this->last_clock_minute_key_ = minute_key;
+
+    char date[11];
+    char time[9];
+    char datetime[20];
+    std::snprintf(date, sizeof(date), "%04u-%02u-%02u", (unsigned) year, (unsigned) month, (unsigned) day);
+    std::snprintf(time, sizeof(time), "%02u:%02u:00", (unsigned) hour, (unsigned) minute);
+    std::snprintf(datetime, sizeof(datetime), "%04u-%02u-%02u %02u:%02u:00",
+                  (unsigned) year, (unsigned) month, (unsigned) day,
+                  (unsigned) hour, (unsigned) minute);
+    if (this->clock_date_text_sensor_ != nullptr) this->clock_date_text_sensor_->publish_state(date);
+    if (this->clock_time_text_sensor_ != nullptr) this->clock_time_text_sensor_->publish_state(time);
+    if (this->clock_datetime_text_sensor_ != nullptr) this->clock_datetime_text_sensor_->publish_state(datetime);
     return;
   }
 
