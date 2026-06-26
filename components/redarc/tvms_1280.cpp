@@ -71,9 +71,20 @@ void TVMS1280Component::publish_output_status_() {
   this->output_status_text_sensor_->publish_state(summary);
 }
 
+void TVMS1280Component::set_digital_input_state_(uint8_t input, bool active) {
+  if (input < TVMS1280_ITEM_INPUT_1 || input > TVMS1280_ITEM_INPUT_3) return;
+  if (this->digital_input_state_known_[input] && this->digital_input_states_[input] == active) return;
+
+  this->digital_input_state_known_[input] = true;
+  this->digital_input_states_[input] = active;
+  if (this->digital_input_sensors_[input] != nullptr) {
+    this->digital_input_sensors_[input]->publish_state(active);
+  }
+}
+
 void TVMS1280Component::publish_channel_(uint8_t channel, bool state) {
   if (channel >= TVMS1280_ITEM_INPUT_1 && channel <= TVMS1280_ITEM_INPUT_3) {
-    if (this->digital_input_sensors_[channel] != nullptr) this->digital_input_sensors_[channel]->publish_state(state);
+    this->set_digital_input_state_(channel, state);
   } else if (channel >= TVMS1280_ITEM_OUTPUT_1 && channel <= TVMS1280_ITEM_OUTPUT_10) {
     this->publish_output_(channel - TVMS1280_ITEM_OUTPUT_1, state);
   } else if (channel == TVMS1280_ITEM_INVERTER) {
