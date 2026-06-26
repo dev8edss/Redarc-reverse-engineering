@@ -16,6 +16,7 @@ static constexpr uint8_t TVMS1280_ITEM_VOLTAGE_INPUT_1 = 0x11;
 static constexpr uint8_t TVMS1280_ITEM_TEMP_2 = 0x14;
 static constexpr uint8_t TVMS1280_ITEM_TANK_3 = 0x17;
 static constexpr uint8_t TVMS1280_ITEM_TANK_6 = 0x1A;
+static constexpr uint8_t TVMS1280_STATUS_MASTER_OFF = 0x1C;
 }  // namespace
 
 void TVMS1280Switch::write_state(bool state) {
@@ -26,7 +27,7 @@ void TVMS1280Switch::write_state(bool state) {
 void TVMS1280Component::setup() {
   const uint8_t sa = this->source_address_;
   const uint8_t ha = this->host_address_;
-  this->command_id_       = 0x0F000000UL | ((uint32_t) sa << 8) | ha;
+  this->command_id_ = 0x0F000000UL | ((uint32_t) sa << 8) | ha;
   redarc_common::RedarcCanDispatcher::instance().add_listener(
       [this](uint32_t id, const std::vector<uint8_t> &data) { this->handle_can_frame(id, data); });
 }
@@ -60,9 +61,9 @@ void TVMS1280Component::publish_output_status_() {
   std::string summary;
   for (uint8_t i = 0; i < this->output_state_.size(); i++) {
     const char *st = redarc_common::output_status_name(this->output_state_[i]);
-    if (st == nullptr) continue;  // 0x00/0x01/0xFF: normal or no-data
+    if (st == nullptr) continue;  // Normal states, master-off and no-data are not faults.
     if (!summary.empty()) summary += ", ";
-    summary += "Output " + std::to_string(i) + " " + st;
+    summary += "Output " + std::to_string(i + 1) + " " + st;
   }
   if (summary.empty()) summary = "None";
   if (summary == this->last_output_status_) return;
@@ -75,13 +76,21 @@ void TVMS1280Component::publish_channel_(uint8_t channel, bool state) {
     if (this->digital_input_sensors_[channel] != nullptr) this->digital_input_sensors_[channel]->publish_state(state);
   } else if (channel >= TVMS1280_ITEM_OUTPUT_1 && channel <= TVMS1280_ITEM_OUTPUT_10) {
     this->publish_output_(channel - TVMS1280_ITEM_OUTPUT_1, state);
-  } else if (channel == TVMS1280_ITEM_INVERTER && this->inverter_switch_ != nullptr) {
-    this->inverter_switch_->publish_state(state);
-  } else if (channel == TVMS1280_ITEM_MASTER && this->master_switch_ != nullptr) {
-    this->master_switch_->publish_state(state);
+  } else if (channel == TVMS1280_ITEM_INVERTER) {
+    if (this->inverter_switch_ != nullptr) this->inverter_switch_->publish_state(state);
+  } else if (channel == TVMS1280_ITEM_MASTER) {
+    if (this->master_switch_ != nullptr) this->master_switch_->publish_state(state);
+
+    // Like the Rogue's zero-level feedback after master-off, the 1280 master is a
+    // global gate. Its output pages report 0x1C rather than ordinary 0x00 while
+    // disabled. Publish every controlled entity OFF immediately; normal 0x1FD00
+    // feedback restores the retained output selections when the master is enabled.
+    if (!state) {
+      for (uint8_t i = 0; i < this->output_switches_.size(); i++) this->publish_output_(i, false);
+      if (this->inverter_switch_ != nullptr) this->inverter_switch_->publish_state(false);
+    }
   }
 }
-
 
 void TVMS1280Component::handle_can_frame(uint32_t can_id, const std::vector<uint8_t> &data) {
   can_id = redarc_common::rvc_id(can_id);
@@ -126,11 +135,10 @@ void TVMS1280Component::handle_can_frame(uint32_t can_id, const std::vector<uint
     return;
   }
 
-  // TVMS commands use the PDU1 destination byte for the target address and the
-  // final byte for the sender. Match the destination and deliberately ignore the
-  // sender so commands from a RedVision display or another controller update Home
-  // Assistant immediately. DGN 0x1FD00 below remains the authoritative hardware
-  // confirmation and will correct the optimistic state if the command is rejected.
+  // Match commands by the 1280 destination address and ignore the sender. This is
+  // the same immediate command-event path used by the Rogue, extended so a command
+  // from any RedVision/controller source updates Home Assistant without waiting for
+  // the periodic feedback cycle. DGN 0x1FD00 remains authoritative confirmation.
   const uint32_t command_target = 0x0F000000UL | ((uint32_t) this->source_address_ << 8);
   if ((can_id & 0x1FFFFF00UL) == command_target) {
     if (data[0] == 0xCB && data[2] == 0xFF && data[4] <= 0x01) {
@@ -143,13 +151,10 @@ void TVMS1280Component::handle_can_frame(uint32_t can_id, const std::vector<uint
   }
 
   if (redarc_common::rvc_matches(can_id, 0x1FD00UL, this->source_address_)) {
-    // TVMS1280 output feedback. D1 is the base channel and D2-D8 are the states
-    // for base+0..base+6. Status codes: 0x00 off, 0x01 on, 0x06 fuse blown,
-    // 0x0A output over temp, 0x14 off override, 0x15 on override, 0xF8
-    // unconfigured, 0xFF no-data. Off/On and the override variants drive the
-    // switch state; all non-normal codes (incl. 0xF8 unconfigured) are
-    // summarised in the Output Status text sensor. (ESPHome cannot mark an
-    // individual switch entity unavailable, so 0xF8 is reported, not disabled.)
+    // D1 is the base item and D2-D8 are states for base..base+6. In addition to
+    // normal off/on and override states, the 1280 reports 0x1C for every output
+    // and the inverter while the master is off. Treat 0x1C as an effective OFF,
+    // not as a fault or an unknown state.
     const uint8_t base_channel = data[0];
     bool output_seen = false;
     for (uint8_t i = 1; i < 8; i++) {
@@ -161,16 +166,16 @@ void TVMS1280Component::handle_can_frame(uint32_t can_id, const std::vector<uint
       }
       switch (value) {
         case 0x00:  // Off
-        case 0x14:  // Off override (state still updates)
+        case 0x14:  // Off override
+        case TVMS1280_STATUS_MASTER_OFF:  // Disabled by master
           this->publish_channel_(channel, false);
           break;
         case 0x01:  // On
-        case 0x15:  // On override (state still updates)
+        case 0x15:  // On override
           this->publish_channel_(channel, true);
           break;
-        default:    // 0x06 fuse blown, 0x0A over temp, 0xF8 unconfigured, 0xFF
-          break;    // no-data: leave switch state; reported via Output Status
-
+        default:    // Fuse blown, over temp, unconfigured or no-data
+          break;
       }
     }
     if (output_seen) this->publish_output_status_();
@@ -178,7 +183,8 @@ void TVMS1280Component::handle_can_frame(uint32_t can_id, const std::vector<uint
   }
 
   if (redarc_common::rvc_matches(can_id, 0x1FCF0UL, this->source_address_)) {
-    if (data[1] == TVMS1280_ITEM_INVERTER && this->inverter_switch_ != nullptr) this->inverter_switch_->publish_state(data[0] != 0);
+    if (data[1] == TVMS1280_ITEM_INVERTER && this->inverter_switch_ != nullptr)
+      this->inverter_switch_->publish_state(data[0] != 0);
     return;
   }
 }
