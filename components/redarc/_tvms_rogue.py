@@ -79,7 +79,7 @@ SCHEMA = cv.Schema(
         cv.Optional(CONF_HOST_ADDRESS): cv.hex_uint8_t,
         cv.Optional(CONF_FILTER_INTERVAL): cv.positive_time_period_milliseconds,
         cv.Optional(CONF_TRUE_OFF_THRESHOLD, default=1.5): cv.float_range(min=0.0, max=10.0),
-        cv.Optional(CONF_TRANSITION_LENGTH): cv.positive_time_period_milliseconds,
+        cv.Optional(CONF_TRANSITION_LENGTH, default="0s"): cv.positive_time_period_milliseconds,
         **_AUTO_IDS,
     }
 ).extend(cv.COMPONENT_SCHEMA)
