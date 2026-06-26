@@ -107,7 +107,8 @@ class Manager30Component : public Component {
   uint32_t last_solar_ms_{0};
   uint32_t last_ac_ms_{0};
   uint32_t last_charger_status_ms_{0};
-  uint32_t last_clock_ms_{0};
+  bool clock_minute_known_{false};
+  uint32_t last_clock_minute_key_{0};
   bool charging_mode_known_{false};
   uint8_t charging_mode_{0};
   bool charging_stage_known_{false};
