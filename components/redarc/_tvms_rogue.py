@@ -71,7 +71,7 @@ _AUTO_IDS[cv.GenerateID("input_voltage_id")] = cv.declare_id(_SensorClass)
 _AUTO_IDS[cv.GenerateID("input_current_id")] = cv.declare_id(_SensorClass)
 _AUTO_IDS[cv.GenerateID("master_id")] = cv.declare_id(TVMSRogueSwitch)
 _AUTO_IDS[cv.GenerateID("output_status_id")] = cv.declare_id(_TSClass)
-_AUTO_IDS[cv.GenerateID("recheck_dimming_button_id")] = cv.declare_id(TVMSRogueRecheckDimmingButton)
+_AUTO_IDS[cv.GenerateID("recheck_dimmable_outputs_button_id")] = cv.declare_id(TVMSRogueRecheckDimmingButton)
 
 SCHEMA = cv.Schema(
     {
@@ -177,7 +177,7 @@ async def to_code(config):
     cg.add(var.register_master_switch(master))
 
     recheck = await button.new_button({
-        CONF_ID: config["recheck_dimming_button_id"],
+        CONF_ID: config["recheck_dimmable_outputs_button_id"],
         CONF_NAME: f"{p} Recheck Dimmable Outputs",
         CONF_DISABLED_BY_DEFAULT: False,
         CONF_ICON: "mdi:lightbulb-auto-outline",
