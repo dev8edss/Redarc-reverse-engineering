@@ -22,7 +22,8 @@ class RedvisionDisplayComponent : public Component {
  protected:
   uint8_t source_address_{0x20};
   uint32_t filter_interval_ms_{5000};
-  uint32_t last_display_ms_{0};
+  uint32_t last_1f280_ms_{0};
+  uint32_t last_1f282_ms_{0};
   sensor::Sensor *battery_current_display_sensor_{nullptr};
   sensor::Sensor *device_current_display_sensor_{nullptr};
   sensor::Sensor *manager_output_current_display_sensor_{nullptr};

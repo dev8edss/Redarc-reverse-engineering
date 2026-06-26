@@ -20,16 +20,13 @@ class TVMS1280Switch : public switch_::Switch {
   void set_parent(TVMS1280Component *parent) { this->parent_ = parent; }
   void set_output_number(uint8_t n) { this->output_number_ = n; }
   void set_channel(uint8_t ch) { this->channel_ = ch; }
-  void set_is_inverter(bool v) { this->is_inverter_ = v; }
   void write_state(bool state) override;
   uint8_t output_number() const { return this->output_number_; }
-  uint8_t channel() const { return this->channel_; }
-  bool is_inverter() const { return this->is_inverter_; }
+
  protected:
   TVMS1280Component *parent_{nullptr};
   uint8_t output_number_{0};
   uint8_t channel_{0x04};
-  bool is_inverter_{false};
 };
 
 class TVMS1280Component : public Component {
@@ -57,6 +54,7 @@ class TVMS1280Component : public Component {
   void publish_output_(uint8_t output_number, bool state);
   void publish_channel_(uint8_t channel, bool state);
   void publish_output_status_();
+  void set_digital_input_state_(uint8_t input, bool active);
 
   uint8_t source_address_{0x24};
   uint8_t host_address_{0x20};
@@ -76,6 +74,8 @@ class TVMS1280Component : public Component {
   sensor::Sensor *voltage_input2_sensor_{nullptr};
   std::array<sensor::Sensor *, 7> tank_sensors_{};
   std::array<binary_sensor::BinarySensor *, 4> digital_input_sensors_{};
+  std::array<bool, 4> digital_input_state_known_{};
+  std::array<bool, 4> digital_input_states_{};
   text_sensor::TextSensor *output_status_text_sensor_{nullptr};
   std::array<uint8_t, 10> output_state_{};
   std::string last_output_status_;

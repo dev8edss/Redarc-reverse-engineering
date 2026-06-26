@@ -23,7 +23,7 @@ cards:
       fallback_solar_current: sensor.redvision_can_bridge_manager30_solar_current
       fallback_solar_voltage: sensor.redvision_can_bridge_manager30_solar_voltage
       fallback_solar_power: sensor.redvision_can_bridge_manager30_solar_power
-      fallback_solar_energy: sensor.redvision_can_bridge_manager30_solar_energy
+      fallback_solar_energy: sensor.redvision_can_bridge_manager30_solar_energy_today
       fallback_ac_voltage: sensor.redvision_can_bridge_manager30_ac_input_voltage
     triggers_update:
       - sensor.redvision_can_bridge_manager30_vehicle_input_current
@@ -35,7 +35,7 @@ cards:
       - sensor.redvision_can_bridge_manager30_solar_current
       - sensor.redvision_can_bridge_manager30_solar_voltage
       - sensor.redvision_can_bridge_manager30_solar_power
-      - sensor.redvision_can_bridge_manager30_solar_energy
+      - sensor.redvision_can_bridge_manager30_solar_energy_today
     custom_fields:
       panel: |
         [[[
@@ -51,32 +51,54 @@ cards:
           ]);
 
           const numberState = (entityId) => {
-            if (!entityId || !states[entityId]) return null;
+            if (!entityId || !states[entityId]) {
+              return null;
+            }
 
             const raw = states[entityId].state;
 
-            if (unavailable.has(raw)) return null;
+            if (unavailable.has(raw)) {
+              return null;
+            }
 
             const value = Number(raw);
 
-            return Number.isFinite(value) ? value : null;
+            return Number.isFinite(value)
+              ? value
+              : null;
           };
 
           const firstNumber = (...entityIds) => {
             for (const entityId of entityIds) {
               const value = numberState(entityId);
 
-              if (value !== null) return value;
+              if (value !== null) {
+                return value;
+              }
             }
 
             return null;
           };
 
           const positive = (value) =>
-            value !== null && value > 0 ? value : 0;
+            value !== null && value > 0
+              ? value
+              : 0;
 
-          const vehicleA = firstNumber(variables.vehicle_current);
-          const vehicleV = firstNumber(variables.vehicle_voltage);
+          const voltagePresent = (
+            voltage,
+            minimumVoltage
+          ) =>
+            voltage !== null &&
+            voltage >= minimumVoltage;
+
+          const vehicleA = firstNumber(
+            variables.vehicle_current
+          );
+
+          const vehicleV = firstNumber(
+            variables.vehicle_voltage
+          );
 
           const solarA = firstNumber(
             variables.solar_current,
@@ -88,7 +110,9 @@ cards:
             variables.fallback_solar_voltage
           );
 
-          const acA = firstNumber(variables.ac_current);
+          const acA = firstNumber(
+            variables.ac_current
+          );
 
           const acV = firstNumber(
             variables.ac_voltage,
@@ -96,13 +120,17 @@ cards:
           );
 
           const vehicleW =
-            vehicleA !== null && vehicleV !== null
-              ? positive(vehicleA) * positive(vehicleV)
+            vehicleA !== null &&
+            vehicleV !== null
+              ? positive(vehicleA) *
+                positive(vehicleV)
               : 0;
 
           const calculatedSolarW =
-            solarA !== null && solarV !== null
-              ? positive(solarA) * positive(solarV)
+            solarA !== null &&
+            solarV !== null
+              ? positive(solarA) *
+                positive(solarV)
               : 0;
 
           const publishedSolarW = firstNumber(
@@ -111,24 +139,46 @@ cards:
 
           const solarW =
             publishedSolarW !== null
-              ? Math.max(publishedSolarW, 0)
+              ? Math.max(
+                  publishedSolarW,
+                  0
+                )
               : calculatedSolarW;
 
           const acW =
-            acA !== null && acV !== null
-              ? positive(acA) * positive(acV)
+            acA !== null &&
+            acV !== null
+              ? positive(acA) *
+                positive(acV)
               : 0;
 
-          const totalW = vehicleW + solarW + acW;
+          const totalW =
+            vehicleW +
+            solarW +
+            acW;
 
           const percentage = (watts) =>
             totalW > 0
-              ? Math.max(0, Math.min(100, watts / totalW * 100))
+              ? Math.max(
+                  0,
+                  Math.min(
+                    100,
+                    watts / totalW * 100
+                  )
+                )
               : 0;
 
-          const vehiclePct = percentage(vehicleW);
-          const solarPct = percentage(solarW);
-          const acPct = percentage(acW);
+          const vehiclePct = percentage(
+            vehicleW
+          );
+
+          const solarPct = percentage(
+            solarW
+          );
+
+          const acPct = percentage(
+            acW
+          );
 
           const solarWh = firstNumber(
             variables.fallback_solar_energy
@@ -139,7 +189,12 @@ cards:
             decimals,
             minimumVoltage
           ) => {
-            if (value === null || value < minimumVoltage) return "";
+            if (
+              value === null ||
+              value < minimumVoltage
+            ) {
+              return "";
+            }
 
             return `${value.toFixed(decimals)}V`;
           };
@@ -162,67 +217,112 @@ cards:
             decimals,
             minimumVoltage,
             active
-          ) => `
-            <div style="
-              display:grid;
-              grid-template-columns:34px minmax(100px,1fr) 64px;
-              align-items:center;
-              gap:14px;
-              min-height:46px;
-            ">
-              <ha-icon
-                icon="${icon}"
-                title="${label}"
-                style="
-                  --mdc-icon-size:29px;
-                  color:${active ? "#95d94a" : "#f0f0f0"};
-                  filter:${active
-                    ? "drop-shadow(0 0 5px rgba(149,217,74,.35))"
-                    : "none"};
-                ">
-              </ha-icon>
+          ) => {
+            /*
+             * Right edge remains square up to 92%.
+             * Radius increases by 1 px per percentage:
+             *
+             * 92%  = 0 px
+             * 93%  = 1 px
+             * 94%  = 2 px
+             * 95%  = 3 px
+             * 96%  = 4 px
+             * 97%  = 5 px
+             * 98%  = 6 px
+             * 99%  = 7 px
+             * 100% = 8 px
+             */
+            const endRadius = Math.max(
+              0,
+              Math.min(
+                8,
+                ((pct - 95) / 5) * 8 
+              )
+            );
 
+            return `
               <div style="
-                height:18px;
-                box-sizing:border-box;
-                padding:2px;
-                overflow:hidden;
-                border:2px solid #9b9b9b;
-                border-radius:12px;
-                background:#181818;
-                box-shadow:inset 0 1px 4px rgba(0,0,0,.8);
-                clip-path:inset(0 round 12px);
+                display:grid;
+                grid-template-columns:
+                  34px
+                  minmax(100px,1fr)
+                  64px;
+                align-items:center;
+                gap:14px;
+                min-height:46px;
               ">
+                <ha-icon
+                  icon="${icon}"
+                  title="${label}"
+                  style="
+                    --mdc-icon-size:29px;
+                    color:${
+                      active
+                        ? "#95d94a"
+                        : "#f0f0f0"
+                    };
+                    filter:${
+                      active
+                        ? "drop-shadow(0 0 5px rgba(149,217,74,.35))"
+                        : "none"
+                    };
+                  ">
+                </ha-icon>
+
                 <div style="
-                  width:${pct.toFixed(1)}%;
-                  height:100%;
-                  border-radius:8px;
-                  background:linear-gradient(
-                    90deg,
-                    #78c536 0%,
-                    #9cdd50 100%
-                  );
-                  box-shadow:0 0 8px rgba(145,214,67,.5);
-                  transition:width .6s ease;
-                "></div>
-              </div>
+                  height:18px;
+                  box-sizing:border-box;
+                  padding:2px;
+                  overflow:hidden;
+                  border:2px solid #9b9b9b;
+                  border-radius:12px;
+                  background:#181818;
+                  box-shadow:
+                    inset 0 1px 4px
+                    rgba(0,0,0,.8);
+                  clip-path:
+                    inset(0 round 12px);
+                ">
+                  <div style="
+                    width:${pct.toFixed(1)}%;
+                    height:100%;
+                    border-radius:
+                      8px
+                      ${endRadius.toFixed(1)}px
+                      ${endRadius.toFixed(1)}px
+                      8px;
+                    background:
+                      linear-gradient(
+                        90deg,
+                        #78c536 0%,
+                        #9cdd50 100%
+                      );
+                    box-shadow:
+                      0 0 8px
+                      rgba(145,214,67,.5);
+                    transition:
+                      width .6s ease,
+                      border-radius .6s ease;
+                  "></div>
+                </div>
 
-              <div style="
-                color:#f2f2f2;
-                text-align:right;
-                white-space:nowrap;
-                font-size:18px;
-                font-weight:500;
-                letter-spacing:.1px;
-              ">
-                ${formatVoltage(
-                  voltage,
-                  decimals,
-                  minimumVoltage
-                )}
+                <div style="
+                  color:#f2f2f2;
+                  text-align:right;
+                  white-space:nowrap;
+                  font-size:18px;
+                  font-weight:500;
+                  letter-spacing:.1px;
+                ">
+                  ${formatVoltage(
+                    voltage,
+                    decimals,
+                    minimumVoltage
+                  )}
+                </div>
               </div>
-            </div>
-          `;
+            `;
+          };
 
           return `
             <div style="
@@ -231,16 +331,20 @@ cards:
               border-radius:18px;
               background:#333333;
               color:#f4f4f4;
-              font-family:Arial,Helvetica,sans-serif;
+              font-family:
+                Arial,
+                Helvetica,
+                sans-serif;
             ">
               <div style="
                 padding:19px 22px 17px;
-                border-radius:0 0 18px 18px;
-                background:linear-gradient(
-                  180deg,
-                  #252525 0%,
-                  #202020 100%
-                );
+                border-radius:18px;
+                background:
+                  linear-gradient(
+                    180deg,
+                    #252525 0%,
+                    #202020 100%
+                  );
               ">
                 ${row(
                   "mdi:car",
@@ -249,7 +353,10 @@ cards:
                   vehicleV,
                   1,
                   4,
-                  vehicleW > 0
+                  voltagePresent(
+                    vehicleV,
+                    4
+                  )
                 )}
 
                 ${row(
@@ -259,7 +366,10 @@ cards:
                   solarV,
                   1,
                   2,
-                  solarW > 0
+                  voltagePresent(
+                    solarV,
+                    2
+                  )
                 )}
 
                 ${row(
@@ -269,18 +379,23 @@ cards:
                   acV,
                   0,
                   1,
-                  acW > 0
+                  voltagePresent(
+                    acV,
+                    1
+                  )
                 )}
               </div>
 
               <div style="
                 display:grid;
-                grid-template-columns:1fr auto;
+                grid-template-columns:
+                  1fr auto;
                 align-items:center;
                 min-height:112px;
                 margin-top:10px;
                 padding:15px 39px;
-                border-radius:18px 18px 0 0;
+                border-radius:
+                  18px 18px 0 0;
                 background:#1b1b1b;
               ">
                 <ha-icon
@@ -288,9 +403,11 @@ cards:
                   style="
                     --mdc-icon-size:67px;
                     color:#ffb000;
-                    filter:drop-shadow(
-                      0 0 9px rgba(255,176,0,.25)
-                    );
+                    filter:
+                      drop-shadow(
+                        0 0 9px
+                        rgba(255,176,0,.25)
+                      );
                   ">
                 </ha-icon>
 
@@ -313,7 +430,9 @@ cards:
                   </div>
 
                   <div>
-                    ${formatEnergy(solarWh)}
+                    ${formatEnergy(
+                      solarWh
+                    )}
                   </div>
                 </div>
               </div>

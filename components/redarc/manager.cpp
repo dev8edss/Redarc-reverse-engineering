@@ -16,7 +16,6 @@ void VehicleInputTriggerSelect::control(size_t index) {
 void ChargingModeSelect::control(size_t index) {
   if (this->parent_ == nullptr || index >= 2) return;
   this->parent_->send_charging_mode((uint8_t) index);
-  this->publish_state(index);
 }
 
 void Manager30SetClockButton::press_action() {
@@ -98,6 +97,7 @@ void Manager30Component::send_charging_mode(uint8_t mode) {
   if (mode > 1) return;
   const std::vector<uint8_t> data = {0x43, 0x00, 0xFF, 0xFF, mode, 0x00, 0x00, 0x00};
   redarc_common::send_command(redarc_common::with_sa(0x0F00FF00UL, this->host_address_), data);
+  this->publish_charging_mode_(mode);
   ESP_LOGD(TAG, "Sent charging mode %s", mode == 0 ? "Touring" : "Storage");
 }
 
@@ -106,40 +106,41 @@ void Manager30Component::handle_can_frame(uint32_t can_id, const std::vector<uin
   if (data.size() < 8) return;
 
   const uint32_t now = millis();
+  const uint32_t directed_response_id =
+      0x0F000000UL | ((uint32_t) this->source_address_ << 8) | this->host_address_;
 
-  if (can_id == (0x0F000000UL | ((uint32_t) this->source_address_ << 8) | this->host_address_) &&
-      data[0] == 0x68 && data[2] == 0x03) {
-    const uint16_t raw = redarc_common::u16_le(data, 4);
-    if (this->vehicle_input_trigger_select_ != nullptr) {
-      if (raw <= 3) this->vehicle_input_trigger_select_->publish_state((size_t) raw);
-      else if (raw == 5) this->vehicle_input_trigger_select_->publish_state((size_t) 4);
+  // Directed acknowledgements/responses from the Manager to this bridge.
+  if (can_id == directed_response_id && data[2] == 0x03) {
+    if (data[0] == 0x68) {
+      this->publish_vehicle_input_trigger_(redarc_common::u16_le(data, 4));
+      return;
     }
-    return;
-  }
-
-  if (can_id == redarc_common::with_sa(0x0F00FF00UL, this->host_address_) &&
-      data[0] == 0x68 && data[2] == 0xFF && data[3] == 0xFF) {
-    const uint16_t raw = redarc_common::u16_le(data, 4);
-    if (this->vehicle_input_trigger_select_ != nullptr) {
-      if (raw <= 3) this->vehicle_input_trigger_select_->publish_state((size_t) raw);
-      else if (raw == 5) this->vehicle_input_trigger_select_->publish_state((size_t) 4);
+    if (data[0] == 0x43) {
+      this->publish_charging_mode_(data[4] & 0x01U);
+      return;
     }
-    return;
   }
 
-  if (can_id == redarc_common::with_sa(0x0F00FF00UL, this->host_address_) &&
-      data[0] == 0x43 && data[1] == 0x00 && data[2] == 0xFF && data[3] == 0xFF) {
-    this->publish_charging_mode_(data[4] & 0x01U);
-    return;
+  // Global configuration commands are sent by whichever RedVision/controller made
+  // the change. Ignore the sender byte so physical-screen changes update HA too.
+  if ((can_id & 0x1FFFFF00UL) == 0x0F00FF00UL &&
+      data[1] == 0x00 && data[2] == 0xFF && data[3] == 0xFF) {
+    if (data[0] == 0x68) {
+      this->publish_vehicle_input_trigger_(redarc_common::u16_le(data, 4));
+      return;
+    }
+    if (data[0] == 0x43) {
+      this->publish_charging_mode_(data[4] & 0x01U);
+      return;
+    }
   }
 
-  // DGN 0x1F200 D1 contains both values:
-  //   bit 0   = charging mode (0 Touring, 1 Storage)
-  //   bits1-7 = charging stage base (D1 & 0xFE)
-  // DGN 0x1F108 is load-disconnect configuration and must not update mode.
+  // DGN 0x1F200 D1 carries both confirmed values:
+  //   bits 1-7 = charging stage base (D1 & 0xFE)
+  //   bit 0    = charging mode (0 Touring, 1 Storage)
+  // DGN 0x1F108 is not used for mode because it can remain fixed and overwrite
+  // valid mode changes from the command/status path.
   if (redarc_common::rvc_matches(can_id, 0x1F200UL, this->source_address_)) {
-    if (now - this->last_charging_stage_ms_ < this->filter_interval_ms_) return;
-    this->last_charging_stage_ms_ = now;
     this->publish_charging_stage_(data[0]);
     this->publish_charging_mode_(data[0] & 0x01U);
     return;
@@ -152,10 +153,7 @@ void Manager30Component::handle_can_frame(uint32_t can_id, const std::vector<uin
       this->vehicle_input_current_sensor_->publish_state(redarc_common::current_32_centered(redarc_common::u32_le(data, 0)));
     if (this->vehicle_input_voltage_sensor_ != nullptr)
       this->vehicle_input_voltage_sensor_->publish_state((float) redarc_common::u16_le(data, 4) * 0.001f);
-    if (this->vehicle_input_trigger_select_ != nullptr && data[7] != 0xFF) {
-      if (data[7] <= 3) this->vehicle_input_trigger_select_->publish_state((size_t) data[7]);
-      else if (data[7] == 5) this->vehicle_input_trigger_select_->publish_state((size_t) 4);
-    }
+    if (data[7] != 0xFF) this->publish_vehicle_input_trigger_(data[7]);
     return;
   }
 
@@ -243,6 +241,15 @@ void Manager30Component::handle_can_frame(uint32_t can_id, const std::vector<uin
   }
 }
 
+void Manager30Component::publish_vehicle_input_trigger_(uint16_t raw_value) {
+  if (this->vehicle_input_trigger_select_ == nullptr) return;
+  if (raw_value <= 3) {
+    this->vehicle_input_trigger_select_->publish_state((size_t) raw_value);
+  } else if (raw_value == 5) {
+    this->vehicle_input_trigger_select_->publish_state((size_t) 4);
+  }
+}
+
 void Manager30Component::publish_solar_daily_energy_(uint8_t day, uint16_t wh) {
   if (day >= 12) return;
   this->solar_daily_wh_[day] = wh;
@@ -290,13 +297,21 @@ void Manager30Component::send_solar_history_request_() {
 
 void Manager30Component::publish_charging_mode_(uint8_t mode) {
   if (mode > 1) return;
+  if (this->charging_mode_known_ && this->charging_mode_ == mode) return;
+  this->charging_mode_known_ = true;
+  this->charging_mode_ = mode;
   if (this->charging_mode_select_ != nullptr) this->charging_mode_select_->publish_state((size_t) mode);
 }
 
 void Manager30Component::publish_charging_stage_(uint8_t stage) {
+  const uint8_t stage_base = stage & 0xFEU;
+  if (this->charging_stage_known_ && this->charging_stage_base_ == stage_base) return;
+  this->charging_stage_known_ = true;
+  this->charging_stage_base_ = stage_base;
   if (this->charging_stage_text_sensor_ == nullptr) return;
+
   const char *name = nullptr;
-  switch (stage & 0xFE) {
+  switch (stage_base) {
     case 0x00: name = "Not Charging"; break;
     case 0x10: name = "Desulphation"; break;
     case 0x20: name = "Soft-start"; break;
@@ -312,7 +327,7 @@ void Manager30Component::publish_charging_stage_(uint8_t stage) {
     this->charging_stage_text_sensor_->publish_state(name);
   } else {
     char unknown[13];
-    std::snprintf(unknown, sizeof(unknown), "Unknown 0x%02X", stage);
+    std::snprintf(unknown, sizeof(unknown), "Unknown 0x%02X", stage_base);
     this->charging_stage_text_sensor_->publish_state(unknown);
   }
 }
