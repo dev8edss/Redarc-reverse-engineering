@@ -11,6 +11,7 @@ static const char *const RUNTIME_TAG = "redarc_tvms_rogue_emulator";
 namespace {
 static constexpr uint32_t ID_CHANNEL_STATUS = 0x1BFD0000UL;
 static constexpr uint32_t ID_SENSOR_VALUES = 0x1BFD0200UL;
+static constexpr uint32_t ID_ACTIVE_CHANNELS = 0x17FD0800UL;
 static constexpr uint32_t ID_OUTPUT_CAPABILITIES = 0x17FD0E00UL;
 static constexpr uint32_t ID_OUTPUT_LEVELS = 0x1BFD1200UL;
 static constexpr uint32_t ID_OUTPUT_ACTIVITY = 0x1BFD1400UL;
@@ -22,6 +23,7 @@ static constexpr uint16_t SERVICE_LEGACY_DIM = 0x0F05;
 
 static constexpr uint16_t REQUEST_DGN_1FD00 = 0xFD00;
 static constexpr uint16_t REQUEST_DGN_1FD02 = 0xFD02;
+static constexpr uint16_t REQUEST_DGN_1FD08 = 0xFD08;
 static constexpr uint16_t REQUEST_DGN_1FD0E = 0xFD0E;
 static constexpr uint16_t REQUEST_DGN_1FD12 = 0xFD12;
 static constexpr uint16_t REQUEST_DGN_1FD14 = 0xFD14;
@@ -115,12 +117,14 @@ void TVMSRogueActiveEmulatorComponent::setup() {
 void TVMSRogueActiveEmulatorComponent::dump_config() {
   TVMSRogueEmulatorComponent::dump_config();
   ESP_LOGCONFIG(RUNTIME_TAG, "  Active output/status emulation: enabled");
+  ESP_LOGCONFIG(RUNTIME_TAG, "  Active channel inventory DGN 0x1FD08: enabled");
   ESP_LOGCONFIG(RUNTIME_TAG, "  Status interval: %u ms", (unsigned) this->status_interval_ms_);
   ESP_LOGCONFIG(RUNTIME_TAG, "  Random sensor interval: %u ms",
                 (unsigned) this->random_update_interval_ms_);
   ESP_LOGCONFIG(RUNTIME_TAG, "  Random digital inputs: %s",
                 this->randomize_inputs_ ? "enabled" : "disabled");
-  ESP_LOGCONFIG(RUNTIME_TAG, "  Home Assistant entities: 10 lights, 10 levels, 8 inputs, 4 sensors");
+  ESP_LOGCONFIG(RUNTIME_TAG,
+                "  Home Assistant entities: 10 lights, 10 levels, 8 inputs, 4 sensors");
 }
 
 void TVMSRogueEmulatorComponent::set_output_from_home_assistant(uint8_t output,
@@ -362,6 +366,15 @@ void TVMSRogueActiveEmulatorComponent::handle_can_frame(
       case REQUEST_DGN_1FD02:
         ESP_LOGI(RUNTIME_TAG, "Requester 0x%02X requested 0x1FD02", requester);
         this->send_sensor_values_();
+        return;
+      case REQUEST_DGN_1FD08:
+        ESP_LOGI(RUNTIME_TAG,
+                 "Requester 0x%02X requested 0x1FD08 active-channel inventory",
+                 requester);
+        this->send_frame_(redarc_common::with_sa(ID_ACTIVE_CHANNELS, this->source_address_),
+                          {0x21, 0xFF, 0xFF, 0x1E, 0xFF, 0xFF, 0xFF, 0xFF});
+        ESP_LOGI(RUNTIME_TAG,
+                 "Responded 0x1FD08: Rogue channels 0x01-0x21 with active mask 0x1E");
         return;
       case REQUEST_DGN_1FD0E:
         ESP_LOGI(RUNTIME_TAG, "Requester 0x%02X requested 0x1FD0E", requester);
