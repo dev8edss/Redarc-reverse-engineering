@@ -770,10 +770,18 @@ void TVMSRogueEmulatorComponent::handle_can_frame(
     }
 
     case 0x89: {
-      const bool valid = write_state.write_active &&
-                         write_state.write_object == MAIN_CONFIGURATION_OBJECT &&
-                         write_state.block_buffer.empty() &&
-                         !write_state.block_overflow;
+      if (!write_state.write_active) {
+        this->selected_object_ = 0xFF;
+        send_programming_status(PROGRAMMING_STATUS_OK, opcode);
+        ESP_LOGI(TAG, "Closed object read session for requester 0x%02X",
+                 requester);
+        break;
+      }
+
+      const bool valid =
+          write_state.write_object == MAIN_CONFIGURATION_OBJECT &&
+          write_state.block_buffer.empty() &&
+          !write_state.block_overflow;
       write_state.write_active = false;
       write_state.write_closed = valid;
       this->selected_object_ = 0xFF;
