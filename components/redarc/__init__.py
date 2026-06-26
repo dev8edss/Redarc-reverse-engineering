@@ -5,7 +5,7 @@ from esphome.components.canbus import CONF_BIT_RATE, CONF_CAN_ID, CONF_USE_EXTEN
 from esphome.components.esp32_can import canbus as esp32_can
 from esphome.components.homeassistant import time as homeassistant_time
 from esphome.const import CONF_ID, CONF_PLATFORM, CONF_RX_PIN, CONF_TX_PIN
-from esphome.core import CORE
+from esphome.core import CORE, ID
 
 from . import (
     _battery_sensor,
@@ -133,6 +133,36 @@ def _time_schema(value):
         return False
     return homeassistant_time.CONFIG_SCHEMA({} if value is None else value)
 
+
+def _derive_entity_ids(config):
+    """Give every auto-generated sub-entity of a device a stable id derived from
+    the device block's id (e.g. id: Manager30 -> Manager30_solar_power), so the
+    entities can be referenced directly from user YAML, e.g.
+
+        id(TVMS_Rogue_button_sensor_8).state
+        id(TVMS1280_output_1).turn_on();
+
+    The id suffix is the schema key (with a trailing "_id" stripped). Only runs
+    when the device block has an explicit id:; otherwise the auto ids are kept.
+    """
+    parent = config.get(CONF_ID)
+    if parent is None or parent.id is None:
+        return config
+    prefix = parent.id
+    for key, value in config.items():
+        if key == CONF_ID:
+            continue
+        if isinstance(value, ID) and value.is_declaration and not value.is_manual:
+            suffix = key[:-3] if key.endswith("_id") else key
+            value.id = f"{prefix}_{suffix}"
+            value.is_manual = True
+    return config
+
+
+def _device_list(schema):
+    return cv.ensure_list(cv.All(schema, _derive_entity_ids))
+
+
 CONFIG_SCHEMA = cv.All(
     cv.Schema({
         cv.GenerateID(): cv.declare_id(RedarcCommonComponent),
@@ -143,11 +173,11 @@ CONFIG_SCHEMA = cv.All(
         cv.Optional(CONF_FILTER_INTERVAL, default="5s"): cv.positive_time_period_milliseconds,
         cv.Optional(CONF_HISTORY_POLL_INTERVAL, default="60s"): zero_or_positive_time_period_milliseconds,
         cv.Optional(CONF_TRANSITION_LENGTH, default="0s"): cv.positive_time_period_milliseconds,
-        cv.Optional(CONF_BATTERY_SENSOR): cv.ensure_list(_battery_sensor.SCHEMA),
-        cv.Optional(CONF_MANAGER): cv.ensure_list(_manager.SCHEMA),
-        cv.Optional(CONF_REDVISION_DISPLAY): cv.ensure_list(_redvision_display.SCHEMA),
-        cv.Optional(CONF_TVMS_ROGUE): cv.ensure_list(_tvms_rogue.SCHEMA),
-        cv.Optional(CONF_TVMS_1280): cv.ensure_list(_tvms_1280.SCHEMA),
+        cv.Optional(CONF_BATTERY_SENSOR): _device_list(_battery_sensor.SCHEMA),
+        cv.Optional(CONF_MANAGER): _device_list(_manager.SCHEMA),
+        cv.Optional(CONF_REDVISION_DISPLAY): _device_list(_redvision_display.SCHEMA),
+        cv.Optional(CONF_TVMS_ROGUE): _device_list(_tvms_rogue.SCHEMA),
+        cv.Optional(CONF_TVMS_1280): _device_list(_tvms_1280.SCHEMA),
     }).extend(cv.COMPONENT_SCHEMA),
     cv.has_exactly_one_key(CONF_CANBUS, CONF_CANBUS_ID),
     _validate_unique_source_addresses,
