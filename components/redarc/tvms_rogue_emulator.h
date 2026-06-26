@@ -61,6 +61,12 @@ class TVMSRogueEmulatorComponent : public Component {
   void send_product_name_();
   void send_unique_identifier_();
 
+  bool load_configuration_object_();
+  void patch_configuration_object_();
+  void update_configuration_crc_();
+  static int8_t base64_value_(char value);
+  static void write_u32_le_(std::vector<uint8_t> &target, size_t offset, uint32_t value);
+
   void send_service_ack_(uint8_t requester, uint8_t opcode);
   void send_empty_block_trailer_(uint8_t requester);
   void send_object_read_block_(uint8_t requester, const std::vector<uint8_t> &request);
@@ -80,6 +86,7 @@ class TVMSRogueEmulatorComponent : public Component {
   std::array<uint8_t, 7> unique_identifier_{{0, 0, 0, 0, 0, 0, 1}};
   uint8_t unique_identifier_record_index_{0};
 
+  std::vector<uint8_t> configuration_object_;
   uint8_t selected_object_{0xFF};
 };
 
