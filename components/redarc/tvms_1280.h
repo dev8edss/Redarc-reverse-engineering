@@ -20,16 +20,13 @@ class TVMS1280Switch : public switch_::Switch {
   void set_parent(TVMS1280Component *parent) { this->parent_ = parent; }
   void set_output_number(uint8_t n) { this->output_number_ = n; }
   void set_channel(uint8_t ch) { this->channel_ = ch; }
-  void set_is_inverter(bool v) { this->is_inverter_ = v; }
   void write_state(bool state) override;
   uint8_t output_number() const { return this->output_number_; }
-  uint8_t channel() const { return this->channel_; }
-  bool is_inverter() const { return this->is_inverter_; }
+
  protected:
   TVMS1280Component *parent_{nullptr};
   uint8_t output_number_{0};
   uint8_t channel_{0x04};
-  bool is_inverter_{false};
 };
 
 class TVMS1280Component : public Component {
