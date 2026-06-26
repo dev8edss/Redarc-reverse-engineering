@@ -3,6 +3,8 @@
 #include "esphome/components/light/light_output.h"
 #include "esphome/components/light/light_state.h"
 
+#include <cstdint>
+
 namespace esphome {
 namespace redarc_tvms_rogue_emulator {
 
