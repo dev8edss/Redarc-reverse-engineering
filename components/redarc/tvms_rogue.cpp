@@ -37,69 +37,74 @@ void TVMSRogueLight::publish_feedback_level(float level_percent) {
   if (level_percent > 100.0f) level_percent = 100.0f;
 
   const bool on = level_percent > 0.5f;
-  const float brightness = on ? level_percent / 100.0f : 0.0f;
+  this->last_sent_percent_ = on ? (uint8_t) std::round(level_percent) : 0;
 
-  // This is bus feedback from the RedVision/TVMS side. Update the frontend state
-  // directly so we do not echo a physical-display button press back onto the CAN bus.
+  // Feedback for each intermediate CAN level must not replace ESPHome's final
+  // remote target while a transition is running, otherwise the transformer stops
+  // at the first reported step. The separate level sensor still receives every
+  // physical feedback update through TVMSRogueComponent::set_feedback_level_().
+  if (this->state_->is_transformer_active()) return;
+
+  if (on) this->last_nonzero_level_percent_ = level_percent;
+  const float retained_brightness = this->last_nonzero_level_percent_ / 100.0f;
+
+  // Preserve the last non-zero brightness while OFF. This matches normal light
+  // behaviour and lets a plain turn_on transition back to the previous level.
   this->state_->current_values.set_state(on);
-  this->state_->current_values.set_brightness(brightness);
+  this->state_->current_values.set_brightness(on ? level_percent / 100.0f : retained_brightness);
   this->state_->remote_values.set_state(on);
-  this->state_->remote_values.set_brightness(brightness);
-  this->state_->publish_state();
-}
-
-void TVMSRogueLight::publish_target_level(float level_percent) {
-  if (this->state_ == nullptr) return;
-
-  if (level_percent < 0.0f) level_percent = 0.0f;
-  if (level_percent > 100.0f) level_percent = 100.0f;
-
-  const bool on = level_percent > 0.5f;
-  const float brightness = on ? level_percent / 100.0f : 0.0f;
-
-  // This is the HA-requested target. The Rogue now supports an absolute level
-  // command, so feedback should reconcile quickly after the CAN frame is sent.
-  this->state_->current_values.set_state(on);
-  this->state_->current_values.set_brightness(brightness);
-  this->state_->remote_values.set_state(on);
-  this->state_->remote_values.set_brightness(brightness);
+  this->state_->remote_values.set_brightness(on ? level_percent / 100.0f : retained_brightness);
   this->state_->publish_state();
 }
 
 void TVMSRogueLight::write_state(light::LightState *state) {
   if (this->parent_ == nullptr) return;
 
-  // Use the requested frontend target, not current_values. current_values may still
-  // contain the previous OFF feedback when HA sends a plain turn_on command.
-  bool binary = state->remote_values.is_on();
-  float brightness = state->remote_values.get_brightness();
+  // ESPHome updates current_values on every transition step. remote_values is the
+  // final requested target and using it here would make every transition instant.
+  bool current_on = false;
+  float current_brightness = 0.0f;
+  state->current_values_as_binary(&current_on);
+  state->current_values_as_brightness(&current_brightness);
 
-  if (!binary) {
-    this->publish_target_level(0.0f);
+  const bool target_on = state->remote_values.is_on();
+  const float target_brightness = state->remote_values.get_brightness();
+
+  // A plain turn_on can occasionally arrive with an ON state but zero brightness.
+  // Restore the last physical non-zero level instead of translating it to OFF.
+  if (target_on && target_brightness <= 0.0f) {
+    uint8_t percent = (uint8_t) std::round(this->last_nonzero_level_percent_);
+    if (percent < 1) percent = 100;
+    if (percent > 100) percent = 100;
+    if (percent == this->last_sent_percent_) return;
+    this->last_sent_percent_ = percent;
+    this->parent_->set_target(this->output_number_, this->channel_, (float) percent);
+    return;
+  }
+
+  float current_percent = current_on ? current_brightness * 100.0f : 0.0f;
+
+  // During fade-out, continue sending interpolated levels until the true-off
+  // threshold is reached, then send one real OFF command.
+  if (!target_on && (!current_on || current_percent <= this->parent_->true_off_threshold())) {
+    if (this->last_sent_percent_ == 0) return;
+    this->last_sent_percent_ = 0;
     this->parent_->turn_off(this->output_number_, this->channel_);
     return;
   }
 
-  float target_percent = brightness * 100.0f;
+  // During fade-in the Rogue remains physically off until the first useful level.
+  if (target_on && current_percent <= this->parent_->true_off_threshold()) return;
 
-  // A plain HA turn_on can arrive as ON with brightness still at 0 because our
-  // feedback publisher correctly reported the real Rogue output as OFF/0%. Do
-  // not translate that into another OFF command; use current feedback if known,
-  // otherwise request full ON.
-  if (target_percent <= 0.0f) {
-    float current = this->parent_->level(this->output_number_);
-    if (!std::isnan(current) && current > this->parent_->true_off_threshold()) {
-      target_percent = current;
-    } else {
-      target_percent = 100.0f;
-    }
-  }
+  if (current_percent > 100.0f) current_percent = 100.0f;
+  uint8_t percent = (uint8_t) std::round(current_percent);
+  if (percent < 1) percent = 1;
+  if (percent > 100) percent = 100;
+  if (percent == this->last_sent_percent_) return;
 
-  if (target_percent > 100.0f) target_percent = 100.0f;
-  if (target_percent < this->parent_->true_off_threshold()) target_percent = this->parent_->true_off_threshold();
-
-  this->publish_target_level(target_percent);
-  this->parent_->set_target(this->output_number_, this->channel_, target_percent);
+  this->last_sent_percent_ = percent;
+  if (target_on) this->last_nonzero_level_percent_ = current_percent;
+  this->parent_->set_target(this->output_number_, this->channel_, (float) percent);
 }
 
 void TVMSRogueComponent::setup() {
