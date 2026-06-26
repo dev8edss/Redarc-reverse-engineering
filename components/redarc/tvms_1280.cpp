@@ -33,9 +33,9 @@ void TVMS1280Component::setup() {
 
 void TVMS1280Component::dump_config() {
   ESP_LOGCONFIG(TAG, "TVMS1280 SA 0x%02X", this->source_address_);
-  LOG_BINARY_SENSOR("  ", "Digital Input 1", this->digital_input_sensors_[1]);
-  LOG_BINARY_SENSOR("  ", "Digital Input 2", this->digital_input_sensors_[2]);
-  LOG_BINARY_SENSOR("  ", "Digital Input 3", this->digital_input_sensors_[3]);
+  LOG_BINARY_SENSOR("  ", "Input 1", this->digital_input_sensors_[1]);
+  LOG_BINARY_SENSOR("  ", "Input 2", this->digital_input_sensors_[2]);
+  LOG_BINARY_SENSOR("  ", "Input 3", this->digital_input_sensors_[3]);
   LOG_TEXT_SENSOR("  ", "Output Status", this->output_status_text_sensor_);
 }
 

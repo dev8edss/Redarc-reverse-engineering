@@ -85,5 +85,5 @@ redarc:
       source_address: 0x30                   # [optional] default 0x30
 
   tvms_1280:
-    - id: TVMS1280                          
+    - id: TVMS1280
       source_address: 0x24                   # [optional] default 0x24

@@ -1088,12 +1088,12 @@ cards:
     show_header_toggle: false
     state_color: true
     entities:
-      - entity: binary_sensor.redvision_can_bridge_tvms1280_digital_input_1
-        name: Digital Input 1
-      - entity: binary_sensor.redvision_can_bridge_tvms1280_digital_input_2
-        name: Digital Input 2
-      - entity: binary_sensor.redvision_can_bridge_tvms1280_digital_input_3
-        name: Digital Input 3
+      - entity: binary_sensor.redvision_can_bridge_tvms1280_input_1
+        name: Input 1
+      - entity: binary_sensor.redvision_can_bridge_tvms1280_input_2
+        name: Input 2
+      - entity: binary_sensor.redvision_can_bridge_tvms1280_input_3
+        name: Input 3
   - type: grid
     title: Water Tanks
     columns: 2
