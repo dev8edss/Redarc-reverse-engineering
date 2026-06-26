@@ -22,7 +22,6 @@ from esphome.const import (
     CONF_UNIT_OF_MEASUREMENT,
     ENTITY_CATEGORY_DIAGNOSTIC,
     ENTITY_CATEGORY_NONE,
-    STATE_CLASS_MEASUREMENT,
 )
 
 CONF_SOURCE_ADDRESS = "source_address"
@@ -56,6 +55,7 @@ TVMSRogueEmulatorLight = rogue_emulator_ns.class_(
 
 _sensor_ns = cg.esphome_ns.namespace("sensor")
 _SensorClass = _sensor_ns.class_("Sensor")
+_StateClass = _sensor_ns.enum("StateClass")
 _bs_ns = cg.esphome_ns.namespace("binary_sensor")
 _BSClass = _bs_ns.class_("BinarySensor")
 _ts_ns = cg.esphome_ns.namespace("text_sensor")
@@ -94,7 +94,6 @@ def _validate_unique_identifier(value):
                 "unique_identifier must contain exactly 7 bytes (14 hex digits)"
             )
         return [int(compact[i : i + 2], 16) for i in range(0, 14, 2)]
-
     values = cv.ensure_list(cv.hex_uint8_t)(value)
     if len(values) != 7:
         raise cv.Invalid("unique_identifier must contain exactly 7 bytes")
@@ -225,7 +224,7 @@ async def _make_sensor(
             if entity_category is not None
             else ENTITY_CATEGORY_NONE
         ),
-        CONF_STATE_CLASS: STATE_CLASS_MEASUREMENT,
+        CONF_STATE_CLASS: _StateClass.STATE_CLASS_MEASUREMENT,
     }
     if unit is not None:
         cfg[CONF_UNIT_OF_MEASUREMENT] = unit
