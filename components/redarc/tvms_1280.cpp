@@ -126,9 +126,18 @@ void TVMS1280Component::handle_can_frame(uint32_t can_id, const std::vector<uint
     return;
   }
 
-  if (can_id == this->command_id_) {
-    if (data[0] == 0xCB && data[2] == 0xFF) {
-      this->publish_channel_(data[3], data[4] != 0);
+  // TVMS commands use the PDU1 destination byte for the target address and the
+  // final byte for the sender. Match the destination and deliberately ignore the
+  // sender so commands from a RedVision display or another controller update Home
+  // Assistant immediately. DGN 0x1FD00 below remains the authoritative hardware
+  // confirmation and will correct the optimistic state if the command is rejected.
+  const uint32_t command_target = 0x0F000000UL | ((uint32_t) this->source_address_ << 8);
+  if ((can_id & 0x1FFFFF00UL) == command_target) {
+    if (data[0] == 0xCB && data[2] == 0xFF && data[4] <= 0x01) {
+      const uint8_t channel = data[3];
+      if (channel >= TVMS1280_ITEM_OUTPUT_1 && channel <= TVMS1280_ITEM_MASTER) {
+        this->publish_channel_(channel, data[4] == 0x01);
+      }
     }
     return;
   }
