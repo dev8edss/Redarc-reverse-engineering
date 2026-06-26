@@ -222,6 +222,45 @@ The screens rebroadcast a few readings, handy as a cross-check:
 
 ---
 
+## Using entities in your own automations
+
+Every entity gets a stable id derived from its device block's `id:`, in the form
+`<device id>_<entity>`. So with `id: TVMS_Rogue` and `id: TVMS1280` you can refer
+to them directly in your own YAML — no extra config, no C++:
+
+```text
+id(TVMS_Rogue_button_sensor_8).state     # bool: physical button 8 pressed
+id(TVMS1280_output_1).turn_on();         # switch output 1 on
+id(TVMS1280_output_1).toggle();          # toggle output 1
+id(Manager30_solar_power).state          # float: solar watts
+id(TVMS_Rogue_light_state_3)             # Rogue dimmable output 3 (a light)
+```
+
+The id suffix matches the entity: e.g. `Manager30_output_current`,
+`Battery_soc`, `TVMS1280_output_1`…`output_10`, `TVMS1280_digital_input_1`,
+`TVMS_Rogue_button_sensor_1`…`8`, `TVMS_Rogue_light_state_1`…`10`,
+`TVMS_Rogue_master`, `Manager30_charging_mode_select`. (Watch the boot logs or
+ESPHome's generated code if you're unsure of an exact suffix.)
+
+**Example — Rogue button 8 toggles TVMS1280 output 1** (the cross-device link),
+done entirely in your device YAML:
+
+```yaml
+interval:
+  - interval: 100ms
+    then:
+      - lambda: |-
+          static bool last = false;
+          const bool now = id(TVMS_Rogue_button_sensor_8).state;
+          if (now && !last) id(TVMS1280_output_1).toggle();
+          last = now;
+```
+
+(Needs `NORMAL` CAN mode to actually send the command. The device block must
+have an explicit `id:` for the derived ids to exist.)
+
+---
+
 ## Troubleshooting
 
 - **No control / can't switch anything.** You're in `LISTENONLY` mode. Switch to
