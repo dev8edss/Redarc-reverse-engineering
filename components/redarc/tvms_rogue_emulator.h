@@ -445,12 +445,16 @@ class TVMSRogueEmulatorComponent : public Component {
     std::array<std::vector<uint8_t>, 33> frames;
     for (uint8_t channel = 1; channel <= 33; channel++) {
       uint32_t record = 0;
+      uint32_t active_tagged = 0;
       uint32_t tagged_value = 0;
       if (!this->channel_record_(channel, &record) ||
+          !this->object_map_value_(record, 0x02U, &active_tagged) ||
           !this->object_map_value_(record, 0x03U, &tagged_value)) {
         return false;
       }
       const uint32_t value = this->decode_tagged_value_(tagged_value);
+      const uint16_t active =
+          (uint16_t) this->decode_tagged_value_(active_tagged);
 
       uint8_t channel_type = 0x00;
       uint16_t subtype = 0x0000;
@@ -479,7 +483,6 @@ class TVMSRogueEmulatorComponent : public Component {
         subtype = 0xFFFF;
       }
 
-      const uint16_t active = channel <= 23U ? 1U : 0U;
       frames[channel - 1U] = {
           channel, channel_type,
           (uint8_t) (subtype & 0xFFU), (uint8_t) ((subtype >> 8) & 0xFFU),
