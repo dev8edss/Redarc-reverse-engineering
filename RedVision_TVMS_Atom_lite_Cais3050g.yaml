@@ -94,5 +94,17 @@ redarc:
       source_address: 0x30                   # [optional] default 0x30
 
   tvms_1280:
-    - id: TVMS1280                          
+    - id: TVMS1280
       source_address: 0x24                   # [optional] default 0x24
+
+# TEST: TVMS Rogue input button 8 toggles TVMS1280 output 1, using the derived
+# entity ids. Polls the button every 100 ms and toggles on each press (rising
+# edge). Needs NORMAL CAN mode to transmit the command.
+interval:
+  - interval: 100ms
+    then:
+      - lambda: |-
+          static bool last = false;
+          const bool now = id(TVMS_Rogue_button_sensor_8).state;
+          if (now && !last) id(TVMS1280_output_1).toggle();
+          last = now;
