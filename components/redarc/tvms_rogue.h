@@ -38,7 +38,6 @@ class TVMSRogueLight : public light::LightOutput {
   void setup_state(light::LightState *state) override;
   void write_state(light::LightState *state) override;
   void publish_feedback_level(float level_percent);
-  void publish_target_level(float level_percent);
 
   uint8_t output_number() const { return this->output_number_; }
   uint8_t channel() const { return this->channel_; }
@@ -48,6 +47,8 @@ class TVMSRogueLight : public light::LightOutput {
   light::LightState *state_{nullptr};
   uint8_t output_number_{1};
   uint8_t channel_{0x0C};
+  uint8_t last_sent_percent_{0xFF};
+  float last_nonzero_level_percent_{100.0f};
 };
 
 class TVMSRogueComponent : public Component {
