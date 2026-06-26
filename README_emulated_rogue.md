@@ -16,11 +16,21 @@ control or decode a physical Rogue.
   - `0x1F403` segmented product name.
   - `0x1F404` serial identity.
   - `0x1F405` unique identifier.
-- Recognises object/programming services `0x0E81`, `0x0E83`, `0x0E85`,
-  `0x0E86`, `0x0E87`, `0x0E88`, `0x0E89`, and `0x0E8A` addressed to the
-  emulator. It returns a complete `0x0280` acknowledgement with the opcode
-  echoed in D3, but deliberately does not read, write, commit, close, or apply
-  any configuration object yet.
+- Supports the object-service read sequence used by the configurator:
+  - `0x0E85` selects the object and receives a complete `0x0280` acknowledgement.
+  - `0x0E86` receives `0x0281` data followed by a `0x0284` byte-count/CRC trailer.
+  - Object `2` currently returns a valid, minimal 28-byte read-only configuration object.
+  - Other object numbers return a zero-length block trailer.
+  - `0x0E89` closes the session and receives a complete acknowledgement.
+- Programming is deliberately non-persistent:
+  - `0x0E81` write-data frames are discarded.
+  - `0x0E83` receives an empty `0x0284` pre-write response.
+  - `0x0E87`, `0x0E88`, and `0x0E8A` receive complete acknowledgements, but no data is retained, committed, or applied.
+
+The minimal object prevents a configuration reader from hanging while full Rogue
+configuration-object emulation is still under development. It does not yet
+contain output names, channel records, tank settings, switch-input settings, or
+other real Rogue configuration values.
 
 No Rogue output/status frames are emulated in this first stage.
 
