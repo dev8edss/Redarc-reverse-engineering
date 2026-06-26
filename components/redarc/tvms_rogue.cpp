@@ -217,12 +217,11 @@ void TVMSRogueComponent::validate_output_configuration_() {
     received++;
     if (this->reported_dimmable_[output] == this->configured_dimmable_[output]) continue;
     mismatches++;
-    ESP_LOGW(TAG,
-             "Output %u dimming mismatch: YAML=%s Rogue=%s (0x1FD0E D2=0x%02X)",
+    ESP_LOGI(TAG,
+             "Output %u dimming mismatch: YAML=%s Rogue=%s",
              (unsigned) output,
-             this->configured_dimmable_[output] ? "dimmable" : "on/off",
-             this->reported_dimmable_[output] ? "dimmable" : "on/off",
-             (unsigned) this->reported_config_raw_[output]);
+             this->configured_dimmable_[output] ? "Dimmable" : "Non-Dimmable",
+             this->reported_dimmable_[output] ? "Dimmable" : "Non-Dimmable");
   }
 
   if (received == 0) {
