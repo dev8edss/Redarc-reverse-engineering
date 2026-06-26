@@ -20,6 +20,7 @@ def zero_or_positive_time_period_milliseconds(value):
         return 0
     return cv.positive_time_period_milliseconds(value)
 
+
 battery_sensor_ns = cg.esphome_ns.namespace("redarc_battery_sensor")
 BatterySensorComponent = battery_sensor_ns.class_("BatterySensorComponent", cg.Component)
 BatterySOCCalibrateButton = battery_sensor_ns.class_("BatterySOCCalibrateButton", button.Button)
@@ -161,8 +162,7 @@ async def to_code(config):
 
     s = await _make_sensor(config["soc_id"], f"{p} SOC",
                            unit="%", device_class="battery",
-                           state_class=STATE_CLASS_MEASUREMENT, decimals=0,
-                           force_update=True)
+                           state_class=STATE_CLASS_MEASUREMENT, decimals=0)
     cg.add(var.set_soc_sensor(s))
 
     s = await _make_sensor(config["last_soc_calibration_target_id"], f"{p} Last SOC Calibration Target",
