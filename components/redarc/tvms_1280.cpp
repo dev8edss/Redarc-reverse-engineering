@@ -16,6 +16,9 @@ static constexpr uint8_t TVMS1280_ITEM_VOLTAGE_INPUT_1 = 0x11;
 static constexpr uint8_t TVMS1280_ITEM_TEMP_2 = 0x14;
 static constexpr uint8_t TVMS1280_ITEM_TANK_3 = 0x17;
 static constexpr uint8_t TVMS1280_ITEM_TANK_6 = 0x1A;
+// TEST link: TVMS Rogue input button 8 -> toggle TVMS1280 output 1.
+static constexpr uint8_t ROGUE_SOURCE_ADDRESS = 0x30;
+static constexpr uint8_t ROGUE_INPUT_BUTTON_8 = 0x08;
 }  // namespace
 
 void TVMS1280Switch::write_state(bool state) {
@@ -170,6 +173,31 @@ void TVMS1280Component::handle_can_frame(uint32_t can_id, const std::vector<uint
 
   if (redarc_common::rvc_matches(can_id, 0x1FCF0UL, this->source_address_)) {
     if (data[1] == TVMS1280_ITEM_INVERTER && this->inverter_switch_ != nullptr) this->inverter_switch_->publish_state(data[0] != 0);
+    return;
+  }
+
+  // --- TEST: TVMS Rogue input button 8 toggles TVMS1280 output 1 ---
+  // The Rogue and 1280 don't talk to each other natively. Watch the Rogue's
+  // button frame (DGN 0x1FD00 from SA 0x30, same paged byte-array layout) and,
+  // on each button-8 press (rising edge), toggle output 1 (channel 0x04) using
+  // this 1280's own tracked state. Remove this block to disable the test.
+  if (redarc_common::rvc_dgn(can_id) == 0x1FD00UL &&
+      redarc_common::rvc_source_address(can_id) == ROGUE_SOURCE_ADDRESS) {
+    const uint8_t base_channel = data[0];
+    for (uint8_t i = 1; i < 8; i++) {
+      if ((uint8_t) (base_channel + i - 1) != ROGUE_INPUT_BUTTON_8) continue;
+      const uint8_t value = data[i];
+      if (value != 0x00 && value != 0x01) break;  // only on/off are valid button states
+      const bool pressed = (value == 0x01);
+      if (this->rogue_button8_known_ && !this->rogue_button8_last_ && pressed) {
+        const bool on = (this->output_state_[0] == 0x01 || this->output_state_[0] == 0x15);
+        this->send_channel(TVMS1280_ITEM_OUTPUT_1, !on);
+        ESP_LOGI(TAG, "TEST: Rogue button 8 -> output 1 %s", !on ? "ON" : "OFF");
+      }
+      this->rogue_button8_last_ = pressed;
+      this->rogue_button8_known_ = true;
+      break;
+    }
     return;
   }
 }

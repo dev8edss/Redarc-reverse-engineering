@@ -79,6 +79,9 @@ class TVMS1280Component : public Component {
   text_sensor::TextSensor *output_status_text_sensor_{nullptr};
   std::array<uint8_t, 10> output_state_{};
   std::string last_output_status_;
+  // TEST link state: last seen TVMS Rogue input-button-8 level (rising-edge detect).
+  bool rogue_button8_last_{false};
+  bool rogue_button8_known_{false};
 };
 
 }  // namespace redarc_tvms_1280
