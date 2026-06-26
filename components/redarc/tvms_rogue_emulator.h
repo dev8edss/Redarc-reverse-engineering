@@ -508,9 +508,10 @@ class TVMSRogueEmulatorComponent : public Component {
           !this->object_map_value_(output_settings, 0x02U, &switch_tagged)) {
         return false;
       }
-      uint8_t capability = 0x01;
-      if (this->decode_tagged_value_(switch_tagged) != 0U) capability |= 0x02;
-      if (this->decode_tagged_value_(dim_tagged) != 0U) capability |= 0x80;
+      const bool dimmable = this->decode_tagged_value_(dim_tagged) != 0U;
+      uint8_t capability = dimmable ? 0x83 : 0x01;
+      if (!dimmable && this->decode_tagged_value_(switch_tagged) != 0U)
+        capability |= 0x02;
       capabilities[channel - 0x0CU] = capability;
     }
 
