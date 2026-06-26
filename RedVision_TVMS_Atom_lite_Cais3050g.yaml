@@ -58,7 +58,6 @@ redarc:
   # [optional] host_address: "0xFF"           # this ESP32's source address for commands (default 0xFF)
   # [optional] filter_interval: 5s            # publish throttle, inherited by all devices
   # [optional] history_poll_interval: 60s     # SOC + solar history poll (0s disables), inherited
-  # [optional] transition_length: 0s          # TVMS Rogue light fade time, inherited
   # [optional] time_id: <id>                  # reference an external time:; otherwise a HA time
                                                # source is auto-added (set `time: false` to disable it and the Manager Set Time button)
 
@@ -83,6 +82,7 @@ redarc:
   tvms_rogue:
     - id: TVMS_Rogue
       source_address: 0x30                   # [optional] default 0x30
+      transition_length: 0s                  # [optional] fade time for Rogue outputs
 
   tvms_1280:
     - id: TVMS1280
