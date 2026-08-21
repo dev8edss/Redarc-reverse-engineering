@@ -29,9 +29,13 @@ The primary tested hardware is:
 
 | RJ45 pin | Signal |
 |---:|---|
+| 1 | CAN 2 L |
+| 2 | CAN 2 H |
+| 3 | Ground |
 | 4 | CAN L |
 | 5 | CAN H |
-| 7 | 12–30 V supply |
+| 6 | PWRA 12–30V |
+| 7 | PWRB 12–30V |
 | 8 | Ground |
 
 Do not connect the REDARC supply directly to an ESP32 input. Use a correctly
