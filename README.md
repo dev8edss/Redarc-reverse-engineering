@@ -7,8 +7,9 @@ The bridge reads battery, charger, solar, tanks, temperatures, digital inputs an
 output states. It also sends supported control commands for Manager30, TVMS
 Rogue and TVMS1280 devices.
 
-Protocol notes are in [PROTOCOL.md](PROTOCOL.md) and
-[`RedVision_TVMS_components.dbc`](RedVision_TVMS_components.dbc).
+Protocol notes are in [PROTOCOL.md](PROTOCOL.md),
+[`RedVision_TVMS_components.dbc`](RedVision_TVMS_components.dbc), and the DGN
+mapping notes under [`docs/`](docs/).
 
 ## Hardware
 
@@ -44,7 +45,7 @@ external_components:
   - source:
       type: git
       url: https://github.com/dev8edss/Redarc-reverse-engineering
-      ref: dev
+      ref: emulated-rogue
     refresh: 0s
     components:
       - redarc
@@ -181,6 +182,133 @@ Transitions apply only to outputs discovered as dimmable. During a fade, the
 component sends changed integer percentages. During fade-out it sends a real OFF
 command when the level reaches `true_off_threshold`.
 
+## TVMS Rogue emulator
+
+The `emulated-rogue` branch includes an active virtual **TVMS Rogue**. It is
+intended for reverse engineering, display/configurator testing, and Home
+Assistant-driven simulation.
+
+The emulator behaves as a CAN node with its own `source_address`. Do not give it
+the same source address as a real Rogue. A common setup is to leave the real
+Rogue at `0x30` and run the emulator at `0x36`.
+
+```yaml
+redarc:
+  canbus:
+    tx_pin: GPIO22
+    rx_pin: GPIO19
+    bit_rate: 250KBPS
+    mode: NORMAL
+
+  tvms_rogue_emulator:
+    - id: TVMS_Rogue_Emulator
+      source_address: 0x36
+      product_name: "TVMS Rogue"
+      serial_prefix: 2606260001
+      serial_suffix: 0x0013
+      status_interval: 1s
+      identity_interval: 1s
+      random_update_interval: 0s
+      randomize_inputs: false
+```
+
+### What the emulator currently supports
+
+The emulator broadcasts identity, output, tank and status data and answers the
+main requests used by the RedVision display/configurator.
+
+Supported identity and object behavior:
+
+- Identity DGN `0x1F404` / serial information
+- Product name chunks `0x1F403`
+- Firmware/version records `0x1F400`
+- Unique/device ID style response `0x1F405`
+- Captured object 2 readback using the REDARC object protocol
+- Padded object block reads with CRC-32C trailers
+
+Supported runtime/status DGNs:
+
+- `0x1FD00` channel status pages
+- `0x1FD02` tank, input voltage and input current values
+- `0x1FD08` active-channel inventory
+- `0x1FD12` output levels
+- `0x1FD14` output activity / hold-dim activity
+
+Supported configuration readback DGNs from the active object:
+
+- `0x1F108` load-disconnect configuration
+- `0x1FD04` channel labels
+- `0x1FD06` alarm/range configuration
+- `0x1FD07` alarm/status placeholder pages matching current captures
+- `0x1FD0A` channel details / inventory
+- `0x1FD0C` analog scaling metadata
+- `0x1FD0E` output capabilities
+- `0x1FD10` digital-input configuration placeholder pages matching current captures
+
+Supported commands:
+
+- Direct command `0xCB` for master/output on/off
+- Direct command `0x5A` for absolute output level
+- Legacy/display hold-dimming command `0x0F05`
+- Direct-command ACK replies using `0x0F04`
+
+The emulator creates Home Assistant entities for:
+
+- Output 1–10 lights
+- Output 1–10 level diagnostic sensors
+- Input 1–8 diagnostic binary sensors
+- Tank 1 and Tank 2 sensors
+- Input voltage and input current sensors
+- Output status text sensor
+
+### Using other ESPHome sensors as tank sources
+
+The emulator can take Tank 1 and Tank 2 values from any other ESPHome `sensor`
+on the same node. This is useful when the tank level comes from Home Assistant,
+an ultrasonic sensor, ADC, pressure sensor, or another custom component.
+
+```yaml
+sensor:
+  - platform: homeassistant
+    id: fresh_water_percent
+    entity_id: sensor.fresh_water_tank
+    internal: true
+
+  - platform: homeassistant
+    id: grey_water_percent
+    entity_id: sensor.grey_water_tank
+    internal: true
+
+redarc:
+  tvms_rogue_emulator:
+    - id: TVMS_Rogue_Emulator
+      source_address: 0x36
+      tank1_source: fresh_water_percent
+      tank2_source: grey_water_percent
+```
+
+When a source sensor updates, the emulator:
+
+1. clamps and rounds the value to `0–100%`,
+2. updates the mirrored Rogue tank entity,
+3. immediately broadcasts `0x1FD02`, and
+4. disables the demo random sensor generator so real tank values are not overwritten.
+
+If `tank1_source` or `tank2_source` is not set, the emulator keeps using its
+internal/default tank values. Set `random_update_interval: 0s` when you do not
+want demo/random tank, voltage or current updates.
+
+### Emulator notes and limits
+
+- The emulator must run in CAN `NORMAL` mode if you want it to answer requests.
+- It is not a full replacement for all REDARC firmware behavior.
+- Unknown or unconfirmed DGN bytes are kept conservative and capture-matched
+  rather than guessed.
+- Some configuration responses are derived from the captured object while others
+  are currently fixed to match known Rogue captures.
+- If ESPHome reports stale external-component behavior, run **Clean Build Files**
+  so the latest branch is downloaded.
+
 ## Home Assistant entities
 
 ### Manager30
@@ -209,6 +337,17 @@ command when the level reaches `true_off_threshold`.
 - Output fault/status diagnostic
 - Recheck Dimmable Outputs diagnostic button
 
+### TVMS Rogue emulator
+
+- Output 1–10 light entities
+- Actual Output 1–10 Level diagnostic sensors
+- Input 1–8 diagnostic binary sensors
+- Tank 1 and Tank 2
+- Optional `tank1_source` / `tank2_source` links to external ESPHome sensors
+- Input voltage and current
+- Output status diagnostic text sensor
+- Active CAN identity, runtime status and object/config readback responses
+
 ### TVMS1280
 
 - Output 1–10 switches
@@ -226,6 +365,8 @@ id(TVMS_Rogue_output_1)
 id(TVMS_Rogue_output_1_level).state
 id(TVMS_Rogue_input_8).state
 id(TVMS_Rogue_recheck_dimmable_outputs).press()
+id(TVMS_Rogue_Emulator_output_1).turn_on()
+id(TVMS_Rogue_Emulator_tank_1).state
 id(TVMS1280_output_1).turn_on()
 id(Manager30_solar_power).state
 ```
@@ -234,13 +375,13 @@ Renaming an entity in Home Assistant does not change its ESPHome compile-time ID
 
 ## Development workflow
 
-While testing changes from `dev`:
+While testing changes from `emulated-rogue`:
 
-1. Keep `ref: dev` and `refresh: 0s`.
+1. Keep `ref: emulated-rogue` and `refresh: 0s`.
 2. Run **Clean Build Files**, or clear `/data/external_components/*`.
 3. Validate and compile.
 4. Flash the bridge.
-5. Check the startup dimming discovery and device-discovery logs.
+5. Check the startup dimming discovery, device-discovery and emulator logs.
 6. Remove `refresh: 0s` or use a normal refresh interval afterward.
 
 ## Troubleshooting
@@ -251,6 +392,12 @@ While testing changes from `dev`:
   integration.
 - **No Rogue capability response:** confirm the Rogue `source_address`, bridge
   `host_address`, CAN wiring and transmit-capable mode.
+- **Emulator does not appear on the display/configurator:** confirm the emulator
+  `source_address` is unique, CAN mode is `NORMAL`, and identity frames are being
+  sent.
+- **External tank source does not update the emulator:** confirm the source is an
+  ESPHome `sensor` ID on the same node, not a Home Assistant entity ID string.
+  Import Home Assistant values with `platform: homeassistant` first.
 - **Old YAML option errors or stale behavior:** clean ESPHome build files and the
   external-component cache.
 - **Dashboard history cards fail:** install the ApexCharts Card if the supplied
