@@ -33,6 +33,8 @@
   std::array<binary_sensor::BinarySensor *, 9> input_sensors_{{nullptr}};
   sensor::Sensor *tank1_sensor_{nullptr};
   sensor::Sensor *tank2_sensor_{nullptr};
+  sensor::Sensor *tank1_source_sensor_{nullptr};
+  sensor::Sensor *tank2_source_sensor_{nullptr};
   sensor::Sensor *input_voltage_sensor_{nullptr};
   sensor::Sensor *input_current_sensor_{nullptr};
   text_sensor::TextSensor *output_status_text_sensor_{nullptr};
