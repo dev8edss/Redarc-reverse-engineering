@@ -33,6 +33,14 @@
 
   void set_tank1_sensor(sensor::Sensor *v) { tank1_sensor_ = v; }
   void set_tank2_sensor(sensor::Sensor *v) { tank2_sensor_ = v; }
+  void set_tank1_source_sensor(sensor::Sensor *v) {
+    tank1_source_sensor_ = v;
+    this->register_tank_source_sensor_(1, v);
+  }
+  void set_tank2_source_sensor(sensor::Sensor *v) {
+    tank2_source_sensor_ = v;
+    this->register_tank_source_sensor_(2, v);
+  }
   void set_input_voltage_sensor(sensor::Sensor *v) { input_voltage_sensor_ = v; }
   void set_input_current_sensor(sensor::Sensor *v) { input_current_sensor_ = v; }
   void set_output_status_text_sensor(text_sensor::TextSensor *v) {
@@ -58,3 +66,41 @@
     uint16_t dgn;
     bool final_frame;
   };
+
+  void register_tank_source_sensor_(uint8_t tank, sensor::Sensor *source) {
+    if (source == nullptr) return;
+    // External tank source sensors should own the tank values. Disable the demo
+    // random generator so it cannot overwrite the source values every interval.
+    this->random_update_interval_ms_ = 0;
+    source->add_on_state_callback([this, tank](float value) {
+      this->update_tank_from_source_(tank, value);
+    });
+  }
+
+  void update_tank_from_source_(uint8_t tank, float value) {
+    if (tank < 1 || tank > 2) return;
+    if (value != value) {
+      ESP_LOGW("redarc_tvms_rogue_emulator",
+               "Ignored NaN external tank %u value", (unsigned) tank);
+      return;
+    }
+
+    uint8_t percent = 0;
+    if (value >= 100.0f) {
+      percent = 100;
+    } else if (value > 0.0f) {
+      percent = (uint8_t) (value + 0.5f);
+    }
+
+    uint8_t *target = tank == 1 ? &this->tank1_percent_ : &this->tank2_percent_;
+    sensor::Sensor *mirror = tank == 1 ? this->tank1_sensor_ : this->tank2_sensor_;
+    const bool changed = *target != percent;
+    *target = percent;
+    if (mirror != nullptr) mirror->publish_state((float) percent);
+
+    ESP_LOGI("redarc_tvms_rogue_emulator",
+             "External tank %u source set value to %u%%%s",
+             (unsigned) tank, (unsigned) percent,
+             changed ? "" : " (unchanged)");
+    this->send_sensor_values_();
+  }
