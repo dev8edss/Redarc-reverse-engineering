@@ -44,6 +44,8 @@ CONF_YEAR = "year"
 CONF_PRODUCT_NAME = "product_name"
 CONF_UNIQUE_IDENTIFIER = "unique_identifier"
 CONF_UNIQUE_IDENTIFIER_RECORD_INDEX = "unique_identifier_record_index"
+CONF_TANK1_SOURCE = "tank1_source"
+CONF_TANK2_SOURCE = "tank2_source"
 
 rogue_emulator_ns = cg.esphome_ns.namespace("redarc_tvms_rogue_emulator")
 TVMSRogueActiveEmulatorComponent = rogue_emulator_ns.class_(
@@ -200,6 +202,8 @@ SCHEMA = cv.Schema(
             default=[0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01],
         ): _validate_unique_identifier,
         cv.Optional(CONF_UNIQUE_IDENTIFIER_RECORD_INDEX, default=0): cv.hex_uint8_t,
+        cv.Optional(CONF_TANK1_SOURCE): cv.use_id(_SensorClass),
+        cv.Optional(CONF_TANK2_SOURCE): cv.use_id(_SensorClass),
         **_AUTO_IDS,
     }
 ).extend(cv.COMPONENT_SCHEMA)
@@ -296,6 +300,12 @@ async def to_code(config):
         config["tank2_id"], f"{prefix} Tank 2", unit="%", decimals=0
     )
     cg.add(var.set_tank2_sensor(s))
+    if CONF_TANK1_SOURCE in config:
+        source = await cg.get_variable(config[CONF_TANK1_SOURCE])
+        cg.add(var.set_tank1_source_sensor(source))
+    if CONF_TANK2_SOURCE in config:
+        source = await cg.get_variable(config[CONF_TANK2_SOURCE])
+        cg.add(var.set_tank2_source_sensor(source))
     s = await _make_sensor(
         config["input_voltage_id"],
         f"{prefix} Input Voltage",
