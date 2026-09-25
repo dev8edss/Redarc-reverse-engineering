@@ -3,6 +3,7 @@
 #include <Arduino.h>
 #include <Preferences.h>
 
+static constexpr uint8_t ROGUE_TANK_COUNT = 2;
 static constexpr uint8_t ROGUE_INPUT_COUNT = 8;
 static constexpr uint8_t ROGUE_OUTPUT_COUNT = 10;
 
@@ -26,6 +27,7 @@ struct RogueSettings {
   char product_name[64];
 
   // 1-based arrays. Index 0 is unused so REDARC channel numbering is easy.
+  RogueIoAssignment tanks[ROGUE_TANK_COUNT + 1];
   RogueIoAssignment inputs[ROGUE_INPUT_COUNT + 1];
   RogueIoAssignment outputs[ROGUE_OUTPUT_COUNT + 1];
 };
@@ -66,6 +68,22 @@ static inline void rogue_copy_product_name(RogueSettings &s, const char *name) {
   if (name == nullptr || name[0] == '\0') name = pref_product_name;
   strncpy(s.product_name, name, sizeof(s.product_name) - 1);
   s.product_name[sizeof(s.product_name) - 1] = '\0';
+}
+
+static inline uint8_t rogue_pref_tank_mode(uint8_t tank) {
+  switch (tank) {
+    case 1: return pref_tank1_mode;
+    case 2: return pref_tank2_mode;
+    default: return ROGUE_IO_SIMULATED;
+  }
+}
+
+static inline int8_t rogue_pref_tank_pin(uint8_t tank) {
+  switch (tank) {
+    case 1: return pref_tank1_pin;
+    case 2: return pref_tank2_pin;
+    default: return -1;
+  }
 }
 
 static inline uint8_t rogue_pref_input_mode(uint8_t input) {
@@ -136,6 +154,10 @@ static inline void rogue_settings_defaults(RogueSettings &s) {
   s.serial_suffix = pref_serial_suffix;
   rogue_copy_product_name(s, pref_product_name);
 
+  for (uint8_t i = 0; i <= ROGUE_TANK_COUNT; i++) {
+    s.tanks[i].mode = ROGUE_IO_SIMULATED;
+    s.tanks[i].pin = -1;
+  }
   for (uint8_t i = 0; i <= ROGUE_INPUT_COUNT; i++) {
     s.inputs[i].mode = ROGUE_IO_SIMULATED;
     s.inputs[i].pin = -1;
@@ -145,6 +167,10 @@ static inline void rogue_settings_defaults(RogueSettings &s) {
     s.outputs[i].pin = -1;
   }
 
+  for (uint8_t tank = 1; tank <= ROGUE_TANK_COUNT; tank++) {
+    s.tanks[tank].mode = rogue_sanitize_io_mode(rogue_pref_tank_mode(tank));
+    s.tanks[tank].pin = rogue_pref_tank_pin(tank);
+  }
   for (uint8_t input = 1; input <= ROGUE_INPUT_COUNT; input++) {
     s.inputs[input].mode = rogue_sanitize_io_mode(rogue_pref_input_mode(input));
     s.inputs[input].pin = rogue_pref_input_pin(input);
@@ -161,6 +187,10 @@ static inline void rogue_settings_sanitize(RogueSettings &s) {
   if (s.tank2_percent > 100) s.tank2_percent = 100;
   if (s.product_name[0] == '\0') rogue_copy_product_name(s, pref_product_name);
 
+  for (uint8_t tank = 1; tank <= ROGUE_TANK_COUNT; tank++) {
+    s.tanks[tank].mode = rogue_sanitize_io_mode((uint8_t) s.tanks[tank].mode);
+    if (s.tanks[tank].mode != ROGUE_IO_PIN) s.tanks[tank].pin = -1;
+  }
   for (uint8_t input = 1; input <= ROGUE_INPUT_COUNT; input++) {
     s.inputs[input].mode = rogue_sanitize_io_mode((uint8_t) s.inputs[input].mode);
     if (s.inputs[input].mode != ROGUE_IO_PIN) s.inputs[input].pin = -1;
@@ -189,6 +219,12 @@ static inline void rogue_settings_load(Preferences &prefs, RogueSettings &s) {
   String saved_name = prefs.getString("name", s.product_name);
   rogue_copy_product_name(s, saved_name.c_str());
 
+  for (uint8_t tank = 1; tank <= ROGUE_TANK_COUNT; tank++) {
+    s.tanks[tank].mode = rogue_sanitize_io_mode(
+        prefs.getUChar(rogue_pref_key("t", tank, "m").c_str(), (uint8_t) s.tanks[tank].mode));
+    s.tanks[tank].pin =
+        prefs.getChar(rogue_pref_key("t", tank, "p").c_str(), s.tanks[tank].pin);
+  }
   for (uint8_t input = 1; input <= ROGUE_INPUT_COUNT; input++) {
     s.inputs[input].mode = rogue_sanitize_io_mode(
         prefs.getUChar(rogue_pref_key("i", input, "m").c_str(), (uint8_t) s.inputs[input].mode));
@@ -215,6 +251,10 @@ static inline void rogue_settings_save(Preferences &prefs, RogueSettings &s) {
   prefs.putUShort("ss", s.serial_suffix);
   prefs.putString("name", s.product_name);
 
+  for (uint8_t tank = 1; tank <= ROGUE_TANK_COUNT; tank++) {
+    prefs.putUChar(rogue_pref_key("t", tank, "m").c_str(), (uint8_t) s.tanks[tank].mode);
+    prefs.putChar(rogue_pref_key("t", tank, "p").c_str(), s.tanks[tank].pin);
+  }
   for (uint8_t input = 1; input <= ROGUE_INPUT_COUNT; input++) {
     prefs.putUChar(rogue_pref_key("i", input, "m").c_str(), (uint8_t) s.inputs[input].mode);
     prefs.putChar(rogue_pref_key("i", input, "p").c_str(), s.inputs[input].pin);
