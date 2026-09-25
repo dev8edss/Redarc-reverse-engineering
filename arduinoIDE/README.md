@@ -6,7 +6,7 @@ The goal is to emulate a **TVMS Rogue / DPDM** CAN device from an ESP32 using th
 
 At the moment this is still inside the original repository because the GitHub connector available here does not expose a fork/create-repository action. Treat `arduinoIDE/` as the Arduino-only project area. Main and `emulated-rogue` are untouched.
 
-## Sketch
+## Sketch files
 
 Open this sketch in Arduino IDE:
 
@@ -14,11 +14,14 @@ Open this sketch in Arduino IDE:
 arduinoIDE/TVMS_Rogue_Emulator/TVMS_Rogue_Emulator.ino
 ```
 
-The embedded captured Object 2 data lives beside it:
+Supporting files beside the sketch:
 
 ```text
 arduinoIDE/TVMS_Rogue_Emulator/RogueObject2.h
+arduinoIDE/TVMS_Rogue_Emulator/RoguePreferences.h
 ```
+
+`RogueObject2.h` stores the captured Object 2 image. `RoguePreferences.h` stores the NVS schema, defaults, IO assignment types and settings load/save helpers.
 
 ## Hardware target
 
@@ -84,6 +87,57 @@ You can change and persist the source address from Serial Monitor:
 
 ```text
 sa 0x36
+```
+
+## Input/output assignment modes
+
+All 8 digital inputs and all 10 outputs now have a persisted assignment mode.
+
+| Mode | Meaning |
+|---|---|
+| `simulated` | Internal emulator-only value. No ESP32 pin is used. |
+| `variable` | Internal variable hook. Can be driven by sketch code or Serial commands. |
+| `pin` | Bound to an ESP32 GPIO pin. Inputs are read from the pin; outputs drive the pin. |
+
+Defaults:
+
+- all inputs are `simulated`, no GPIO pin,
+- all outputs are `simulated`, no GPIO pin.
+
+Examples:
+
+```text
+input 1 pin 33
+input 2 variable
+input 3 simulated
+
+output 1 pin 25
+output 2 variable
+output 3 simulated
+```
+
+GPIO assignments are saved in NVS. After reboot, the sketch loads them, configures input pins with `pinMode(pin, INPUT)`, configures output pins with `pinMode(pin, OUTPUT)`, and drives each output pin according to the current output level.
+
+For output GPIO mode, the first implementation is digital-only:
+
+```text
+0%    -> LOW
+1-100 -> HIGH
+```
+
+Brightness percentages are still sent on CAN as normal Rogue output levels. GPIO PWM can be added later if needed.
+
+Use this to show current mappings:
+
+```text
+io
+```
+
+Use this to drive variable/simulated inputs from Serial Monitor:
+
+```text
+in1 1
+in1 0
 ```
 
 ## Runtime broadcasts
@@ -189,6 +243,7 @@ Open Serial Monitor at `115200`.
 ```text
 help
 status
+io
 
 t1 <0-100>            set/persist Tank 1 percent
 t2 <0-100>            set/persist Tank 2 percent
@@ -196,6 +251,10 @@ v <millivolts>        set input voltage, e.g. v 13600
 i <milliamps>         set input current, e.g. i 2500
 m <0|1>               master off/on
 o<n> <0-100>          set output, e.g. o1 75
+in<n> <0|1>           set input variable/simulated state, e.g. in1 1
+
+input <n> <simulated|variable|pin> [gpio]
+output <n> <simulated|variable|pin> [gpio]
 
 sa <0x01-0xFE>        set/persist source address
 serial <prefix> <suffix>
@@ -214,10 +273,18 @@ Examples:
 sa 0x36
 serial 2606260001 0x0013
 name TVMS Rogue
+
+input 1 pin 33
+input 2 variable
+in2 1
+
+output 1 pin 25
+output 2 variable
+o1 100
+o2 55
+
 t1 25
 t2 80
-o1 100
-o6 55
 m 1
 v 13750
 i 3200
@@ -227,33 +294,29 @@ Tank values are expected as percentages. They are clamped/rounded to `0–100%` 
 
 ## NVS persistence
 
-The following are saved in ESP32 NVS:
+The following are saved in ESP32 NVS by `RoguePreferences.h`:
 
 - source address,
 - Tank 1 percent,
 - Tank 2 percent,
 - serial prefix,
 - serial suffix,
-- product name.
+- product name,
+- input 1–8 assignment mode,
+- input 1–8 GPIO pin,
+- output 1–10 assignment mode,
+- output 1–10 GPIO pin.
 
 Use `defaults` to restore the built-in defaults.
 
-Output levels, input voltage/current, and master state are currently runtime-only.
+## Current limits
 
-## Known limits
-
-- This branch has not been compile-tested in this chat environment.
-- Object 2 is currently static. Serial changes to product name, serial, or source address affect live CAN identity frames, but do not rewrite the embedded Object 2 image.
-- Object write/programming services are not implemented yet:
-  - `0x0E87`
-  - `0x0E81`
-  - `0x0E88`
-  - `0x0E89`
-  - `0x0E8A`
+- It has not been compile-tested in this chat environment.
+- GPIO outputs are currently digital on/off only, not PWM brightness.
+- GPIO inputs are read as active-high using `pinMode(pin, INPUT)`.
+- Object 2 is still the captured/static object image; changing serial/name/source address changes live identity frames but does not rewrite the embedded Object 2 image.
 - BLE/RBus emulation is not included.
-- Real analog/digital hardware inputs are not mapped yet.
-- This is still one sketch plus one embedded object header; it can be split into a reusable Arduino library after it compiles and behaves correctly.
 
 ## CAN safety
 
-Use a bench setup first. Running this emulator on the same bus as a live REDARC system means it will actively transmit frames. Keep its source address unique and avoid source `0x30` unless the real Rogue is unplugged.
+Use a bench setup first. Running this emulator on the same bus as a live Redarc system means it will actively transmit frames. Keep its source address unique and avoid source `0x30` unless the real Rogue is unplugged.
