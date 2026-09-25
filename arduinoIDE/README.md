@@ -1,6 +1,6 @@
 # Arduino IDE TVMS Rogue Emulator
 
-This branch starts a standalone Arduino IDE port of the `emulated-rogue` ESPHome work.
+This branch is a standalone Arduino IDE port of the `emulated-rogue` ESPHome work.
 
 The goal is deliberately narrow:
 
@@ -18,6 +18,12 @@ Open this sketch in Arduino IDE:
 
 ```text
 arduinoIDE/TVMS_Rogue_Emulator/TVMS_Rogue_Emulator.ino
+```
+
+The embedded Object 2 readback data is in:
+
+```text
+arduinoIDE/TVMS_Rogue_Emulator/RogueObject2.h
 ```
 
 ## Hardware target
@@ -76,7 +82,7 @@ A real TVMS Rogue normally uses `0x30`. Do not run the emulator at `0x30` on the
 
 ## What is currently ported
 
-The first Arduino IDE port includes the main live CAN behavior learned in the `emulated-rogue` branch.
+The Arduino IDE port includes the main live CAN behavior learned in the `emulated-rogue` branch.
 
 ### Runtime broadcasts
 
@@ -109,6 +115,35 @@ The sketch responds to DGN requests for:
 | `0x1FD0E` | output capabilities |
 | `0x1FD12` | output levels |
 | `0x1FD14` | output activity |
+
+### REDARC object readback
+
+The sketch now embeds the captured Rogue **Object 2** image from the ESPHome emulator and serves it through the REDARC object read protocol.
+
+| CAN service / response | Meaning |
+|---|---|
+| `0x0E85` | select object, for example object `0x02` |
+| `0x0E86` | read object block, offset + length little-endian |
+| `0x0281` | returned object data, 8-byte chunks |
+| `0x0284` | returned length and CRC-32C trailer |
+
+Current embedded object:
+
+```text
+Object: 2 / main configuration object
+ROGUE_OBJECT2_SIZE: 4748 bytes
+Stored object CRC field: 0xFA84819A
+```
+
+Readback behavior:
+
+- If selected object is `0x02`, reads return bytes from the captured Rogue object.
+- If the request reads beyond the object end, the sketch pads with `0xFF`, matching the ESPHome emulator behavior.
+- Unsupported selected objects return `0xFF` data with a valid block CRC.
+- Trailer CRC uses CRC-32C / Castagnoli reflected polynomial `0x82F63B78`.
+- Oversized block reads above `8192` bytes are refused to protect ESP32 RAM.
+
+The object data is stored as base64 text in flash/PROGMEM and decoded byte-by-byte when a read request arrives. That keeps RAM use low while still giving the display/configurator a real object image.
 
 ### Commands
 
@@ -165,23 +200,21 @@ The ESPHome branch has:
 - ESPHome callbacks,
 - Home Assistant API integration,
 - ESPHome external component packaging,
-- full captured object readback in the current emulator.
+- a larger set of active-object derived configuration responses.
 
 The Arduino branch currently has:
 
 - raw CAN/TWAI setup,
 - serial command control,
-- hardcoded emulator state,
+- hardcoded emulator runtime state,
 - simple periodic identity/status loop,
-- the core output/tank/status command behavior.
+- core output/tank/status command behavior,
+- embedded Rogue Object 2 readback.
 
 ## Current limits / next work
 
-The port is a first working base, not the finished replacement.
-
 Known limits:
 
-- Full REDARC object readback still needs to be added to the Arduino sketch.
 - Some identity/config DGNs are conservative approximations.
 - Some fields are fixed to values captured from the current Rogue object.
 - It does not yet support BLE/RBus emulation.
@@ -195,7 +228,7 @@ Likely next steps:
 3. Run on an isolated CAN bench first.
 4. Capture what the RedVision display requests from source `0x36`.
 5. Compare responses against the ESPHome `emulated-rogue` branch.
-6. Add full captured Object 2 readback.
+6. Add more active-object derived DGN responses as needed.
 7. Split the sketch into a small reusable Arduino library once the base compiles and behaves correctly.
 
 ## CAN safety
