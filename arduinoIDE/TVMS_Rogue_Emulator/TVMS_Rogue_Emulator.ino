@@ -12,6 +12,9 @@
 
 #include <Arduino.h>
 #include <driver/twai.h>
+#include <pgmspace.h>
+
+#include "RogueObject2.h"
 
 static constexpr gpio_num_t CAN_TX_PIN = GPIO_NUM_22;
 static constexpr gpio_num_t CAN_RX_PIN = GPIO_NUM_19;
@@ -29,11 +32,15 @@ static constexpr uint32_t ID_NODE_PRODUCT_NAME      = 0x17F40300UL;
 static constexpr uint32_t ID_NODE_SERIAL_INFO       = 0x17F40400UL;
 static constexpr uint32_t ID_NODE_DEVICE_ID         = 0x17F40500UL;
 static constexpr uint32_t ID_DIRECT_ACK_BASE        = 0x0F040000UL;
+static constexpr uint32_t ID_SERVICE_DATA_BASE      = 0x02810000UL;
+static constexpr uint32_t ID_SERVICE_TRAILER_BASE   = 0x02840000UL;
 
 static constexpr uint16_t SERVICE_DGN_REQUEST       = 0x0F03;
 static constexpr uint16_t SERVICE_DIRECT_COMMAND    = 0x0F00;
 static constexpr uint16_t SERVICE_LEGACY_DIM        = 0x0F05;
+static constexpr uint16_t SERVICE_OBJECT_PREFIX     = 0x0E00;
 
+static constexpr uint8_t MAIN_CONFIGURATION_OBJECT  = 0x02;
 static constexpr uint8_t CHANNEL_MASTER             = 0x0B;
 static constexpr uint8_t CHANNEL_OUTPUT_1           = 0x0C;
 static constexpr uint8_t CHANNEL_OUTPUT_10          = 0x15;
@@ -43,6 +50,7 @@ static constexpr uint32_t STATUS_INTERVAL_MS        = 1000UL;
 static constexpr uint32_t HOLD_DIM_STEP_MS          = 100UL;
 static constexpr uint8_t HOLD_DIM_STEP_PERCENT      = 2;
 
+static uint8_t selected_object = 0xFF;
 static uint8_t output_levels[11] = {0};       // outputs 1..10, percent
 static bool input_states[9] = {false};        // inputs 1..8
 static bool master_state = false;
@@ -69,10 +77,26 @@ uint16_t u16_le(const uint8_t *d) {
   return (uint16_t) d[0] | ((uint16_t) d[1] << 8);
 }
 
+uint32_t u32_le(const uint8_t *d) {
+  return (uint32_t) d[0] | ((uint32_t) d[1] << 8) |
+         ((uint32_t) d[2] << 16) | ((uint32_t) d[3] << 24);
+}
+
 uint8_t clamp_percent(float value) {
   if (isnan(value) || value <= 0.0f) return 0;
   if (value >= 100.0f) return 100;
   return (uint8_t) lroundf(value);
+}
+
+uint32_t crc32c(const uint8_t *data, size_t len) {
+  uint32_t crc = 0xFFFFFFFFUL;
+  for (size_t i = 0; i < len; i++) {
+    crc ^= data[i];
+    for (uint8_t bit = 0; bit < 8; bit++) {
+      crc = (crc & 1U) ? ((crc >> 1) ^ 0x82F63B78UL) : (crc >> 1);
+    }
+  }
+  return ~crc;
 }
 
 void send_frame(uint32_t id, const uint8_t *data, uint8_t len) {
@@ -216,11 +240,11 @@ void send_node_firmware() {
 
 void send_product_name() {
   const size_t len = strlen(PRODUCT_NAME);
-  uint8_t seg_count = (uint8_t) (len / 7 + 1);
+  const uint8_t seg_count = (uint8_t) (len / 7 + 1);
   for (uint8_t seg = 0; seg < seg_count; seg++) {
     uint8_t data[8] = {seg, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
     for (uint8_t i = 0; i < 7; i++) {
-      size_t pos = (size_t) seg * 7 + i;
+      const size_t pos = (size_t) seg * 7 + i;
       if (pos < len) data[1 + i] = (uint8_t) PRODUCT_NAME[pos];
     }
     send_frame(with_sa(ID_NODE_PRODUCT_NAME), data, 8);
@@ -235,7 +259,7 @@ void send_serial_info() {
               (uint8_t) ((SERIAL_PREFIX >> 24) & 0xFF),
               (uint8_t) (SERIAL_SUFFIX & 0xFF),
               (uint8_t) ((SERIAL_SUFFIX >> 8) & 0xFF),
-              0x16, 0x00);
+              DEVICE_TYPE, DEVICE_SUBTYPE);
 }
 
 void send_device_id() {
@@ -248,6 +272,61 @@ void send_identity() {
   send_serial_info();
   send_device_id();
   send_load_disconnect_config();
+}
+
+void handle_object_select(const uint8_t *data, uint8_t len) {
+  if (len < 1) return;
+  selected_object = data[0];
+  Serial.printf("Selected REDARC object %u\n", selected_object);
+}
+
+void handle_object_read(uint8_t requester, const uint8_t *data, uint8_t len) {
+  if (len < 8) return;
+  const uint32_t offset = u32_le(data);
+  const uint32_t requested_length = u32_le(data + 4);
+
+  if (requested_length > 8192UL) {
+    Serial.printf("Refusing oversized object read length %lu\n", (unsigned long) requested_length);
+    return;
+  }
+
+  uint8_t *block = (uint8_t *) malloc(requested_length == 0 ? 1 : requested_length);
+  if (block == nullptr) {
+    Serial.println("Object read malloc failed");
+    return;
+  }
+  memset(block, 0xFF, requested_length);
+
+  if (selected_object == MAIN_CONFIGURATION_OBJECT && offset < ROGUE_OBJECT2_SIZE) {
+    const uint32_t available = ROGUE_OBJECT2_SIZE - offset;
+    const uint32_t copy_len = requested_length < available ? requested_length : available;
+    for (uint32_t i = 0; i < copy_len; i++) block[i] = rogue_object2_byte(offset + i);
+  }
+
+  const uint32_t data_id = ID_SERVICE_DATA_BASE | ((uint32_t) requester << 8) | SOURCE_ADDRESS;
+  for (uint32_t pos = 0; pos < requested_length; pos += 8) {
+    uint8_t frame[8] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+    const uint8_t chunk = (uint8_t) ((requested_length - pos) < 8UL ? (requested_length - pos) : 8UL);
+    memcpy(frame, block + pos, chunk);
+    send_frame(data_id, frame, 8);
+  }
+
+  const uint32_t block_crc = crc32c(block, requested_length);
+  const uint32_t trailer_id = ID_SERVICE_TRAILER_BASE | ((uint32_t) requester << 8) | SOURCE_ADDRESS;
+  send_frame8(trailer_id,
+              (uint8_t) (requested_length & 0xFF),
+              (uint8_t) ((requested_length >> 8) & 0xFF),
+              (uint8_t) ((requested_length >> 16) & 0xFF),
+              (uint8_t) ((requested_length >> 24) & 0xFF),
+              (uint8_t) (block_crc & 0xFF),
+              (uint8_t) ((block_crc >> 8) & 0xFF),
+              (uint8_t) ((block_crc >> 16) & 0xFF),
+              (uint8_t) ((block_crc >> 24) & 0xFF));
+
+  Serial.printf("Object %u read offset=%lu length=%lu crc=0x%08lX\n",
+                selected_object, (unsigned long) offset,
+                (unsigned long) requested_length, (unsigned long) block_crc);
+  free(block);
 }
 
 void handle_dgn_request(uint8_t requester, uint16_t dgn) {
@@ -328,18 +407,16 @@ void handle_can_message(const twai_message_t &msg) {
   const uint8_t requester = (uint8_t) (id & 0xFFUL);
   if (destination != SOURCE_ADDRESS) return;
 
+  if ((service & 0xFF00U) == SERVICE_OBJECT_PREFIX) {
+    const uint8_t object_service = (uint8_t) (service & 0x00FFU);
+    if (object_service == 0x85) { handle_object_select(msg.data, msg.data_length_code); return; }
+    if (object_service == 0x86) { handle_object_read(requester, msg.data, msg.data_length_code); return; }
+  }
   if (service == SERVICE_DGN_REQUEST && msg.data_length_code >= 2) {
-    handle_dgn_request(requester, u16_le(msg.data));
-    return;
+    handle_dgn_request(requester, u16_le(msg.data)); return;
   }
-  if (service == SERVICE_DIRECT_COMMAND) {
-    handle_direct_command(requester, msg.data, msg.data_length_code);
-    return;
-  }
-  if (service == SERVICE_LEGACY_DIM) {
-    handle_legacy_dim(msg.data, msg.data_length_code);
-    return;
-  }
+  if (service == SERVICE_DIRECT_COMMAND) { handle_direct_command(requester, msg.data, msg.data_length_code); return; }
+  if (service == SERVICE_LEGACY_DIM) { handle_legacy_dim(msg.data, msg.data_length_code); return; }
 }
 
 void receive_can() {
@@ -348,8 +425,9 @@ void receive_can() {
 }
 
 void print_status() {
-  Serial.printf("SA=0x%02X master=%s tank1=%u%% tank2=%u%% Vin=%.3fV Iin=%.3fA\n",
-                SOURCE_ADDRESS, master_state ? "ON" : "OFF", tank1_percent, tank2_percent,
+  Serial.printf("SA=0x%02X object=%u object2=%lu bytes master=%s tank1=%u%% tank2=%u%% Vin=%.3fV Iin=%.3fA\n",
+                SOURCE_ADDRESS, selected_object, (unsigned long) ROGUE_OBJECT2_SIZE,
+                master_state ? "ON" : "OFF", tank1_percent, tank2_percent,
                 input_voltage_mv / 1000.0f, input_current_ma / 1000.0f);
   for (uint8_t output = 1; output <= 10; output++) Serial.printf("O%u=%u%% ", output, output_levels[output]);
   Serial.println();
@@ -433,6 +511,7 @@ void setup() {
   Serial.println();
   Serial.println("REDARC TVMS Rogue Emulator - Arduino IDE");
   Serial.printf("Source address: 0x%02X\n", SOURCE_ADDRESS);
+  Serial.printf("Embedded object 2 length: %lu bytes\n", (unsigned long) ROGUE_OBJECT2_SIZE);
   Serial.println("Type help for serial commands.");
   start_can();
   send_identity();
