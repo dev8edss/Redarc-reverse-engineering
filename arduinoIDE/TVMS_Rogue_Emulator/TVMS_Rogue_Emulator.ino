@@ -1,16 +1,16 @@
 /*
-  REDARC TVMS Rogue Emulator - Arduino IDE port
+  REDARC TVMS Rogue Emulator - Arduino IDE standalone port
 
-  Standalone ESP32/TWAI port of the emulated-rogue ESPHome component.
-  It emulates only a TVMS Rogue CAN node. It does not use ESPHome or
-  Home Assistant.
+  This sketch emulates only a TVMS Rogue / DPDM CAN node.
+  It does not use ESPHome or Home Assistant.
 
-  Default hardware target:
-    M5Stack Atom Lite + Atomic CAN Base / CA-IS3050G
+  Target:
+    ESP32 + CAN transceiver/base, e.g. M5Stack Atom Lite + Atomic CAN Base
     CAN TX GPIO22, CAN RX GPIO19, 250 kbit/s, extended IDs
 */
 
 #include <Arduino.h>
+#include <Preferences.h>
 #include <driver/twai.h>
 #include <pgmspace.h>
 
@@ -18,13 +18,23 @@
 
 static constexpr gpio_num_t CAN_TX_PIN = GPIO_NUM_22;
 static constexpr gpio_num_t CAN_RX_PIN = GPIO_NUM_19;
-static constexpr uint8_t SOURCE_ADDRESS = 0x36;   // keep different from real Rogue 0x30
+
+static constexpr uint8_t DEFAULT_SOURCE_ADDRESS = 0x36;   // keep different from real Rogue 0x30
+static constexpr uint32_t DEFAULT_SERIAL_PREFIX = 2606260001UL;
+static constexpr uint16_t DEFAULT_SERIAL_SUFFIX = 0x0013;
+static constexpr char DEFAULT_PRODUCT_NAME[] = "TVMS Rogue";
 
 static constexpr uint32_t ID_LOAD_DISCONNECT_CONFIG = 0x13F10800UL;
 static constexpr uint32_t ID_CHANNEL_STATUS         = 0x1BFD0000UL;
 static constexpr uint32_t ID_SENSOR_VALUES          = 0x1BFD0200UL;
+static constexpr uint32_t ID_CHANNEL_LABEL          = 0x17FD0400UL;
+static constexpr uint32_t ID_ALARM_CONFIG           = 0x17FD0600UL;
+static constexpr uint32_t ID_ALARM_STATUS           = 0x17FD0700UL;
 static constexpr uint32_t ID_ACTIVE_CHANNELS        = 0x17FD0800UL;
+static constexpr uint32_t ID_CHANNEL_DETAILS        = 0x17FD0A00UL;
+static constexpr uint32_t ID_ANALOG_SCALING         = 0x17FD0C00UL;
 static constexpr uint32_t ID_OUTPUT_CAPABILITIES    = 0x17FD0E00UL;
+static constexpr uint32_t ID_DIGITAL_INPUT_CONFIG   = 0x17FD1000UL;
 static constexpr uint32_t ID_OUTPUT_LEVELS          = 0x1BFD1200UL;
 static constexpr uint32_t ID_OUTPUT_ACTIVITY        = 0x1BFD1400UL;
 static constexpr uint32_t ID_NODE_FIRMWARE          = 0x17F40000UL;
@@ -50,6 +60,13 @@ static constexpr uint32_t STATUS_INTERVAL_MS        = 1000UL;
 static constexpr uint32_t HOLD_DIM_STEP_MS          = 100UL;
 static constexpr uint8_t HOLD_DIM_STEP_PERCENT      = 2;
 
+Preferences prefs;
+
+static uint8_t source_address = DEFAULT_SOURCE_ADDRESS;
+static uint32_t serial_prefix = DEFAULT_SERIAL_PREFIX;
+static uint16_t serial_suffix = DEFAULT_SERIAL_SUFFIX;
+static char product_name[64] = "TVMS Rogue";
+
 static uint8_t selected_object = 0xFF;
 static uint8_t output_levels[11] = {0};       // outputs 1..10, percent
 static bool input_states[9] = {false};        // inputs 1..8
@@ -63,14 +80,8 @@ static uint32_t hold_dim_last_step_ms[11] = {0};
 static uint32_t last_identity_ms = 0;
 static uint32_t last_status_ms = 0;
 
-static constexpr uint32_t SERIAL_PREFIX = 2606260001UL;
-static constexpr uint16_t SERIAL_SUFFIX = 0x0013;
-static constexpr uint8_t DEVICE_TYPE = 0x16;   // TVMS Rogue / DPDM
-static constexpr uint8_t DEVICE_SUBTYPE = 0x00;
-static const char PRODUCT_NAME[] = "TVMS Rogue";
-
 uint32_t with_sa(uint32_t base_id) {
-  return (base_id & 0x1FFFFF00UL) | SOURCE_ADDRESS;
+  return (base_id & 0x1FFFFF00UL) | source_address;
 }
 
 uint16_t u16_le(const uint8_t *d) {
@@ -88,15 +99,102 @@ uint8_t clamp_percent(float value) {
   return (uint8_t) lroundf(value);
 }
 
+uint32_t parse_u32(const String &text) {
+  String s = text;
+  s.trim();
+  return strtoul(s.c_str(), nullptr, 0);
+}
+
+uint32_t crc32c_update_byte(uint32_t crc, uint8_t b) {
+  crc ^= b;
+  for (uint8_t bit = 0; bit < 8; bit++) {
+    crc = (crc & 1U) ? ((crc >> 1) ^ 0x82F63B78UL) : (crc >> 1);
+  }
+  return crc;
+}
+
 uint32_t crc32c(const uint8_t *data, size_t len) {
   uint32_t crc = 0xFFFFFFFFUL;
-  for (size_t i = 0; i < len; i++) {
-    crc ^= data[i];
-    for (uint8_t bit = 0; bit < 8; bit++) {
-      crc = (crc & 1U) ? ((crc >> 1) ^ 0x82F63B78UL) : (crc >> 1);
-    }
+  for (size_t i = 0; i < len; i++) crc = crc32c_update_byte(crc, data[i]);
+  return ~crc;
+}
+
+uint32_t object2_stored_crc() {
+  return (uint32_t) rogue_object2_byte(8) |
+         ((uint32_t) rogue_object2_byte(9) << 8) |
+         ((uint32_t) rogue_object2_byte(10) << 16) |
+         ((uint32_t) rogue_object2_byte(11) << 24);
+}
+
+uint32_t object2_declared_length() {
+  return (uint32_t) rogue_object2_byte(4) |
+         ((uint32_t) rogue_object2_byte(5) << 8) |
+         ((uint32_t) rogue_object2_byte(6) << 16) |
+         ((uint32_t) rogue_object2_byte(7) << 24);
+}
+
+uint32_t object2_calculated_crc_zeroed() {
+  uint32_t crc = 0xFFFFFFFFUL;
+  for (uint32_t i = 0; i < ROGUE_OBJECT2_SIZE; i++) {
+    uint8_t b = rogue_object2_byte(i);
+    if (i >= 8 && i <= 11) b = 0x00;
+    crc = crc32c_update_byte(crc, b);
   }
   return ~crc;
+}
+
+void object2_self_test() {
+  const uint32_t declared_len = object2_declared_length();
+  const uint32_t stored_crc = object2_stored_crc();
+  const uint32_t calc_crc = object2_calculated_crc_zeroed();
+
+  Serial.printf("Object2 size=%lu declared_len=%lu stored_crc=0x%08lX calc_crc=0x%08lX %s\n",
+                (unsigned long) ROGUE_OBJECT2_SIZE,
+                (unsigned long) declared_len,
+                (unsigned long) stored_crc,
+                (unsigned long) calc_crc,
+                (stored_crc == calc_crc && declared_len == ROGUE_OBJECT2_SIZE) ? "OK" : "FAIL");
+}
+
+void copy_product_name(const char *name) {
+  if (name == nullptr || name[0] == '\0') name = DEFAULT_PRODUCT_NAME;
+  strncpy(product_name, name, sizeof(product_name) - 1);
+  product_name[sizeof(product_name) - 1] = '\0';
+}
+
+void save_settings() {
+  prefs.putUChar("sa", source_address);
+  prefs.putUChar("t1", tank1_percent);
+  prefs.putUChar("t2", tank2_percent);
+  prefs.putUInt("sp", serial_prefix);
+  prefs.putUShort("ss", serial_suffix);
+  prefs.putString("name", product_name);
+  Serial.println("Settings saved to NVS");
+}
+
+void load_settings() {
+  prefs.begin("rogueemu", false);
+  source_address = prefs.getUChar("sa", DEFAULT_SOURCE_ADDRESS);
+  tank1_percent = prefs.getUChar("t1", 50);
+  tank2_percent = prefs.getUChar("t2", 75);
+  serial_prefix = prefs.getUInt("sp", DEFAULT_SERIAL_PREFIX);
+  serial_suffix = prefs.getUShort("ss", DEFAULT_SERIAL_SUFFIX);
+  String saved_name = prefs.getString("name", DEFAULT_PRODUCT_NAME);
+  copy_product_name(saved_name.c_str());
+
+  if (source_address == 0x00 || source_address == 0xFF) source_address = DEFAULT_SOURCE_ADDRESS;
+  if (tank1_percent > 100) tank1_percent = 100;
+  if (tank2_percent > 100) tank2_percent = 100;
+}
+
+void reset_settings_to_defaults() {
+  source_address = DEFAULT_SOURCE_ADDRESS;
+  tank1_percent = 50;
+  tank2_percent = 75;
+  serial_prefix = DEFAULT_SERIAL_PREFIX;
+  serial_suffix = DEFAULT_SERIAL_SUFFIX;
+  copy_product_name(DEFAULT_PRODUCT_NAME);
+  save_settings();
 }
 
 void send_frame(uint32_t id, const uint8_t *data, uint8_t len) {
@@ -120,7 +218,7 @@ void send_frame8(uint32_t id,
 }
 
 void send_direct_ack(uint8_t requester, uint8_t command) {
-  const uint32_t id = ID_DIRECT_ACK_BASE | ((uint32_t) requester << 8) | SOURCE_ADDRESS;
+  const uint32_t id = ID_DIRECT_ACK_BASE | ((uint32_t) requester << 8) | source_address;
   send_frame8(id, 0x01, command, 0x00, 0xFF, 0x00, 0xFF, 0xFF, 0xFF);
 }
 
@@ -140,7 +238,6 @@ void set_master(bool on, const char *origin) {
 }
 
 void send_load_disconnect_config() {
-  // Captured object-derived Rogue payload: trigger Never, 10.2V/11.6V, 23/61% SOC.
   send_frame8(with_sa(ID_LOAD_DISCONNECT_CONFIG),
               0xEC, 0xD8, 0x27, 0x50, 0x2D, 0x17, 0x3D, 0x00);
 }
@@ -150,21 +247,14 @@ void send_channel_status() {
   for (uint8_t input = 1; input <= 7; input++) page1[input] = input_states[input] ? 1 : 0;
   send_frame(with_sa(ID_CHANNEL_STATUS), page1, 8);
 
-  send_frame8(with_sa(ID_CHANNEL_STATUS),
-              0x08, input_states[8] ? 1 : 0, 0xFF, 0xFF,
-              master_state ? 1 : 0,
-              output_levels[1] > 0 ? 1 : 0,
-              output_levels[2] > 0 ? 1 : 0,
-              output_levels[3] > 0 ? 1 : 0);
+  send_frame8(with_sa(ID_CHANNEL_STATUS), 0x08, input_states[8] ? 1 : 0, 0xFF, 0xFF,
+              master_state ? 1 : 0, output_levels[1] > 0 ? 1 : 0,
+              output_levels[2] > 0 ? 1 : 0, output_levels[3] > 0 ? 1 : 0);
 
-  send_frame8(with_sa(ID_CHANNEL_STATUS),
-              0x0F,
-              output_levels[4] > 0 ? 1 : 0,
-              output_levels[5] > 0 ? 1 : 0,
-              output_levels[6] > 0 ? 1 : 0,
-              output_levels[7] > 0 ? 1 : 0,
-              output_levels[8] > 0 ? 1 : 0,
-              output_levels[9] > 0 ? 1 : 0,
+  send_frame8(with_sa(ID_CHANNEL_STATUS), 0x0F,
+              output_levels[4] > 0 ? 1 : 0, output_levels[5] > 0 ? 1 : 0,
+              output_levels[6] > 0 ? 1 : 0, output_levels[7] > 0 ? 1 : 0,
+              output_levels[8] > 0 ? 1 : 0, output_levels[9] > 0 ? 1 : 0,
               output_levels[10] > 0 ? 1 : 0);
 
   send_frame8(with_sa(ID_CHANNEL_STATUS), 0x18, 0xF8, 0xF8, 0xF8, 0xF8, 0xF8, 0xF8, 0xF8);
@@ -172,45 +262,29 @@ void send_channel_status() {
 }
 
 void send_sensor_values() {
-  send_frame8(with_sa(ID_SENSOR_VALUES),
-              0x09, tank1_percent, tank2_percent, 0x00, 0x00, 0xFF, 0xFF, 0xFF);
-
-  send_frame8(with_sa(ID_SENSOR_VALUES),
-              0x16,
-              (uint8_t) (input_voltage_mv & 0xFF),
-              (uint8_t) ((input_voltage_mv >> 8) & 0xFF),
-              (uint8_t) (input_current_ma & 0xFF),
-              (uint8_t) ((input_current_ma >> 8) & 0xFF),
+  send_frame8(with_sa(ID_SENSOR_VALUES), 0x09, tank1_percent, tank2_percent, 0x00, 0x00, 0xFF, 0xFF, 0xFF);
+  send_frame8(with_sa(ID_SENSOR_VALUES), 0x16,
+              (uint8_t) (input_voltage_mv & 0xFF), (uint8_t) ((input_voltage_mv >> 8) & 0xFF),
+              (uint8_t) (input_current_ma & 0xFF), (uint8_t) ((input_current_ma >> 8) & 0xFF),
               0xFF, 0xFF, 0xFF);
 }
 
 void send_output_levels() {
-  send_frame8(with_sa(ID_OUTPUT_LEVELS),
-              0x0C, output_levels[1], output_levels[2], output_levels[3],
-              output_levels[4], output_levels[5], output_levels[6], output_levels[7]);
-  send_frame8(with_sa(ID_OUTPUT_LEVELS),
-              0x13, output_levels[8], output_levels[9], output_levels[10],
-              0xFF, 0xFF, 0x00, 0x00);
+  send_frame8(with_sa(ID_OUTPUT_LEVELS), 0x0C, output_levels[1], output_levels[2], output_levels[3], output_levels[4], output_levels[5], output_levels[6], output_levels[7]);
+  send_frame8(with_sa(ID_OUTPUT_LEVELS), 0x13, output_levels[8], output_levels[9], output_levels[10], 0xFF, 0xFF, 0x00, 0x00);
   send_frame8(with_sa(ID_OUTPUT_LEVELS), 0x1A, 0, 0, 0, 0, 0, 0, 0);
   send_frame8(with_sa(ID_OUTPUT_LEVELS), 0x21, 0, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF);
 }
 
 void send_output_activity() {
-  send_frame8(with_sa(ID_OUTPUT_ACTIVITY),
-              0x0C,
-              hold_dim_direction[1] ? 0x02 : 0x00,
-              hold_dim_direction[2] ? 0x02 : 0x00,
-              hold_dim_direction[3] ? 0x02 : 0x00,
-              hold_dim_direction[4] ? 0x02 : 0x00,
-              hold_dim_direction[5] ? 0x02 : 0x00,
-              hold_dim_direction[6] ? 0x02 : 0x00,
+  send_frame8(with_sa(ID_OUTPUT_ACTIVITY), 0x0C,
+              hold_dim_direction[1] ? 0x02 : 0x00, hold_dim_direction[2] ? 0x02 : 0x00,
+              hold_dim_direction[3] ? 0x02 : 0x00, hold_dim_direction[4] ? 0x02 : 0x00,
+              hold_dim_direction[5] ? 0x02 : 0x00, hold_dim_direction[6] ? 0x02 : 0x00,
               hold_dim_direction[7] ? 0x02 : 0x00);
-  send_frame8(with_sa(ID_OUTPUT_ACTIVITY),
-              0x13,
-              hold_dim_direction[8] ? 0x02 : 0x00,
-              hold_dim_direction[9] ? 0x02 : 0x00,
-              hold_dim_direction[10] ? 0x02 : 0x00,
-              0xFF, 0xFF, 0xFF, 0xFF);
+  send_frame8(with_sa(ID_OUTPUT_ACTIVITY), 0x13,
+              hold_dim_direction[8] ? 0x02 : 0x00, hold_dim_direction[9] ? 0x02 : 0x00,
+              hold_dim_direction[10] ? 0x02 : 0x00, 0xFF, 0xFF, 0xFF, 0xFF);
 }
 
 void send_active_channels() {
@@ -219,18 +293,75 @@ void send_active_channels() {
 
 void send_output_capabilities() {
   const uint8_t caps[10] = {0x83, 0x83, 0x83, 0x83, 0x83, 0x83, 0x83, 0x01, 0x03, 0x03};
-  for (uint8_t i = 0; i < 10; i++) {
-    send_frame8(with_sa(ID_OUTPUT_CAPABILITIES), CHANNEL_OUTPUT_1 + i, caps[i], 0, 0, 0, 0, 0, 0);
+  for (uint8_t i = 0; i < 10; i++) send_frame8(with_sa(ID_OUTPUT_CAPABILITIES), CHANNEL_OUTPUT_1 + i, caps[i], 0, 0, 0, 0, 0, 0);
+}
+
+void send_label_chunk(uint8_t channel, uint8_t segment, const char *label) {
+  uint8_t data[8] = {channel, segment, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+  const size_t len = strlen(label);
+  for (uint8_t i = 0; i < 6; i++) {
+    size_t pos = (size_t) segment * 6U + i;
+    if (pos < len) data[2 + i] = (uint8_t) label[pos];
+  }
+  send_frame(with_sa(ID_CHANNEL_LABEL), data, 8);
+}
+
+void send_channel_label(uint8_t channel, const char *label) {
+  const size_t len = strlen(label);
+  const uint8_t segments = (uint8_t) (len / 6U + 1U);
+  for (uint8_t seg = 0; seg < segments; seg++) send_label_chunk(channel, seg, label);
+}
+
+void send_channel_labels() {
+  static const char *const labels[34] = {
+    "", "Left", "Strip", "Dome", "Digital Input 4", "Digital Input 5", "Digital Input 6", "Digital Input 7", "Digital Input 8",
+    "Rear", "Front", "Master", "Left", "Right", "Rear", "Kitchen", "Handle", "LED", "Dome Light", "Lights", "Amber lights", "Amber Kitchen",
+    "Rogue Input Voltage", "Input Current", "Remote Input  1", "Remote Input  2", "Remote Input  3", "Remote Input  4", "Remote Input  5",
+    "Remote Input  6", "Remote Input  7", "Remote Input  8", "Remote Input  9", "Remote Input  10"
+  };
+  for (uint8_t ch = 1; ch <= 33; ch++) send_channel_label(ch, labels[ch]);
+}
+
+struct ChannelDetail { uint8_t channel; uint8_t category; uint16_t subtype; uint16_t icon; uint8_t enabled; uint8_t present; };
+
+void send_channel_details() {
+  const ChannelDetail details[] = {
+    {1,0x00,0,0x003B,1,1},{2,0x00,0,0,1,1},{3,0x00,0,0,1,1},{4,0x00,0,0,1,1},{5,0x00,0,0,1,1},{6,0x00,0,0,1,1},{7,0x00,0,0,1,1},{8,0x00,0,0,1,1},
+    {9,0x0C,0,0x8052,1,1},{10,0x0C,0,0x8146,1,1},{11,0x08,0,0,1,1},
+    {12,0x0A,1,0x0001,1,1},{13,0x0A,1,0x1252,1,1},{14,0x0A,1,0x1000,0,1},{15,0x0A,1,0,1,1},{16,0x0A,1,0,1,1},{17,0x0A,1,0,1,1},{18,0x0A,1,0,1,1},{19,0x0A,0,0,1,1},{20,0x0A,0,0,1,1},{21,0x0A,0,0,1,1},
+    {22,0x02,0,0,1,1},{23,0x02,0,0,1,1},
+    {24,0x0B,0,0,0,1},{25,0x0B,0,0,0,1},{26,0x0B,0,0,0,1},{27,0x0B,0,0,0,1},{28,0x0B,0,0,0,1},{29,0x0B,0,0,0,1},{30,0x0B,0,0,0,1},{31,0x0B,0,0,0,1},{32,0x0B,0,0,0,1},{33,0x0B,0,0,0,1}
+  };
+  for (const auto &d : details) {
+    send_frame8(with_sa(ID_CHANNEL_DETAILS), d.channel, d.category, (uint8_t)(d.subtype & 0xFF), (uint8_t)(d.subtype >> 8), (uint8_t)(d.icon & 0xFF), (uint8_t)(d.icon >> 8), d.enabled, d.present);
   }
 }
 
+void send_alarm_config() {
+  send_frame8(with_sa(ID_ALARM_CONFIG), 0x09, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xFF);
+  send_frame8(with_sa(ID_ALARM_CONFIG), 0x0A, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xFF);
+  send_frame8(with_sa(ID_ALARM_CONFIG), 0x16, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xFF);
+  send_frame8(with_sa(ID_ALARM_CONFIG), 0x17, 0x00, 0x1E, 0x00, 0x28, 0x00, 0xFF, 0xFF);
+}
+
+void send_alarm_status() {
+  send_frame8(with_sa(ID_ALARM_STATUS), 0x09, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF);
+  send_frame8(with_sa(ID_ALARM_STATUS), 0x16, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF);
+}
+
+void send_analog_scaling() {
+  send_frame8(with_sa(ID_ANALOG_SCALING), 0x09, 0x64, 0x00, 0x00, 0x00, 0x00, 0x64, 0x00);
+  send_frame8(with_sa(ID_ANALOG_SCALING), 0x0A, 0x64, 0x00, 0x00, 0x00, 0x00, 0x64, 0x00);
+  send_frame8(with_sa(ID_ANALOG_SCALING), 0x16, 0x61, 0x00, 0x00, 0x00, 0x00, 0x60, 0xEA);
+  send_frame8(with_sa(ID_ANALOG_SCALING), 0x17, 0x61, 0x00, 0x00, 0x00, 0x00, 0x60, 0xEA);
+}
+
+void send_digital_input_config() {
+  for (uint8_t ch = 1; ch <= 8; ch++) send_frame8(with_sa(ID_DIGITAL_INPUT_CONFIG), ch, 0x00, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF);
+}
+
 void send_all_status() {
-  send_channel_status();
-  send_sensor_values();
-  send_output_levels();
-  send_output_activity();
-  send_active_channels();
-  send_output_capabilities();
+  send_channel_status(); send_sensor_values(); send_output_levels(); send_output_activity(); send_active_channels(); send_output_capabilities();
 }
 
 void send_node_firmware() {
@@ -239,93 +370,48 @@ void send_node_firmware() {
 }
 
 void send_product_name() {
-  const size_t len = strlen(PRODUCT_NAME);
-  const uint8_t seg_count = (uint8_t) (len / 7 + 1);
+  const size_t len = strlen(product_name);
+  uint8_t seg_count = (uint8_t) (len / 7 + 1);
   for (uint8_t seg = 0; seg < seg_count; seg++) {
     uint8_t data[8] = {seg, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
-    for (uint8_t i = 0; i < 7; i++) {
-      const size_t pos = (size_t) seg * 7 + i;
-      if (pos < len) data[1 + i] = (uint8_t) PRODUCT_NAME[pos];
-    }
+    for (uint8_t i = 0; i < 7; i++) { size_t pos = (size_t) seg * 7 + i; if (pos < len) data[1 + i] = (uint8_t) product_name[pos]; }
     send_frame(with_sa(ID_NODE_PRODUCT_NAME), data, 8);
   }
 }
 
 void send_serial_info() {
-  send_frame8(with_sa(ID_NODE_SERIAL_INFO),
-              (uint8_t) (SERIAL_PREFIX & 0xFF),
-              (uint8_t) ((SERIAL_PREFIX >> 8) & 0xFF),
-              (uint8_t) ((SERIAL_PREFIX >> 16) & 0xFF),
-              (uint8_t) ((SERIAL_PREFIX >> 24) & 0xFF),
-              (uint8_t) (SERIAL_SUFFIX & 0xFF),
-              (uint8_t) ((SERIAL_SUFFIX >> 8) & 0xFF),
-              DEVICE_TYPE, DEVICE_SUBTYPE);
+  send_frame8(with_sa(ID_NODE_SERIAL_INFO), (uint8_t)(serial_prefix & 0xFF), (uint8_t)((serial_prefix >> 8) & 0xFF), (uint8_t)((serial_prefix >> 16) & 0xFF), (uint8_t)((serial_prefix >> 24) & 0xFF), (uint8_t)(serial_suffix & 0xFF), (uint8_t)((serial_suffix >> 8) & 0xFF), 0x16, 0x00);
 }
 
-void send_device_id() {
-  send_frame8(with_sa(ID_NODE_DEVICE_ID), 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00);
-}
+void send_device_id() { send_frame8(with_sa(ID_NODE_DEVICE_ID), 0x00, 0x00, 0x00, 0x00, 0x00, source_address, 0x01, 0x00); }
+void send_identity() { send_node_firmware(); send_product_name(); send_serial_info(); send_device_id(); send_load_disconnect_config(); }
 
-void send_identity() {
-  send_node_firmware();
-  send_product_name();
-  send_serial_info();
-  send_device_id();
-  send_load_disconnect_config();
-}
-
-void handle_object_select(const uint8_t *data, uint8_t len) {
-  if (len < 1) return;
-  selected_object = data[0];
-  Serial.printf("Selected REDARC object %u\n", selected_object);
-}
+void handle_object_select(const uint8_t *data, uint8_t len) { if (len < 1) return; selected_object = data[0]; Serial.printf("Selected REDARC object %u\n", selected_object); }
 
 void handle_object_read(uint8_t requester, const uint8_t *data, uint8_t len) {
   if (len < 8) return;
   const uint32_t offset = u32_le(data);
   const uint32_t requested_length = u32_le(data + 4);
-
-  if (requested_length > 8192UL) {
-    Serial.printf("Refusing oversized object read length %lu\n", (unsigned long) requested_length);
-    return;
-  }
-
+  if (requested_length > 8192UL) { Serial.printf("Refusing oversized object read length %lu\n", (unsigned long) requested_length); return; }
   uint8_t *block = (uint8_t *) malloc(requested_length == 0 ? 1 : requested_length);
-  if (block == nullptr) {
-    Serial.println("Object read malloc failed");
-    return;
-  }
+  if (block == nullptr) { Serial.println("Object read malloc failed"); return; }
   memset(block, 0xFF, requested_length);
-
   if (selected_object == MAIN_CONFIGURATION_OBJECT && offset < ROGUE_OBJECT2_SIZE) {
     const uint32_t available = ROGUE_OBJECT2_SIZE - offset;
     const uint32_t copy_len = requested_length < available ? requested_length : available;
     for (uint32_t i = 0; i < copy_len; i++) block[i] = rogue_object2_byte(offset + i);
   }
-
-  const uint32_t data_id = ID_SERVICE_DATA_BASE | ((uint32_t) requester << 8) | SOURCE_ADDRESS;
+  const uint32_t data_id = ID_SERVICE_DATA_BASE | ((uint32_t) requester << 8) | source_address;
   for (uint32_t pos = 0; pos < requested_length; pos += 8) {
-    uint8_t frame[8] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+    uint8_t frame[8] = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};
     const uint8_t chunk = (uint8_t) ((requested_length - pos) < 8UL ? (requested_length - pos) : 8UL);
     memcpy(frame, block + pos, chunk);
     send_frame(data_id, frame, 8);
   }
-
   const uint32_t block_crc = crc32c(block, requested_length);
-  const uint32_t trailer_id = ID_SERVICE_TRAILER_BASE | ((uint32_t) requester << 8) | SOURCE_ADDRESS;
-  send_frame8(trailer_id,
-              (uint8_t) (requested_length & 0xFF),
-              (uint8_t) ((requested_length >> 8) & 0xFF),
-              (uint8_t) ((requested_length >> 16) & 0xFF),
-              (uint8_t) ((requested_length >> 24) & 0xFF),
-              (uint8_t) (block_crc & 0xFF),
-              (uint8_t) ((block_crc >> 8) & 0xFF),
-              (uint8_t) ((block_crc >> 16) & 0xFF),
-              (uint8_t) ((block_crc >> 24) & 0xFF));
-
-  Serial.printf("Object %u read offset=%lu length=%lu crc=0x%08lX\n",
-                selected_object, (unsigned long) offset,
-                (unsigned long) requested_length, (unsigned long) block_crc);
+  const uint32_t trailer_id = ID_SERVICE_TRAILER_BASE | ((uint32_t) requester << 8) | source_address;
+  send_frame8(trailer_id, (uint8_t)(requested_length & 0xFF), (uint8_t)((requested_length >> 8) & 0xFF), (uint8_t)((requested_length >> 16) & 0xFF), (uint8_t)((requested_length >> 24) & 0xFF), (uint8_t)(block_crc & 0xFF), (uint8_t)((block_crc >> 8) & 0xFF), (uint8_t)((block_crc >> 16) & 0xFF), (uint8_t)((block_crc >> 24) & 0xFF));
+  Serial.printf("Object %u read offset=%lu length=%lu crc=0x%08lX\n", selected_object, (unsigned long) offset, (unsigned long) requested_length, (unsigned long) block_crc);
   free(block);
 }
 
@@ -339,8 +425,14 @@ void handle_dgn_request(uint8_t requester, uint16_t dgn) {
     case 0xF405: send_device_id(); return;
     case 0xFD00: send_channel_status(); return;
     case 0xFD02: send_sensor_values(); return;
+    case 0xFD04: send_channel_labels(); return;
+    case 0xFD06: send_alarm_config(); return;
+    case 0xFD07: send_alarm_status(); return;
     case 0xFD08: send_active_channels(); return;
+    case 0xFD0A: send_channel_details(); return;
+    case 0xFD0C: send_analog_scaling(); return;
     case 0xFD0E: send_output_capabilities(); return;
+    case 0xFD10: send_digital_input_config(); return;
     case 0xFD12: send_output_levels(); return;
     case 0xFD14: send_output_activity(); return;
     default: Serial.printf("Unhandled DGN 0x1%04X\n", dgn); return;
@@ -350,53 +442,27 @@ void handle_dgn_request(uint8_t requester, uint16_t dgn) {
 void handle_direct_command(uint8_t requester, const uint8_t *data, uint8_t len) {
   if (len < 5) return;
   const uint8_t command = data[0];
-
   if (command == 0xCB && data[2] == 0xFF) {
-    const uint8_t channel = data[3];
-    const bool state = data[4] != 0;
-    if (channel == CHANNEL_MASTER) {
-      set_master(state, "CAN 0xCB");
-    } else if (channel >= CHANNEL_OUTPUT_1 && channel <= CHANNEL_OUTPUT_10) {
-      const uint8_t output = channel - CHANNEL_MASTER;
-      hold_dim_direction[output] = 0;
-      uint8_t level = state ? output_levels[output] : 0;
-      if (state && level == 0) level = 100;
-      set_output_level(output, level, "CAN 0xCB");
-    }
-    send_direct_ack(requester, command);
-    send_all_status();
-    return;
+    const uint8_t channel = data[3]; const bool state = data[4] != 0;
+    if (channel == CHANNEL_MASTER) set_master(state, "CAN 0xCB");
+    else if (channel >= CHANNEL_OUTPUT_1 && channel <= CHANNEL_OUTPUT_10) { const uint8_t output = channel - CHANNEL_MASTER; hold_dim_direction[output] = 0; uint8_t level = state ? output_levels[output] : 0; if (state && level == 0) level = 100; set_output_level(output, level, "CAN 0xCB"); }
+    send_direct_ack(requester, command); send_all_status(); return;
   }
-
   if (command == 0x5A && data[1] == 0x01 && data[2] == 0xFF) {
     const uint8_t channel = data[3];
-    if (channel >= CHANNEL_OUTPUT_1 && channel <= CHANNEL_OUTPUT_10) {
-      const uint8_t output = channel - CHANNEL_MASTER;
-      hold_dim_direction[output] = 0;
-      set_output_level(output, data[4] > 100 ? 100 : data[4], "CAN 0x5A");
-    }
-    send_direct_ack(requester, command);
-    send_all_status();
-    return;
+    if (channel >= CHANNEL_OUTPUT_1 && channel <= CHANNEL_OUTPUT_10) { const uint8_t output = channel - CHANNEL_MASTER; hold_dim_direction[output] = 0; set_output_level(output, data[4] > 100 ? 100 : data[4], "CAN 0x5A"); }
+    send_direct_ack(requester, command); send_all_status(); return;
   }
-
-  Serial.printf("Unsupported command 0x%02X\n", command);
-  send_direct_ack(requester, command);
+  Serial.printf("Unsupported command 0x%02X\n", command); send_direct_ack(requester, command);
 }
 
 void handle_legacy_dim(const uint8_t *data, uint8_t len) {
   if (len < 3) return;
-  const uint8_t channel = data[0];
-  const uint8_t direction = data[2];
+  const uint8_t channel = data[0]; const uint8_t direction = data[2];
   if (channel < CHANNEL_OUTPUT_1 || channel > CHANNEL_OUTPUT_10) return;
   const uint8_t output = channel - CHANNEL_MASTER;
-
-  if (direction == 0x01) hold_dim_direction[output] = -1;
-  else if (direction == 0x64) hold_dim_direction[output] = 1;
-  else if (direction == 0xFF) hold_dim_direction[output] = 0;
-
-  Serial.printf("Hold dim output %u direction 0x%02X\n", output, direction);
-  send_output_activity();
+  if (direction == 0x01) hold_dim_direction[output] = -1; else if (direction == 0x64) hold_dim_direction[output] = 1; else if (direction == 0xFF) hold_dim_direction[output] = 0;
+  Serial.printf("Hold dim output %u direction 0x%02X\n", output, direction); send_output_activity();
 }
 
 void handle_can_message(const twai_message_t &msg) {
@@ -405,88 +471,64 @@ void handle_can_message(const twai_message_t &msg) {
   const uint16_t service = (uint16_t) ((id >> 16) & 0xFFFFUL);
   const uint8_t destination = (uint8_t) ((id >> 8) & 0xFFUL);
   const uint8_t requester = (uint8_t) (id & 0xFFUL);
-  if (destination != SOURCE_ADDRESS) return;
-
-  if ((service & 0xFF00U) == SERVICE_OBJECT_PREFIX) {
-    const uint8_t object_service = (uint8_t) (service & 0x00FFU);
-    if (object_service == 0x85) { handle_object_select(msg.data, msg.data_length_code); return; }
-    if (object_service == 0x86) { handle_object_read(requester, msg.data, msg.data_length_code); return; }
-  }
-  if (service == SERVICE_DGN_REQUEST && msg.data_length_code >= 2) {
-    handle_dgn_request(requester, u16_le(msg.data)); return;
-  }
+  if (destination != source_address) return;
+  if ((service & 0xFF00U) == SERVICE_OBJECT_PREFIX) { const uint8_t object_service = (uint8_t)(service & 0x00FFU); if (object_service == 0x85) { handle_object_select(msg.data, msg.data_length_code); return; } if (object_service == 0x86) { handle_object_read(requester, msg.data, msg.data_length_code); return; } }
+  if (service == SERVICE_DGN_REQUEST && msg.data_length_code >= 2) { handle_dgn_request(requester, u16_le(msg.data)); return; }
   if (service == SERVICE_DIRECT_COMMAND) { handle_direct_command(requester, msg.data, msg.data_length_code); return; }
   if (service == SERVICE_LEGACY_DIM) { handle_legacy_dim(msg.data, msg.data_length_code); return; }
 }
 
-void receive_can() {
-  twai_message_t msg = {};
-  while (twai_receive(&msg, 0) == ESP_OK) handle_can_message(msg);
-}
+void receive_can() { twai_message_t msg = {}; while (twai_receive(&msg, 0) == ESP_OK) handle_can_message(msg); }
 
 void print_status() {
-  Serial.printf("SA=0x%02X object=%u object2=%lu bytes master=%s tank1=%u%% tank2=%u%% Vin=%.3fV Iin=%.3fA\n",
-                SOURCE_ADDRESS, selected_object, (unsigned long) ROGUE_OBJECT2_SIZE,
-                master_state ? "ON" : "OFF", tank1_percent, tank2_percent,
-                input_voltage_mv / 1000.0f, input_current_ma / 1000.0f);
+  Serial.printf("SA=0x%02X object=%u object2=%lu bytes master=%s tank1=%u%% tank2=%u%% Vin=%.3fV Iin=%.3fA\n", source_address, selected_object, (unsigned long) ROGUE_OBJECT2_SIZE, master_state ? "ON" : "OFF", tank1_percent, tank2_percent, input_voltage_mv / 1000.0f, input_current_ma / 1000.0f);
+  Serial.printf("Serial=%lu-%04u name=\"%s\"\n", (unsigned long) serial_prefix, (unsigned) serial_suffix, product_name);
   for (uint8_t output = 1; output <= 10; output++) Serial.printf("O%u=%u%% ", output, output_levels[output]);
   Serial.println();
 }
 
-void handle_serial_line(String line) {
-  line.trim();
-  line.toLowerCase();
-  if (line.length() == 0) return;
-  if (line == "help") {
-    Serial.println("status | t1 <0-100> | t2 <0-100> | v <mV> | i <mA> | m <0|1> | o<n> <0-100> | identity | send");
-    return;
-  }
-  if (line == "status") { print_status(); return; }
-  if (line == "identity") { send_identity(); return; }
-  if (line == "send") { send_all_status(); return; }
-  if (line.startsWith("t1 ")) { tank1_percent = clamp_percent(line.substring(3).toFloat()); send_sensor_values(); return; }
-  if (line.startsWith("t2 ")) { tank2_percent = clamp_percent(line.substring(3).toFloat()); send_sensor_values(); return; }
-  if (line.startsWith("v ")) { input_voltage_mv = (uint16_t) constrain(line.substring(2).toInt(), 0, 65535); send_sensor_values(); return; }
-  if (line.startsWith("i ")) { input_current_ma = (uint16_t) constrain(line.substring(2).toInt(), 0, 65535); send_sensor_values(); return; }
-  if (line.startsWith("m ")) { set_master(line.substring(2).toInt() != 0, "Serial"); send_all_status(); return; }
-  if (line.startsWith("o")) {
-    const int space = line.indexOf(' ');
-    if (space > 1) {
-      const uint8_t output = (uint8_t) line.substring(1, space).toInt();
-      const uint8_t percent = clamp_percent(line.substring(space + 1).toFloat());
-      set_output_level(output, percent, "Serial");
-      send_all_status();
-      return;
-    }
-  }
+void print_help() {
+  Serial.println("status | t1 <0-100> | t2 <0-100> | v <mV> | i <mA> | m <0|1> | o<n> <0-100>");
+  Serial.println("sa <0x01-0xFE> | serial <prefix> <suffix> | name <text> | save | defaults | crc | identity | send");
+}
+
+void handle_serial_line(String raw) {
+  raw.trim(); if (raw.length() == 0) return;
+  String lower = raw; lower.toLowerCase();
+  if (lower == "help") { print_help(); return; }
+  if (lower == "status") { print_status(); return; }
+  if (lower == "identity") { send_identity(); return; }
+  if (lower == "send") { send_all_status(); return; }
+  if (lower == "save") { save_settings(); return; }
+  if (lower == "defaults") { reset_settings_to_defaults(); send_identity(); send_all_status(); return; }
+  if (lower == "crc") { object2_self_test(); return; }
+  if (lower.startsWith("t1 ")) { tank1_percent = clamp_percent(raw.substring(3).toFloat()); save_settings(); send_sensor_values(); return; }
+  if (lower.startsWith("t2 ")) { tank2_percent = clamp_percent(raw.substring(3).toFloat()); save_settings(); send_sensor_values(); return; }
+  if (lower.startsWith("v ")) { input_voltage_mv = (uint16_t) constrain(raw.substring(2).toInt(), 0, 65535); send_sensor_values(); return; }
+  if (lower.startsWith("i ")) { input_current_ma = (uint16_t) constrain(raw.substring(2).toInt(), 0, 65535); send_sensor_values(); return; }
+  if (lower.startsWith("m ")) { set_master(raw.substring(2).toInt() != 0, "Serial"); send_all_status(); return; }
+  if (lower.startsWith("sa ")) { uint32_t value = parse_u32(raw.substring(3)); if (value == 0 || value > 0xFE) { Serial.println("Invalid source address. Use 0x01..0xFE."); return; } source_address = (uint8_t) value; save_settings(); send_identity(); send_all_status(); return; }
+  if (lower.startsWith("serial ")) { String rest = raw.substring(7); rest.trim(); int space = rest.indexOf(' '); if (space <= 0) { Serial.println("Usage: serial <prefix> <suffix>"); return; } serial_prefix = parse_u32(rest.substring(0, space)); serial_suffix = (uint16_t) parse_u32(rest.substring(space + 1)); save_settings(); send_serial_info(); return; }
+  if (lower.startsWith("name ")) { String new_name = raw.substring(5); new_name.trim(); if (new_name.length() == 0) { Serial.println("Name cannot be empty."); return; } copy_product_name(new_name.c_str()); save_settings(); send_product_name(); return; }
+  if (lower.startsWith("o")) { const int space = raw.indexOf(' '); if (space > 1) { const uint8_t output = (uint8_t) raw.substring(1, space).toInt(); const uint8_t percent = clamp_percent(raw.substring(space + 1).toFloat()); set_output_level(output, percent, "Serial"); send_all_status(); return; } }
   Serial.println("Unknown command. Type help.");
 }
 
 void poll_serial() {
   static String line;
-  while (Serial.available()) {
-    char ch = (char) Serial.read();
-    if (ch == '\n' || ch == '\r') {
-      if (line.length()) { handle_serial_line(line); line = ""; }
-    } else {
-      line += ch;
-      if (line.length() > 80) line = "";
-    }
-  }
+  while (Serial.available()) { char ch = (char) Serial.read(); if (ch == '\n' || ch == '\r') { if (line.length()) { handle_serial_line(line); line = ""; } } else { line += ch; if (line.length() > 120) line = ""; } }
 }
 
 bool start_can() {
   twai_general_config_t g_config = TWAI_GENERAL_CONFIG_DEFAULT(CAN_TX_PIN, CAN_RX_PIN, TWAI_MODE_NORMAL);
   twai_timing_config_t t_config = TWAI_TIMING_CONFIG_250KBITS();
   twai_filter_config_t f_config = TWAI_FILTER_CONFIG_ACCEPT_ALL();
-  g_config.rx_queue_len = 64;
-  g_config.tx_queue_len = 32;
+  g_config.rx_queue_len = 64; g_config.tx_queue_len = 32;
   esp_err_t err = twai_driver_install(&g_config, &t_config, &f_config);
   if (err != ESP_OK) { Serial.printf("twai_driver_install failed: %d\n", (int) err); return false; }
   err = twai_start();
   if (err != ESP_OK) { Serial.printf("twai_start failed: %d\n", (int) err); return false; }
-  Serial.println("CAN/TWAI started at 250 kbit/s");
-  return true;
+  Serial.println("CAN/TWAI started at 250 kbit/s"); return true;
 }
 
 void update_hold_dim() {
@@ -498,30 +540,24 @@ void update_hold_dim() {
     int next = (int) output_levels[output] + (hold_dim_direction[output] > 0 ? HOLD_DIM_STEP_PERCENT : -HOLD_DIM_STEP_PERCENT);
     if (next <= 0) { next = 0; hold_dim_direction[output] = 0; }
     if (next >= 100) { next = 100; hold_dim_direction[output] = 0; }
-    output_levels[output] = (uint8_t) next;
-    send_output_levels();
-    send_output_activity();
-    send_channel_status();
+    output_levels[output] = (uint8_t) next; send_output_levels(); send_output_activity(); send_channel_status();
   }
 }
 
 void setup() {
-  Serial.begin(115200);
-  delay(500);
-  Serial.println();
-  Serial.println("REDARC TVMS Rogue Emulator - Arduino IDE");
-  Serial.printf("Source address: 0x%02X\n", SOURCE_ADDRESS);
-  Serial.printf("Embedded object 2 length: %lu bytes\n", (unsigned long) ROGUE_OBJECT2_SIZE);
+  Serial.begin(115200); delay(500); Serial.println();
+  Serial.println("REDARC TVMS Rogue Emulator - Arduino IDE standalone");
+  load_settings();
+  Serial.printf("Source address: 0x%02X\n", source_address);
+  Serial.printf("Serial: %lu-%04u  Product: %s\n", (unsigned long) serial_prefix, (unsigned) serial_suffix, product_name);
   Serial.println("Type help for serial commands.");
+  object2_self_test();
   start_can();
-  send_identity();
-  send_all_status();
+  send_identity(); send_all_status();
 }
 
 void loop() {
-  receive_can();
-  poll_serial();
-  update_hold_dim();
+  receive_can(); poll_serial(); update_hold_dim();
   const uint32_t now = millis();
   if (now - last_identity_ms >= IDENTITY_INTERVAL_MS) { last_identity_ms = now; send_identity(); }
   if (now - last_status_ms >= STATUS_INTERVAL_MS) { last_status_ms = now; send_all_status(); }
