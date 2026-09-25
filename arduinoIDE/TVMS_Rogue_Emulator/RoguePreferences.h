@@ -12,14 +12,23 @@
 //
 // Pin value:
 //   -1 = no pin assigned
+//
+// Tank pin mode uses analogRead() and maps raw ADC 0..4095 to 0..100%.
 
 static uint8_t pref_source_address = 0x36;        // keep different from a real Rogue at 0x30
-static uint8_t pref_tank1_percent = 50;
-static uint8_t pref_tank2_percent = 75;
 
 static uint32_t pref_serial_prefix = 2606260001UL;
 static uint16_t pref_serial_suffix = 0x0013;
 static char pref_product_name[] = "TVMS Rogue";
+
+// Tank levels 1..2
+static uint8_t pref_tank1_percent = 50;
+static uint8_t pref_tank1_mode    = 0;
+static int8_t  pref_tank1_pin     = -1;
+
+static uint8_t pref_tank2_percent = 75;
+static uint8_t pref_tank2_mode    = 0;
+static int8_t  pref_tank2_pin     = -1;
 
 // Digital inputs 1..8
 static uint8_t pref_input_1_mode = 0;
