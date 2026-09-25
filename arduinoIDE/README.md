@@ -19,9 +19,10 @@ Supporting files beside the sketch:
 ```text
 arduinoIDE/TVMS_Rogue_Emulator/RogueObject2.h
 arduinoIDE/TVMS_Rogue_Emulator/RoguePreferences.h
+arduinoIDE/TVMS_Rogue_Emulator/RoguePreferencesRuntime.h
 ```
 
-`RogueObject2.h` stores the captured Object 2 image. `RoguePreferences.h` stores the NVS schema, defaults, IO assignment types and settings load/save helpers.
+`RogueObject2.h` stores the captured Object 2 image. `RoguePreferences.h` is intentionally only editable variables and values. `RoguePreferencesRuntime.h` owns the structs, NVS schema, validation, and load/save helpers.
 
 ## Hardware target
 
@@ -89,24 +90,61 @@ You can change and persist the source address from Serial Monitor:
 sa 0x36
 ```
 
-## Input/output assignment modes
+## Preference defaults file
 
-All 8 digital inputs and all 10 outputs now have a persisted assignment mode.
+Edit this file for built-in defaults:
+
+```text
+arduinoIDE/TVMS_Rogue_Emulator/RoguePreferences.h
+```
+
+It is deliberately simple variable/value configuration. Mode values are:
+
+```text
+0 = simulated
+1 = variable
+2 = pin
+```
+
+Pin value `-1` means no GPIO assigned.
+
+Example defaults:
+
+```cpp
+static uint8_t pref_tank1_mode = 2;
+static int8_t  pref_tank1_pin  = 34;
+
+static uint8_t pref_input_1_mode = 2;
+static int8_t  pref_input_1_pin  = 33;
+
+static uint8_t pref_output_1_mode = 2;
+static int8_t  pref_output_1_pin  = 25;
+```
+
+After changing the defaults file, run `defaults` from Serial Monitor to clear NVS and reload the built-in defaults.
+
+## Tank/input/output assignment modes
+
+Tank 1–2, digital input 1–8, and output 1–10 all have the same persisted assignment pattern.
 
 | Mode | Meaning |
 |---|---|
 | `simulated` | Internal emulator-only value. No ESP32 pin is used. |
 | `variable` | Internal variable hook. Can be driven by sketch code or Serial commands. |
-| `pin` | Bound to an ESP32 GPIO pin. Inputs are read from the pin; outputs drive the pin. |
+| `pin` | Bound to an ESP32 GPIO pin. Tanks read analog ADC; inputs read digital; outputs drive digital. |
 
 Defaults:
 
+- all tanks are `simulated`, no GPIO pin,
 - all inputs are `simulated`, no GPIO pin,
 - all outputs are `simulated`, no GPIO pin.
 
 Examples:
 
 ```text
+tank 1 pin 34
+tank 2 variable
+
 input 1 pin 33
 input 2 variable
 input 3 simulated
@@ -116,9 +154,23 @@ output 2 variable
 output 3 simulated
 ```
 
-GPIO assignments are saved in NVS. After reboot, the sketch loads them, configures input pins with `pinMode(pin, INPUT)`, configures output pins with `pinMode(pin, OUTPUT)`, and drives each output pin according to the current output level.
+GPIO assignments are saved in NVS. After reboot, the sketch loads them and configures the relevant pins.
 
-For output GPIO mode, the first implementation is digital-only:
+Tank GPIO mode uses `analogRead()`:
+
+```text
+ADC raw 0    -> 0%
+ADC raw 4095 -> 100%
+```
+
+Input GPIO mode is active-high:
+
+```text
+LOW  -> off
+HIGH -> on
+```
+
+Output GPIO mode is currently digital-only:
 
 ```text
 0%    -> LOW
@@ -133,9 +185,11 @@ Use this to show current mappings:
 io
 ```
 
-Use this to drive variable/simulated inputs from Serial Monitor:
+Use these to drive variable/simulated tanks and inputs from Serial Monitor:
 
 ```text
+t1 25
+t2 80
 in1 1
 in1 0
 ```
@@ -253,6 +307,7 @@ m <0|1>               master off/on
 o<n> <0-100>          set output, e.g. o1 75
 in<n> <0|1>           set input variable/simulated state, e.g. in1 1
 
+tank <n> <simulated|variable|pin> [gpio]
 input <n> <simulated|variable|pin> [gpio]
 output <n> <simulated|variable|pin> [gpio]
 
@@ -274,6 +329,10 @@ sa 0x36
 serial 2606260001 0x0013
 name TVMS Rogue
 
+tank 1 pin 34
+tank 2 variable
+t2 80
+
 input 1 pin 33
 input 2 variable
 in2 1
@@ -284,21 +343,22 @@ o1 100
 o2 55
 
 t1 25
-t2 80
 m 1
 v 13750
 i 3200
 ```
 
-Tank values are expected as percentages. They are clamped/rounded to `0–100%` before being sent on `0x1FD02`.
+Tank values are expected as percentages in `simulated` and `variable` mode. In `pin` mode, the tank pin is read with `analogRead()` and converted to `0–100%` before being sent on `0x1FD02`.
 
 ## NVS persistence
 
-The following are saved in ESP32 NVS by `RoguePreferences.h`:
+The following are saved in ESP32 NVS by `RoguePreferencesRuntime.h`:
 
 - source address,
 - Tank 1 percent,
 - Tank 2 percent,
+- Tank 1–2 assignment mode,
+- Tank 1–2 GPIO pin,
 - serial prefix,
 - serial suffix,
 - product name,
@@ -312,6 +372,7 @@ Use `defaults` to restore the built-in defaults.
 ## Current limits
 
 - It has not been compile-tested in this chat environment.
+- Tank GPIO mode currently uses fixed raw ADC scaling `0..4095 -> 0..100%`; calibration can be added later.
 - GPIO outputs are currently digital on/off only, not PWM brightness.
 - GPIO inputs are read as active-high using `pinMode(pin, INPUT)`.
 - Object 2 is still the captured/static object image; changing serial/name/source address changes live identity frames but does not rewrite the embedded Object 2 image.
