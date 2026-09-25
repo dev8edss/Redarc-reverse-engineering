@@ -1,18 +1,12 @@
 # Arduino IDE TVMS Rogue Emulator
 
-This branch is a standalone Arduino IDE port of the `emulated-rogue` ESPHome work.
+This branch is the standalone Arduino IDE port of the REDARC / RedVision `emulated-rogue` work.
 
-The goal is deliberately narrow:
+The goal is to emulate a **TVMS Rogue / DPDM** CAN device from an ESP32 using the Arduino IDE, without ESPHome or Home Assistant runtime dependencies.
 
-- emulate a **TVMS Rogue / DPDM** CAN device,
-- run from the Arduino IDE on an ESP32,
-- use the ESP32 built-in TWAI/CAN driver,
-- avoid ESPHome and Home Assistant dependencies,
-- keep the reverse-engineered Rogue protocol behavior in normal C++/Arduino code.
+At the moment this is still inside the original repository because the GitHub connector available here does not expose a fork/create-repository action. Treat `arduinoIDE/` as the Arduino-only project area. Main and `emulated-rogue` are untouched.
 
-This sketch is intended for reverse-engineering and test-bench use. It is not a complete REDARC firmware replacement.
-
-## Folder
+## Sketch
 
 Open this sketch in Arduino IDE:
 
@@ -20,7 +14,7 @@ Open this sketch in Arduino IDE:
 arduinoIDE/TVMS_Rogue_Emulator/TVMS_Rogue_Emulator.ino
 ```
 
-The embedded Object 2 readback data is in:
+The embedded captured Object 2 data lives beside it:
 
 ```text
 arduinoIDE/TVMS_Rogue_Emulator/RogueObject2.h
@@ -53,7 +47,7 @@ REDARC RJ45 pinout used throughout this project:
 
 Do not feed the REDARC supply directly into the ESP32. Use a suitable regulator or isolated design.
 
-## Required Arduino setup
+## Arduino setup
 
 Use Arduino IDE with an ESP32 board package that exposes the ESP-IDF TWAI driver.
 
@@ -70,21 +64,29 @@ No external CAN library is used. The sketch includes:
 #include <driver/twai.h>
 ```
 
-## Source address
-
-The sketch defaults to source address:
+The sketch also uses ESP32 NVS via:
 
 ```cpp
-SOURCE_ADDRESS = 0x36
+#include <Preferences.h>
 ```
 
-A real TVMS Rogue normally uses `0x30`. Do not run the emulator at `0x30` on the same CAN bus as a real Rogue unless the real device is disconnected.
+## Source address
 
-## What is currently ported
+The default emulator source address is:
 
-The Arduino IDE port includes the main live CAN behavior learned in the `emulated-rogue` branch.
+```cpp
+0x36
+```
 
-### Runtime broadcasts
+A real TVMS Rogue normally uses `0x30`. Do not run this emulator at `0x30` on the same CAN bus as a real Rogue unless the real Rogue is disconnected.
+
+You can change and persist the source address from Serial Monitor:
+
+```text
+sa 0x36
+```
+
+## Runtime broadcasts
 
 The sketch periodically sends:
 
@@ -98,7 +100,7 @@ The sketch periodically sends:
 | `0x1FD12` | output levels |
 | `0x1FD14` | output activity / hold-dim activity |
 
-### Identity/config responses
+## Identity/config DGN responses
 
 The sketch responds to DGN requests for:
 
@@ -111,14 +113,22 @@ The sketch responds to DGN requests for:
 | `0x1F405` | unique/device ID |
 | `0x1FD00` | channel status |
 | `0x1FD02` | tanks / voltage / current |
+| `0x1FD04` | channel labels |
+| `0x1FD06` | alarm/range configuration |
+| `0x1FD07` | alarm/status placeholder pages |
 | `0x1FD08` | active-channel inventory |
+| `0x1FD0A` | channel details / inventory |
+| `0x1FD0C` | analog scaling metadata |
 | `0x1FD0E` | output capabilities |
+| `0x1FD10` | digital-input configuration placeholder pages |
 | `0x1FD12` | output levels |
 | `0x1FD14` | output activity |
 
-### REDARC object readback
+Some bytes are still conservative/capture-matched placeholders rather than fully understood semantics. They are ported from the ESPHome emulator work so the RedVision side sees familiar responses.
 
-The sketch now embeds the captured Rogue **Object 2** image from the ESPHome emulator and serves it through the REDARC object read protocol.
+## REDARC Object 2 readback
+
+The sketch embeds the captured Rogue **Object 2** image from the ESPHome emulator and serves it through the REDARC object-read protocol.
 
 | CAN service / response | Meaning |
 |---|---|
@@ -143,11 +153,27 @@ Readback behavior:
 - Trailer CRC uses CRC-32C / Castagnoli reflected polynomial `0x82F63B78`.
 - Oversized block reads above `8192` bytes are refused to protect ESP32 RAM.
 
-The object data is stored as base64 text in flash/PROGMEM and decoded byte-by-byte when a read request arrives. That keeps RAM use low while still giving the display/configurator a real object image.
+## Startup Object 2 self-test
 
-### Commands
+At boot, the sketch checks the embedded Object 2 image:
 
-The sketch handles:
+- object header declared length,
+- stored whole-object CRC field,
+- calculated whole-object CRC-32C with bytes `8..11` zeroed.
+
+Expected Serial Monitor line:
+
+```text
+Object2 size=4748 declared_len=4748 stored_crc=0xFA84819A calc_crc=0xFA84819A OK
+```
+
+You can run it again:
+
+```text
+crc
+```
+
+## Commands handled over CAN
 
 | Command | Meaning |
 |---|---|
@@ -156,28 +182,38 @@ The sketch handles:
 | `0x0F05` | legacy/display hold dimming |
 | `0x0F04` | direct-command ACK reply |
 
-## Serial commands
+## Serial Monitor commands
 
 Open Serial Monitor at `115200`.
-
-Commands:
 
 ```text
 help
 status
-t1 <0-100>        set Tank 1 percent
-t2 <0-100>        set Tank 2 percent
-v <millivolts>    set input voltage, e.g. v 13600
-i <milliamps>     set input current, e.g. i 2500
-m <0|1>           master off/on
-o<n> <0-100>      set output, e.g. o1 75
-identity          send identity frames now
-send              send status frames now
+
+t1 <0-100>            set/persist Tank 1 percent
+t2 <0-100>            set/persist Tank 2 percent
+v <millivolts>        set input voltage, e.g. v 13600
+i <milliamps>         set input current, e.g. i 2500
+m <0|1>               master off/on
+o<n> <0-100>          set output, e.g. o1 75
+
+sa <0x01-0xFE>        set/persist source address
+serial <prefix> <suffix>
+name <text>
+
+save                  save settings to NVS
+defaults              restore default persisted settings
+crc                   run Object 2 CRC self-test
+identity              send identity frames now
+send                  send status frames now
 ```
 
 Examples:
 
 ```text
+sa 0x36
+serial 2606260001 0x0013
+name TVMS Rogue
 t1 25
 t2 80
 o1 100
@@ -189,48 +225,35 @@ i 3200
 
 Tank values are expected as percentages. They are clamped/rounded to `0–100%` before being sent on `0x1FD02`.
 
-## Important differences from ESPHome branch
+## NVS persistence
 
-This Arduino sketch does not create Home Assistant entities and does not depend on ESPHome component code.
+The following are saved in ESP32 NVS:
 
-The ESPHome branch has:
+- source address,
+- Tank 1 percent,
+- Tank 2 percent,
+- serial prefix,
+- serial suffix,
+- product name.
 
-- generated HA lights and sensors,
-- external tank source sensor binding,
-- ESPHome callbacks,
-- Home Assistant API integration,
-- ESPHome external component packaging,
-- a larger set of active-object derived configuration responses.
+Use `defaults` to restore the built-in defaults.
 
-The Arduino branch currently has:
+Output levels, input voltage/current, and master state are currently runtime-only.
 
-- raw CAN/TWAI setup,
-- serial command control,
-- hardcoded emulator runtime state,
-- simple periodic identity/status loop,
-- core output/tank/status command behavior,
-- embedded Rogue Object 2 readback.
+## Known limits
 
-## Current limits / next work
-
-Known limits:
-
-- Some identity/config DGNs are conservative approximations.
-- Some fields are fixed to values captured from the current Rogue object.
-- It does not yet support BLE/RBus emulation.
-- It does not yet include a full Arduino library abstraction; it is currently one sketch.
-- It has not been compile-tested in this chat environment.
-
-Likely next steps:
-
-1. Compile in Arduino IDE against your ESP32 board package.
-2. Fix any ESP32-core/TWAI compatibility issues.
-3. Run on an isolated CAN bench first.
-4. Capture what the RedVision display requests from source `0x36`.
-5. Compare responses against the ESPHome `emulated-rogue` branch.
-6. Add more active-object derived DGN responses as needed.
-7. Split the sketch into a small reusable Arduino library once the base compiles and behaves correctly.
+- This branch has not been compile-tested in this chat environment.
+- Object 2 is currently static. Serial changes to product name, serial, or source address affect live CAN identity frames, but do not rewrite the embedded Object 2 image.
+- Object write/programming services are not implemented yet:
+  - `0x0E87`
+  - `0x0E81`
+  - `0x0E88`
+  - `0x0E89`
+  - `0x0E8A`
+- BLE/RBus emulation is not included.
+- Real analog/digital hardware inputs are not mapped yet.
+- This is still one sketch plus one embedded object header; it can be split into a reusable Arduino library after it compiles and behaves correctly.
 
 ## CAN safety
 
-Use a bench setup first. Running this emulator on the same bus as a live Redarc system means it will actively transmit frames. Keep its source address unique and avoid source `0x30` unless the real Rogue is unplugged.
+Use a bench setup first. Running this emulator on the same bus as a live REDARC system means it will actively transmit frames. Keep its source address unique and avoid source `0x30` unless the real Rogue is unplugged.
