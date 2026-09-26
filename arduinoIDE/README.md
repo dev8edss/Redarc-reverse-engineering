@@ -22,7 +22,7 @@ arduinoIDE/TVMS_Rogue_Emulator/RoguePreferences.h
 arduinoIDE/TVMS_Rogue_Emulator/RoguePreferencesRuntime.h
 ```
 
-`RogueObject2.h` stores the captured Object 2 image. `RoguePreferences.h` holds only the built-in default values, one `name = value;` per line, with no types or code. The types are declared in `TVMS_Rogue_Emulator.ino`, which includes the file inside `load_preference_defaults()`. `RoguePreferencesRuntime.h` owns the structs, NVS schema, validation, and load/save helpers.
+`RogueObject2.h` stores the captured Object 2 image. `RoguePreferences.h` holds only the built-in default values, one `name = value;` per line, with no types or code. The types are declared in `struct RogueDefaults` in `TVMS_Rogue_Emulator.ino`, which includes the file inside `RogueDefaults::load()`; the code reads the values as `defaults.<name>`. `RoguePreferencesRuntime.h` owns the structs, NVS schema, validation, and load/save helpers.
 
 ## Hardware target
 
@@ -41,8 +41,8 @@ Default CAN pins (change them in `RoguePreferences.h`):
 | CAN RX | `GPIO19` |
 
 ```cpp
-pref_can_tx_pin = 22;
-pref_can_rx_pin = 19;
+can_tx_pin = 22;
+can_rx_pin = 19;
 ```
 
 At boot the sketch checks the CAN pins. If TX and RX are the same pin, TX is input-only, or either is a flash pin (GPIO6–11 on the original ESP32), CAN stays off and the Serial Monitor says why. The CAN pins can't be assigned to a tank, input or output.
@@ -119,11 +119,11 @@ Matching is case-insensitive (`gpio34`, `Simulate`, `DISABLED` all work). Text s
 Example defaults:
 
 ```cpp
-pref_tank1    = "GPIO34";
-pref_tank2    = "grey_water";
-pref_input_1  = "GPIO33";
-pref_input_2  = "disabled";
-pref_output_1 = "GPIO25";
+tank1    = "GPIO34";
+tank2    = "grey_water";
+input_1  = "GPIO33";
+input_2  = "disabled";
+output_1 = "GPIO25";
 ```
 
 The shipped defaults are `simulate` for every tank, input and output.
@@ -136,7 +136,7 @@ A GPIO assignment is refused (from Serial) or the channel is set to `disabled` w
 
 - is not a GPIO on the chip,
 - is GPIO6–11 on the original ESP32 (wired to the SPI flash),
-- is one of the CAN TX/RX pins (`pref_can_tx_pin` / `pref_can_rx_pin`, default `GPIO22` / `GPIO19`),
+- is one of the CAN TX/RX pins (`can_tx_pin` / `can_rx_pin`, default `GPIO22` / `GPIO19`),
 - is input-only (GPIO34–39) and is assigned to an output,
 - is not an ADC pin and is assigned to a tank,
 - is already used by another tank/input/output.
@@ -181,8 +181,8 @@ If the object cannot be decoded, the captured capability values are used and a m
 PWM frequency and resolution for dimmable outputs are set in `RoguePreferences.h`:
 
 ```cpp
-pref_output_pwm_frequency_hz    = 5000;
-pref_output_pwm_resolution_bits = 10;
+output_pwm_frequency_hz    = 5000;
+output_pwm_resolution_bits = 10;
 ```
 
 Duty is linear in the level (no gamma correction). If no LEDC channel is free for a pin (the original ESP32 has 16, ESP32-S3 has 8, ESP32-C3 has 6), that output falls back to on/off and a message is printed.
@@ -222,27 +222,29 @@ The sketch periodically sends:
 
 The sketch responds to DGN requests for:
 
-| DGN | Meaning |
-|---|---|
-| `0x1F108` | load-disconnect configuration |
-| `0x1F400` | firmware/version records |
-| `0x1F403` | product name chunks |
-| `0x1F404` | serial/device type information |
-| `0x1F405` | unique/device ID |
-| `0x1FD00` | channel status |
-| `0x1FD02` | tanks / voltage / current |
-| `0x1FD04` | channel labels |
-| `0x1FD06` | alarm/range configuration |
-| `0x1FD07` | alarm/status placeholder pages |
-| `0x1FD08` | active-channel inventory |
-| `0x1FD0A` | channel details / inventory |
-| `0x1FD0C` | analog scaling metadata |
-| `0x1FD0E` | output capabilities |
-| `0x1FD10` | digital-input configuration placeholder pages |
-| `0x1FD12` | output levels |
-| `0x1FD14` | output activity |
+| DGN | Meaning | Source |
+|---|---|---|
+| `0x1F108` | load-disconnect configuration | Object 2: Rogue root key 4 (trigger, disconnect/reconnect mV and SOC) |
+| `0x1F400` | firmware/version records | fixed |
+| `0x1F403` | product name chunks | `name` setting |
+| `0x1F404` | serial/device type information | `serial` setting |
+| `0x1F405` | unique/device ID | fixed |
+| `0x1FD00` | channel status | live state |
+| `0x1FD02` | tanks / voltage / current | live state |
+| `0x1FD04` | channel labels | Object 2: channel record key 1 |
+| `0x1FD06` | alarm mode and thresholds (tanks, input V/A) | Object 2: tanks record key 5 → 7, input V/A record key 8 → 1 |
+| `0x1FD07` | sensor validity/status pages | captured Rogue reply |
+| `0x1FD08` | active-channel inventory | captured Rogue reply |
+| `0x1FD0A` | channel class, subtype, icon, enabled | Object 2: channel record keys 2, 3 (tanks also key 5 → 4) |
+| `0x1FD0C` | sensor engineering metadata | captured Rogue reply |
+| `0x1FD0E` | output capabilities | Object 2: channel record key 6 |
+| `0x1FD10` | digital-input secondary configuration | captured Rogue reply |
+| `0x1FD12` | output levels | live state |
+| `0x1FD14` | output activity | live state |
 
-Some bytes are still conservative/capture-matched placeholders rather than fully understood semantics. They are ported from the ESPHome emulator work so the RedVision side sees familiar responses.
+Replies marked Object 2 are built from the active configuration each time they are sent, so they follow a configuration written from RedVision straight away. The object paths are the ones confirmed against a real Rogue in `docs/TVMS_ROGUE_DGN_OBJECT_MAPPING.md` on the `emulated-rogue` branch. That document also explains why `0x1FD07`, `0x1FD08`, `0x1FD0C` and `0x1FD10` are not derived from the object yet: a real Rogue's reply does not follow the object fields found so far, so the captured reply is sent unchanged.
+
+If the active object does not contain a field a reply needs, that reply is not sent, and the Serial Monitor prints `Object2: cannot build 0x1FDxx from the active configuration` once per configuration.
 
 ## REDARC Object 2 (configuration)
 
@@ -411,7 +413,7 @@ Use `defaults` to restore the built-in defaults, and `factory` to erase the save
 - Tank GPIO mode currently uses fixed raw ADC scaling `0..4095 -> 0..100%`; calibration can be added later.
 - GPIO output PWM is linear duty with no gamma correction, and is active-high only.
 - Configuration writes were tested against a simulated write sequence built from the ESPHome emulator notes, not yet against RedVision on a real bus.
-- Only output types are read from a written configuration. Labels, alarm/scaling and other configuration DGN replies (`0x1FD04`, `0x1FD06`, `0x1FD0A`, `0x1FD0C`, `0x1FD10`) still send the captured values.
+- `0x1FD07`, `0x1FD08`, `0x1FD0C` and `0x1FD10` still send the captured Rogue replies. Identity (`0x1F403`/`0x1F404`) comes from the `name`/`serial` settings, not from Object 2.
 - GPIO inputs are read as active-high using `pinMode(pin, INPUT)`.
 - GPIO6–11 are blocked only on the original ESP32; flash/PSRAM pins on other ESP32 variants are not blocked.
 - Master OFF sets all outputs to 0% but does not stop outputs being switched on again while master is off.

@@ -103,45 +103,45 @@ static inline String rogue_io_describe(const RogueIoAssignment &a) {
 }
 
 static inline void rogue_copy_product_name(RogueSettings &s, const char *name) {
-  if (name == nullptr || name[0] == '\0') name = pref_product_name;
+  if (name == nullptr || name[0] == '\0') name = defaults.product_name;
   strncpy(s.product_name, name, sizeof(s.product_name) - 1);
   s.product_name[sizeof(s.product_name) - 1] = '\0';
 }
 
-static inline const char *rogue_pref_tank(uint8_t tank) {
+static inline const char *rogue_default_tank(uint8_t tank) {
   switch (tank) {
-    case 1: return pref_tank1;
-    case 2: return pref_tank2;
+    case 1: return defaults.tank1;
+    case 2: return defaults.tank2;
     default: return "simulate";
   }
 }
 
-static inline const char *rogue_pref_input(uint8_t input) {
+static inline const char *rogue_default_input(uint8_t input) {
   switch (input) {
-    case 1: return pref_input_1;
-    case 2: return pref_input_2;
-    case 3: return pref_input_3;
-    case 4: return pref_input_4;
-    case 5: return pref_input_5;
-    case 6: return pref_input_6;
-    case 7: return pref_input_7;
-    case 8: return pref_input_8;
+    case 1: return defaults.input_1;
+    case 2: return defaults.input_2;
+    case 3: return defaults.input_3;
+    case 4: return defaults.input_4;
+    case 5: return defaults.input_5;
+    case 6: return defaults.input_6;
+    case 7: return defaults.input_7;
+    case 8: return defaults.input_8;
     default: return "simulate";
   }
 }
 
-static inline const char *rogue_pref_output(uint8_t output) {
+static inline const char *rogue_default_output(uint8_t output) {
   switch (output) {
-    case 1: return pref_output_1;
-    case 2: return pref_output_2;
-    case 3: return pref_output_3;
-    case 4: return pref_output_4;
-    case 5: return pref_output_5;
-    case 6: return pref_output_6;
-    case 7: return pref_output_7;
-    case 8: return pref_output_8;
-    case 9: return pref_output_9;
-    case 10: return pref_output_10;
+    case 1: return defaults.output_1;
+    case 2: return defaults.output_2;
+    case 3: return defaults.output_3;
+    case 4: return defaults.output_4;
+    case 5: return defaults.output_5;
+    case 6: return defaults.output_6;
+    case 7: return defaults.output_7;
+    case 8: return defaults.output_8;
+    case 9: return defaults.output_9;
+    case 10: return defaults.output_10;
     default: return "simulate";
   }
 }
@@ -154,19 +154,19 @@ static inline void rogue_io_from_pref(RogueIoAssignment &a, const char *kind, ui
 }
 
 static inline void rogue_settings_defaults(RogueSettings &s) {
-  s.source_address = pref_source_address;
-  s.tank1_percent = pref_tank1_percent;
-  s.tank2_percent = pref_tank2_percent;
-  s.serial_prefix = pref_serial_prefix;
-  s.serial_suffix = pref_serial_suffix;
-  rogue_copy_product_name(s, pref_product_name);
+  s.source_address = defaults.source_address;
+  s.tank1_percent = defaults.tank1_percent;
+  s.tank2_percent = defaults.tank2_percent;
+  s.serial_prefix = defaults.serial_prefix;
+  s.serial_suffix = defaults.serial_suffix;
+  rogue_copy_product_name(s, defaults.product_name);
 
   rogue_io_set_simulated(s.tanks[0]);
   rogue_io_set_simulated(s.inputs[0]);
   rogue_io_set_simulated(s.outputs[0]);
-  for (uint8_t tank = 1; tank <= ROGUE_TANK_COUNT; tank++) rogue_io_from_pref(s.tanks[tank], "tank", tank, rogue_pref_tank(tank));
-  for (uint8_t input = 1; input <= ROGUE_INPUT_COUNT; input++) rogue_io_from_pref(s.inputs[input], "input", input, rogue_pref_input(input));
-  for (uint8_t output = 1; output <= ROGUE_OUTPUT_COUNT; output++) rogue_io_from_pref(s.outputs[output], "output", output, rogue_pref_output(output));
+  for (uint8_t tank = 1; tank <= ROGUE_TANK_COUNT; tank++) rogue_io_from_pref(s.tanks[tank], "tank", tank, rogue_default_tank(tank));
+  for (uint8_t input = 1; input <= ROGUE_INPUT_COUNT; input++) rogue_io_from_pref(s.inputs[input], "input", input, rogue_default_input(input));
+  for (uint8_t output = 1; output <= ROGUE_OUTPUT_COUNT; output++) rogue_io_from_pref(s.outputs[output], "output", output, rogue_default_output(output));
 }
 
 static inline void rogue_io_sanitize(RogueIoAssignment &a) {
@@ -181,7 +181,7 @@ static inline void rogue_settings_sanitize(RogueSettings &s) {
   if (s.source_address == 0x00 || s.source_address == 0xFF) s.source_address = 0x36;
   if (s.tank1_percent > 100) s.tank1_percent = 100;
   if (s.tank2_percent > 100) s.tank2_percent = 100;
-  if (s.product_name[0] == '\0') rogue_copy_product_name(s, pref_product_name);
+  if (s.product_name[0] == '\0') rogue_copy_product_name(s, defaults.product_name);
 
   for (uint8_t tank = 1; tank <= ROGUE_TANK_COUNT; tank++) rogue_io_sanitize(s.tanks[tank]);
   for (uint8_t input = 1; input <= ROGUE_INPUT_COUNT; input++) rogue_io_sanitize(s.inputs[input]);

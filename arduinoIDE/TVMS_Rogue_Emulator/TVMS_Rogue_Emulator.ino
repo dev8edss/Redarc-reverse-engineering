@@ -17,31 +17,33 @@
 #error "This sketch needs the esp32 Arduino core 3.x (uses the ledcAttach/ledcWrite PWM API)."
 #endif
 
-// Built-in defaults. The values are set in RoguePreferences.h by load_preference_defaults().
-static int8_t      pref_can_tx_pin;
-static int8_t      pref_can_rx_pin;
-static uint8_t     pref_source_address;
-static uint32_t    pref_serial_prefix;
-static uint16_t    pref_serial_suffix;
-static const char *pref_product_name;
-static uint8_t     pref_tank1_percent;
-static const char *pref_tank1;
-static uint8_t     pref_tank2_percent;
-static const char *pref_tank2;
-static const char *pref_input_1, *pref_input_2, *pref_input_3, *pref_input_4,
-                  *pref_input_5, *pref_input_6, *pref_input_7, *pref_input_8;
-static uint32_t    pref_output_pwm_frequency_hz;
-static uint8_t     pref_output_pwm_resolution_bits;
-static const char *pref_output_1, *pref_output_2, *pref_output_3, *pref_output_4, *pref_output_5,
-                  *pref_output_6, *pref_output_7, *pref_output_8, *pref_output_9, *pref_output_10;
+// Built-in defaults. RoguePreferences.h sets the values, one `name = value;` per line,
+// by being included inside load() below. Everything else reads them as defaults.<name>.
+struct RogueDefaults {
+  int8_t      can_tx_pin;
+  int8_t      can_rx_pin;
+  uint8_t     source_address;
+  uint32_t    serial_prefix;
+  uint16_t    serial_suffix;
+  const char *product_name;
+  uint8_t     tank1_percent;
+  const char *tank1;
+  uint8_t     tank2_percent;
+  const char *tank2;
+  const char *input_1, *input_2, *input_3, *input_4, *input_5, *input_6, *input_7, *input_8;
+  uint32_t    output_pwm_frequency_hz;
+  uint8_t     output_pwm_resolution_bits;
+  const char *output_1, *output_2, *output_3, *output_4, *output_5,
+             *output_6, *output_7, *output_8, *output_9, *output_10;
+
+  void load() {
+#include "RoguePreferences.h"
+  }
+};
+static RogueDefaults defaults;
 
 #include "RogueObject2.h"
 #include "RoguePreferencesRuntime.h"
-
-// Must run first in setup(), before anything reads a pref_ value.
-void load_preference_defaults() {
-#include "RoguePreferences.h"
-}
 
 static constexpr uint32_t ID_LOAD_DISCONNECT_CONFIG = 0x13F10800UL;
 static constexpr uint32_t ID_CHANNEL_STATUS         = 0x1BFD0000UL;
@@ -115,6 +117,7 @@ Preferences object_prefs;
 static uint8_t *config_object = nullptr;
 static uint32_t config_object_len = 0;
 static bool config_from_flash = false;
+static bool object2_dgn_warned[256] = {false};   // per DGN low byte; cleared when the object changes
 
 // Transactional Object 2 write (0x0E87 start .. 0x0E8A commit), ported from the ESPHome
 // emulated-rogue component. Blocks are staged and only replace the active object after
@@ -256,18 +259,51 @@ uint32_t object2_tagged_value(uint32_t value) {
   return (value & 0x03UL) == 0x01UL ? (value - 1UL) / 4UL : value;
 }
 
-// Reads an output's programmed settings: root(@12)[1][2 devices][0x16 Rogue][2 channels]
-// [channel 0x0C..0x15][6 output settings] -> key 1 = dimmable, key 2 = switch flag.
+// Map lookup whose value is a tagged integer (stored as value * 4 + 1).
+bool object2_map_int(uint32_t map_offset, uint32_t key, uint32_t &value) {
+  uint32_t raw = 0;
+  if (!object2_map_value(map_offset, key, raw)) return false;
+  value = object2_tagged_value(raw);
+  return true;
+}
+
+// String node (type 0x01): gives the offset and length of its bytes in config_object.
+bool object2_string(uint32_t offset, uint32_t &data_offset, uint32_t &length) {
+  if (offset + 4UL > config_object_len) return false;
+  const uint32_t header = object2_u32(offset);
+  length = header & 0x00FFFFFFUL;
+  if ((header >> 24) != 0x01 || offset + 4UL + length > config_object_len) return false;
+  data_offset = offset + 4UL;
+  return true;
+}
+
+// Rogue device root: root(@12)[1] -> device types[2] -> Rogue[0x16].
+bool object2_rogue_root(uint32_t &node) {
+  return object2_map_value(12, 0x01, node) && object2_map_value(node, 0x02, node) && object2_map_value(node, 0x16, node);
+}
+
+// Channel record for channel 1..33: Rogue root[2] -> channel map -> channel.
+bool object2_channel_record(uint8_t channel, uint32_t &record) {
+  uint32_t node = 0;
+  return object2_rogue_root(node) && object2_map_value(node, 0x02, node) && object2_map_value(node, channel, record);
+}
+
+// Reports once per active object that a DGN reply could not be built from it.
+void object2_dgn_failed(uint16_t dgn) {
+  if (object2_dgn_warned[dgn & 0xFF]) return;
+  object2_dgn_warned[dgn & 0xFF] = true;
+  Serial.printf("Object2: cannot build 0x1%04X from the active configuration, not sent\n", dgn);
+}
+
+// Output settings: channel record[6] -> key 1 = dimmable, key 2 = switchable (0 = always on).
 bool object2_output_settings(uint8_t output, bool &dimmable, bool &switchable) {
-  uint32_t node = 0, dim_tagged = 0, switch_tagged = 0;
-  if (!object2_map_value(12, 0x01, node) || !object2_map_value(node, 0x02, node) ||
-      !object2_map_value(node, 0x16, node) || !object2_map_value(node, 0x02, node) ||
-      !object2_map_value(node, (uint32_t) (CHANNEL_MASTER + output), node) || !object2_map_value(node, 0x06, node) ||
-      !object2_map_value(node, 0x01, dim_tagged) || !object2_map_value(node, 0x02, switch_tagged)) {
+  uint32_t node = 0, dim = 0, sw = 0;
+  if (!object2_channel_record((uint8_t) (CHANNEL_MASTER + output), node) || !object2_map_value(node, 0x06, node) ||
+      !object2_map_int(node, 0x01, dim) || !object2_map_int(node, 0x02, sw)) {
     return false;
   }
-  dimmable = object2_tagged_value(dim_tagged) != 0;
-  switchable = object2_tagged_value(switch_tagged) != 0;
+  dimmable = dim != 0;
+  switchable = sw != 0;
   return true;
 }
 
@@ -330,7 +366,7 @@ const char *gpio_pin_problem(int8_t pin, bool needs_output, bool needs_adc) {
 #if CONFIG_IDF_TARGET_ESP32
   if (pin >= 6 && pin <= 11) return "is reserved for the SPI flash";
 #endif
-  if (pin == pref_can_tx_pin || pin == pref_can_rx_pin) return "is used by CAN";
+  if (pin == defaults.can_tx_pin || pin == defaults.can_rx_pin) return "is used by CAN";
   if (needs_output && !GPIO_IS_VALID_OUTPUT_GPIO(pin)) return "is input-only";
   if (needs_adc && digitalPinToAnalogChannel(pin) < 0) return "is not an ADC pin";
   return nullptr;
@@ -394,7 +430,7 @@ void apply_output_assignment(uint8_t output) {
   if (a.mode != ROGUE_IO_PIN) return;
   if (output_pwm_pin[output] == a.pin) {
     // The core turns max_duty into a true 100% duty, so 100% is fully on.
-    const uint32_t max_duty = (1UL << pref_output_pwm_resolution_bits) - 1UL;
+    const uint32_t max_duty = (1UL << defaults.output_pwm_resolution_bits) - 1UL;
     ledcWrite((uint8_t) a.pin, (output_levels[output] * max_duty + 50UL) / 100UL);
   } else {
     digitalWrite((uint8_t) a.pin, output_levels[output] > 0 ? HIGH : LOW);
@@ -406,7 +442,7 @@ void apply_output_assignment(uint8_t output) {
 void attach_output_pwm(uint8_t output) {
   const RogueIoAssignment &a = settings.outputs[output];
   if (output_pwm_pin[output] == a.pin) return;
-  if (ledcAttach((uint8_t) a.pin, pref_output_pwm_frequency_hz, pref_output_pwm_resolution_bits)) {
+  if (ledcAttach((uint8_t) a.pin, defaults.output_pwm_frequency_hz, defaults.output_pwm_resolution_bits)) {
     output_pwm_pin[output] = a.pin;
     return;
   }
@@ -578,7 +614,15 @@ void set_master(bool on, const char *origin) {
   }
 }
 
-void send_load_disconnect_config() { send_frame8(with_sa(ID_LOAD_DISCONNECT_CONFIG), 0xEC, 0xD8, 0x27, 0x50, 0x2D, 0x17, 0x3D, 0x00); }
+// 0x1F108 load disconnect: Rogue root[4] -> key 1 trigger, 2/3 disconnect/reconnect mV,
+// 4/5 disconnect/reconnect SOC %.
+void send_load_disconnect_config() {
+  uint32_t node = 0, v[5] = {0};
+  bool found = object2_rogue_root(node) && object2_map_value(node, 0x04, node);
+  for (uint8_t k = 1; found && k <= 5; k++) found = object2_map_int(node, k, v[k - 1]);
+  if (!found || v[1] > 0xFFFF || v[2] > 0xFFFF || v[3] > 0xFF || v[4] > 0xFF) { object2_dgn_failed(0xF108); return; }
+  send_frame8(with_sa(ID_LOAD_DISCONNECT_CONFIG), (uint8_t) (0xE0 | ((v[0] & 0x07) << 2)), (uint8_t) (v[1] & 0xFF), (uint8_t) (v[1] >> 8), (uint8_t) (v[2] & 0xFF), (uint8_t) (v[2] >> 8), (uint8_t) v[3], (uint8_t) v[4], 0x00);
+}
 
 void send_channel_status() {
   uint8_t page1[8] = {0x01};
@@ -609,27 +653,68 @@ void send_output_activity() {
 
 void send_active_channels() { send_frame8(with_sa(ID_ACTIVE_CHANNELS), 0x21, 0xFF, 0xFF, 0x1E, 0xFF, 0xFF, 0xFF, 0xFF); }
 uint8_t output_capability(uint8_t output) { return output >= 1 && output <= ROGUE_OUTPUT_COUNT ? output_caps[output] : 0; }
-void send_output_capabilities() { for (uint8_t i = 1; i <= 10; i++) send_frame8(with_sa(ID_OUTPUT_CAPABILITIES), CHANNEL_OUTPUT_1 + i - 1, output_capability(i), 0, 0, 0, 0, 0, 0); }
+void send_output_capabilities() { for (uint8_t i = 1; i <= 10; i++) send_frame8(with_sa(ID_OUTPUT_CAPABILITIES), CHANNEL_OUTPUT_1 + i - 1, output_capability(i), 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF); }
 
-void send_label_chunk(uint8_t channel, uint8_t segment, const char *label) {
-  uint8_t data[8] = {channel, segment, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
-  const size_t len = strlen(label);
-  for (uint8_t i = 0; i < 6; i++) { size_t pos = (size_t) segment * 6U + i; if (pos < len) data[2 + i] = (uint8_t) label[pos]; }
-  send_frame(with_sa(ID_CHANNEL_LABEL), data, 8);
-}
-void send_channel_label(uint8_t channel, const char *label) { const size_t len = strlen(label); const uint8_t segments = (uint8_t) (len / 6U + 1U); for (uint8_t seg = 0; seg < segments; seg++) send_label_chunk(channel, seg, label); }
+// 0x1FD04 channel labels: channel record[1] string, six characters per segment. The real
+// Rogue sends (length / 6) + 1 segments, so a length that is a multiple of 6 ends with an
+// empty terminator segment.
 void send_channel_labels() {
-  static const char *const labels[34] = {"", "Left", "Strip", "Dome", "Digital Input 4", "Digital Input 5", "Digital Input 6", "Digital Input 7", "Digital Input 8", "Rear", "Front", "Master", "Left", "Right", "Rear", "Kitchen", "Handle", "LED", "Dome Light", "Lights", "Amber lights", "Amber Kitchen", "Rogue Input Voltage", "Input Current", "Remote Input  1", "Remote Input  2", "Remote Input  3", "Remote Input  4", "Remote Input  5", "Remote Input  6", "Remote Input  7", "Remote Input  8", "Remote Input  9", "Remote Input  10"};
-  for (uint8_t ch = 1; ch <= 33; ch++) send_channel_label(ch, labels[ch]);
+  uint32_t label_offset[34] = {0}, label_len[34] = {0};
+  for (uint8_t ch = 1; ch <= 33; ch++) {
+    uint32_t record = 0, label = 0;
+    if (!object2_channel_record(ch, record) || !object2_map_value(record, 0x01, label) || !object2_string(label, label_offset[ch], label_len[ch])) { object2_dgn_failed(0xFD04); return; }
+  }
+  for (uint8_t ch = 1; ch <= 33; ch++) {
+    const uint32_t segments = label_len[ch] / 6UL + 1UL;
+    for (uint32_t seg = 0; seg < segments; seg++) {
+      uint8_t data[8] = {ch, (uint8_t) seg, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+      for (uint8_t i = 0; i < 6; i++) { const uint32_t pos = seg * 6UL + i; if (pos < label_len[ch]) data[2 + i] = config_object[label_offset[ch] + pos]; }
+      send_frame(with_sa(ID_CHANNEL_LABEL), data, 8);
+    }
+  }
 }
 
-struct ChannelDetail { uint8_t channel; uint8_t category; uint16_t subtype; uint16_t icon; uint8_t enabled; uint8_t present; };
+// 0x1FD0A channel inventory: D2 class, D3-D4 class subtype, D5-D6 icon/type (record[3]),
+// D7-D8 enabled (record[2]). Classes are fixed by channel range; tank subtype is record[5][4].
 void send_channel_details() {
-  const ChannelDetail details[] = {{1,0x00,0,0x003B,1,1},{2,0x00,0,0,1,1},{3,0x00,0,0,1,1},{4,0x00,0,0,1,1},{5,0x00,0,0,1,1},{6,0x00,0,0,1,1},{7,0x00,0,0,1,1},{8,0x00,0,0,1,1},{9,0x0C,0,0x8052,1,1},{10,0x0C,0,0x8146,1,1},{11,0x08,0,0,1,1},{12,0x0A,1,0x0001,1,1},{13,0x0A,1,0x1252,1,1},{14,0x0A,1,0x1000,0,1},{15,0x0A,1,0,1,1},{16,0x0A,1,0,1,1},{17,0x0A,1,0,1,1},{18,0x0A,1,0,1,1},{19,0x0A,0,0,1,1},{20,0x0A,0,0,1,1},{21,0x0A,0,0,1,1},{22,0x02,0,0,1,1},{23,0x02,0,0,1,1},{24,0x0B,0,0,0,1},{25,0x0B,0,0,0,1},{26,0x0B,0,0,0,1},{27,0x0B,0,0,0,1},{28,0x0B,0,0,0,1},{29,0x0B,0,0,0,1},{30,0x0B,0,0,0,1},{31,0x0B,0,0,0,1},{32,0x0B,0,0,0,1},{33,0x0B,0,0,0,1}};
-  for (size_t i = 0; i < sizeof(details) / sizeof(details[0]); i++) { const ChannelDetail &d = details[i]; send_frame8(with_sa(ID_CHANNEL_DETAILS), d.channel, d.category, (uint8_t)(d.subtype & 0xFF), (uint8_t)(d.subtype >> 8), (uint8_t)(d.icon & 0xFF), (uint8_t)(d.icon >> 8), d.enabled, d.present); }
+  uint8_t frames[33][8];
+  for (uint8_t ch = 1; ch <= 33; ch++) {
+    uint32_t record = 0, enabled = 0, icon = 0, tank = 0, tank_subtype = 0;
+    if (!object2_channel_record(ch, record) || !object2_map_int(record, 0x02, enabled) || !object2_map_int(record, 0x03, icon)) { object2_dgn_failed(0xFD0A); return; }
+    uint8_t cls = 0x00; uint16_t subtype = 0xFFFF;
+    if (ch <= 8) { cls = 0x00; subtype = 0x0000; }                 // switch input
+    else if (ch <= 10) {                                          // tank
+      if (!object2_map_value(record, 0x05, tank) || !object2_map_int(tank, 0x04, tank_subtype)) { object2_dgn_failed(0xFD0A); return; }
+      cls = 0x0C; subtype = (uint16_t) tank_subtype;
+    }
+    else if (ch == 11) cls = 0x08;                                // master
+    else if (ch <= 21) cls = 0x0A;                                // output
+    else if (ch <= 23) { cls = 0x02; subtype = ch == 22 ? 0x0064 : 0x0065; }  // input voltage / current
+    else cls = 0x0B;                                              // remote input
+    const uint8_t frame[8] = {ch, cls, (uint8_t) (subtype & 0xFF), (uint8_t) (subtype >> 8), (uint8_t) (icon & 0xFF), (uint8_t) ((icon >> 8) & 0xFF), (uint8_t) (enabled & 0xFF), (uint8_t) ((enabled >> 8) & 0xFF)};
+    memcpy(frames[ch - 1], frame, 8);
+  }
+  for (uint8_t i = 0; i < 33; i++) send_frame(with_sa(ID_CHANNEL_DETAILS), frames[i], 8);
 }
 
-void send_alarm_config() { send_frame8(with_sa(ID_ALARM_CONFIG),0x09,0,0,0,0,0,0xFF,0xFF); send_frame8(with_sa(ID_ALARM_CONFIG),0x0A,0,0,0,0,0,0xFF,0xFF); send_frame8(with_sa(ID_ALARM_CONFIG),0x16,0,0,0,0,0,0xFF,0xFF); send_frame8(with_sa(ID_ALARM_CONFIG),0x17,0,0x1E,0,0x28,0,0xFF,0xFF); }
+// 0x1FD06 alarm/range: D2 mode (0 disabled, 1 high, 2 low), D3-D4 lower, D5-D6 upper threshold.
+// Tanks 0x09/0x0A: record[5][7][1..3]. Input voltage/current 0x16/0x17: record[8][1][1..3].
+void send_alarm_config() {
+  static const uint8_t channels[4] = {0x09, 0x0A, 0x16, 0x17};
+  uint32_t v[4][3];
+  for (uint8_t i = 0; i < 4; i++) {
+    uint32_t node = 0;
+    const bool found = object2_channel_record(channels[i], node) &&
+        (channels[i] <= 0x0A ? object2_map_value(node, 0x05, node) && object2_map_value(node, 0x07, node)
+                             : object2_map_value(node, 0x08, node) && object2_map_value(node, 0x01, node)) &&
+        object2_map_int(node, 1, v[i][0]) && object2_map_int(node, 2, v[i][1]) && object2_map_int(node, 3, v[i][2]);
+    if (!found) { object2_dgn_failed(0xFD06); return; }
+  }
+  for (uint8_t i = 0; i < 4; i++) send_frame8(with_sa(ID_ALARM_CONFIG), channels[i], (uint8_t) v[i][0], (uint8_t) (v[i][1] & 0xFF), (uint8_t) ((v[i][1] >> 8) & 0xFF), (uint8_t) (v[i][2] & 0xFF), (uint8_t) ((v[i][2] >> 8) & 0xFF), 0xFF, 0xFF);
+}
+
+// Not derived from Object 2: a real Rogue's replies to these are not yet decoded, so the
+// captured values are sent (see docs/TVMS_ROGUE_DGN_OBJECT_MAPPING.md on emulated-rogue).
 void send_alarm_status() { send_frame8(with_sa(ID_ALARM_STATUS),0x09,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF); send_frame8(with_sa(ID_ALARM_STATUS),0x16,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF); }
 void send_analog_scaling() { send_frame8(with_sa(ID_ANALOG_SCALING),0x09,0x64,0,0,0,0,0x64,0); send_frame8(with_sa(ID_ANALOG_SCALING),0x0A,0x64,0,0,0,0,0x64,0); send_frame8(with_sa(ID_ANALOG_SCALING),0x16,0x61,0,0,0,0,0x60,0xEA); send_frame8(with_sa(ID_ANALOG_SCALING),0x17,0x61,0,0,0,0,0x60,0xEA); }
 void send_digital_input_config() { for (uint8_t ch = 1; ch <= 8; ch++) send_frame8(with_sa(ID_DIGITAL_INPUT_CONFIG), ch, 0, 0, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF); }
@@ -672,6 +757,7 @@ void end_config_write() {
 
 // Re-derives everything that comes from Object 2 after it changes, and re-broadcasts it.
 void apply_config_object() {
+  memset(object2_dgn_warned, 0, sizeof(object2_dgn_warned));
   load_output_capabilities();
   configure_io_pins();
   send_output_capabilities();
@@ -910,11 +996,11 @@ void poll_serial() { static String line; while (Serial.available()) { char ch = 
 // or after bus-off recovery has returned the controller to the stopped state.
 // Returns nullptr when the CAN pins from RoguePreferences.h are usable, otherwise why not.
 const char *can_pins_problem() {
-  if (pref_can_tx_pin == pref_can_rx_pin) return "TX and RX are the same pin";
-  if (pref_can_tx_pin < 0 || !GPIO_IS_VALID_OUTPUT_GPIO(pref_can_tx_pin)) return "TX is not an output-capable GPIO";
-  if (pref_can_rx_pin < 0 || !GPIO_IS_VALID_GPIO(pref_can_rx_pin)) return "RX is not a GPIO on this chip";
+  if (defaults.can_tx_pin == defaults.can_rx_pin) return "TX and RX are the same pin";
+  if (defaults.can_tx_pin < 0 || !GPIO_IS_VALID_OUTPUT_GPIO(defaults.can_tx_pin)) return "TX is not an output-capable GPIO";
+  if (defaults.can_rx_pin < 0 || !GPIO_IS_VALID_GPIO(defaults.can_rx_pin)) return "RX is not a GPIO on this chip";
 #if CONFIG_IDF_TARGET_ESP32
-  if ((pref_can_tx_pin >= 6 && pref_can_tx_pin <= 11) || (pref_can_rx_pin >= 6 && pref_can_rx_pin <= 11)) return "GPIO6-11 are reserved for the SPI flash";
+  if ((defaults.can_tx_pin >= 6 && defaults.can_tx_pin <= 11) || (defaults.can_rx_pin >= 6 && defaults.can_rx_pin <= 11)) return "GPIO6-11 are reserved for the SPI flash";
 #endif
   return nullptr;
 }
@@ -925,15 +1011,15 @@ bool start_can() {
     const char *problem = can_pins_problem();
     if (problem != nullptr) {
       can_pins_invalid = true;
-      Serial.printf("CAN disabled: pref_can_tx_pin=%d pref_can_rx_pin=%d, %s. Fix RoguePreferences.h.\n", pref_can_tx_pin, pref_can_rx_pin, problem);
+      Serial.printf("CAN disabled: can_tx_pin=%d can_rx_pin=%d, %s. Fix can_tx_pin / can_rx_pin in RoguePreferences.h.\n", defaults.can_tx_pin, defaults.can_rx_pin, problem);
       return false;
     }
-    twai_general_config_t g_config = TWAI_GENERAL_CONFIG_DEFAULT((gpio_num_t) pref_can_tx_pin, (gpio_num_t) pref_can_rx_pin, TWAI_MODE_NORMAL); twai_timing_config_t t_config = TWAI_TIMING_CONFIG_250KBITS(); twai_filter_config_t f_config = TWAI_FILTER_CONFIG_ACCEPT_ALL(); g_config.rx_queue_len = 256; g_config.tx_queue_len = 32;
+    twai_general_config_t g_config = TWAI_GENERAL_CONFIG_DEFAULT((gpio_num_t) defaults.can_tx_pin, (gpio_num_t) defaults.can_rx_pin, TWAI_MODE_NORMAL); twai_timing_config_t t_config = TWAI_TIMING_CONFIG_250KBITS(); twai_filter_config_t f_config = TWAI_FILTER_CONFIG_ACCEPT_ALL(); g_config.rx_queue_len = 256; g_config.tx_queue_len = 32;
     esp_err_t err = twai_driver_install(&g_config, &t_config, &f_config); if (err != ESP_OK) { Serial.printf("twai_driver_install failed: %s, retrying in %lus\n", esp_err_to_name(err), (unsigned long) (CAN_RESTART_INTERVAL_MS / 1000UL)); return false; }
     can_installed = true;
   }
   esp_err_t err = twai_start(); if (err != ESP_OK) { Serial.printf("twai_start failed: %s, retrying in %lus\n", esp_err_to_name(err), (unsigned long) (CAN_RESTART_INTERVAL_MS / 1000UL)); return false; }
-  can_running = true; Serial.printf("CAN/TWAI started at 250 kbit/s on TX GPIO%d RX GPIO%d\n", pref_can_tx_pin, pref_can_rx_pin); return true;
+  can_running = true; Serial.printf("CAN/TWAI started at 250 kbit/s on TX GPIO%d RX GPIO%d\n", defaults.can_tx_pin, defaults.can_rx_pin); return true;
 }
 
 // Reports dropped TX frames, recovers from bus-off, and retries a failed CAN start.
@@ -960,7 +1046,7 @@ void poll_io_assignments() {
 }
 
 void setup() {
-  load_preference_defaults(); Serial.begin(115200); delay(500); Serial.println(); Serial.println("REDARC TVMS Rogue Emulator - Arduino IDE standalone"); rogue_settings_load(prefs, settings); load_config_object(); load_output_capabilities(); validate_io_assignments(); tank_variable_percent[1] = settings.tank1_percent; tank_variable_percent[2] = settings.tank2_percent; configure_io_pins(); Serial.printf("Source address: 0x%02X\n", settings.source_address); Serial.printf("Serial: %lu-%04u  Product: %s\n", (unsigned long) settings.serial_prefix, (unsigned) settings.serial_suffix, settings.product_name); Serial.println("Type help for serial commands."); object2_self_test(); start_can(); send_identity(); send_all_status();
+  defaults.load(); Serial.begin(115200); delay(500); Serial.println(); Serial.println("REDARC TVMS Rogue Emulator - Arduino IDE standalone"); rogue_settings_load(prefs, settings); load_config_object(); load_output_capabilities(); validate_io_assignments(); tank_variable_percent[1] = settings.tank1_percent; tank_variable_percent[2] = settings.tank2_percent; configure_io_pins(); Serial.printf("Source address: 0x%02X\n", settings.source_address); Serial.printf("Serial: %lu-%04u  Product: %s\n", (unsigned long) settings.serial_prefix, (unsigned) settings.serial_suffix, settings.product_name); Serial.println("Type help for serial commands."); object2_self_test(); start_can(); send_identity(); send_all_status();
 }
 
 void loop() {
