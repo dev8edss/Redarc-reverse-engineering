@@ -22,7 +22,7 @@ arduinoIDE/TVMS_Rogue_Emulator/RoguePreferences.h
 arduinoIDE/TVMS_Rogue_Emulator/RoguePreferencesRuntime.h
 ```
 
-`RogueObject2.h` stores the captured Object 2 image. `RoguePreferences.h` is intentionally only editable variables and values. `RoguePreferencesRuntime.h` owns the structs, NVS schema, validation, and load/save helpers.
+`RogueObject2.h` stores the captured Object 2 image. `RoguePreferences.h` holds only the built-in default values, one `name = value;` per line, with no types or code. The types are declared in `TVMS_Rogue_Emulator.ino`, which includes the file inside `load_preference_defaults()`. `RoguePreferencesRuntime.h` owns the structs, NVS schema, validation, and load/save helpers.
 
 ## Hardware target
 
@@ -33,12 +33,19 @@ Primary target:
 - REDARC CAN bus at 250 kbit/s
 - Extended CAN IDs
 
-Default pins:
+Default CAN pins (change them in `RoguePreferences.h`):
 
 | Signal | ESP32 pin |
 |---|---|
 | CAN TX | `GPIO22` |
 | CAN RX | `GPIO19` |
+
+```cpp
+pref_can_tx_pin = 22;
+pref_can_rx_pin = 19;
+```
+
+At boot the sketch checks the CAN pins. If TX and RX are the same pin, TX is input-only, or either is a flash pin (GPIO6–11 on the original ESP32), CAN stays off and the Serial Monitor says why. The CAN pins can't be assigned to a tank, input or output.
 
 REDARC RJ45 pinout used throughout this project:
 
@@ -112,11 +119,11 @@ Matching is case-insensitive (`gpio34`, `Simulate`, `DISABLED` all work). Text s
 Example defaults:
 
 ```cpp
-static const char pref_tank1[]    = "GPIO34";
-static const char pref_tank2[]    = "grey_water";
-static const char pref_input_1[]  = "GPIO33";
-static const char pref_input_2[]  = "disabled";
-static const char pref_output_1[] = "GPIO25";
+pref_tank1    = "GPIO34";
+pref_tank2    = "grey_water";
+pref_input_1  = "GPIO33";
+pref_input_2  = "disabled";
+pref_output_1 = "GPIO25";
 ```
 
 The shipped defaults are `simulate` for every tank, input and output.
@@ -129,7 +136,7 @@ A GPIO assignment is refused (from Serial) or the channel is set to `disabled` w
 
 - is not a GPIO on the chip,
 - is GPIO6–11 on the original ESP32 (wired to the SPI flash),
-- is the CAN TX/RX pin (`GPIO22` / `GPIO19`),
+- is one of the CAN TX/RX pins (`pref_can_tx_pin` / `pref_can_rx_pin`, default `GPIO22` / `GPIO19`),
 - is input-only (GPIO34–39) and is assigned to an output,
 - is not an ADC pin and is assigned to a tank,
 - is already used by another tank/input/output.
@@ -174,8 +181,8 @@ If the object cannot be decoded, the captured capability values are used and a m
 PWM frequency and resolution for dimmable outputs are set in `RoguePreferences.h`:
 
 ```cpp
-static uint32_t pref_output_pwm_frequency_hz    = 5000;
-static uint8_t  pref_output_pwm_resolution_bits = 10;
+pref_output_pwm_frequency_hz    = 5000;
+pref_output_pwm_resolution_bits = 10;
 ```
 
 Duty is linear in the level (no gamma correction). If no LEDC channel is free for a pin (the original ESP32 has 16, ESP32-S3 has 8, ESP32-C3 has 6), that output falls back to on/off and a message is printed.

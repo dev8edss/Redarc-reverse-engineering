@@ -6,22 +6,42 @@
 
   Target:
     ESP32 + CAN transceiver/base, e.g. M5Stack Atom Lite + Atomic CAN Base
-    CAN TX GPIO22, CAN RX GPIO19, 250 kbit/s, extended IDs
+    CAN pins set in RoguePreferences.h (default TX GPIO22, RX GPIO19), 250 kbit/s, extended IDs
 */
 
 #include <Arduino.h>
 #include <driver/twai.h>
 #include <pgmspace.h>
 
-#include "RogueObject2.h"
-#include "RoguePreferences.h"
-
 #if !defined(ESP_ARDUINO_VERSION_MAJOR) || ESP_ARDUINO_VERSION_MAJOR < 3
 #error "This sketch needs the esp32 Arduino core 3.x (uses the ledcAttach/ledcWrite PWM API)."
 #endif
 
-static constexpr gpio_num_t CAN_TX_PIN = GPIO_NUM_22;
-static constexpr gpio_num_t CAN_RX_PIN = GPIO_NUM_19;
+// Built-in defaults. The values are set in RoguePreferences.h by load_preference_defaults().
+static int8_t      pref_can_tx_pin;
+static int8_t      pref_can_rx_pin;
+static uint8_t     pref_source_address;
+static uint32_t    pref_serial_prefix;
+static uint16_t    pref_serial_suffix;
+static const char *pref_product_name;
+static uint8_t     pref_tank1_percent;
+static const char *pref_tank1;
+static uint8_t     pref_tank2_percent;
+static const char *pref_tank2;
+static const char *pref_input_1, *pref_input_2, *pref_input_3, *pref_input_4,
+                  *pref_input_5, *pref_input_6, *pref_input_7, *pref_input_8;
+static uint32_t    pref_output_pwm_frequency_hz;
+static uint8_t     pref_output_pwm_resolution_bits;
+static const char *pref_output_1, *pref_output_2, *pref_output_3, *pref_output_4, *pref_output_5,
+                  *pref_output_6, *pref_output_7, *pref_output_8, *pref_output_9, *pref_output_10;
+
+#include "RogueObject2.h"
+#include "RoguePreferencesRuntime.h"
+
+// Must run first in setup(), before anything reads a pref_ value.
+void load_preference_defaults() {
+#include "RoguePreferences.h"
+}
 
 static constexpr uint32_t ID_LOAD_DISCONNECT_CONFIG = 0x13F10800UL;
 static constexpr uint32_t ID_CHANNEL_STATUS         = 0x1BFD0000UL;
@@ -75,6 +95,7 @@ static uint8_t output_caps[ROGUE_OUTPUT_COUNT + 1] = {0};
 
 static bool can_installed = false;
 static bool can_running = false;
+static bool can_pins_invalid = false;
 static uint32_t last_can_health_ms = 0;
 static uint32_t last_can_restart_ms = 0;
 static uint32_t last_tx_report_ms = 0;
@@ -309,7 +330,7 @@ const char *gpio_pin_problem(int8_t pin, bool needs_output, bool needs_adc) {
 #if CONFIG_IDF_TARGET_ESP32
   if (pin >= 6 && pin <= 11) return "is reserved for the SPI flash";
 #endif
-  if (pin == CAN_TX_PIN || pin == CAN_RX_PIN) return "is used by CAN";
+  if (pin == pref_can_tx_pin || pin == pref_can_rx_pin) return "is used by CAN";
   if (needs_output && !GPIO_IS_VALID_OUTPUT_GPIO(pin)) return "is input-only";
   if (needs_adc && digitalPinToAnalogChannel(pin) < 0) return "is not an ADC pin";
   return nullptr;
@@ -887,22 +908,39 @@ void poll_serial() { static String line; while (Serial.available()) { char ch = 
 
 // Installs the TWAI driver (once) and starts it. Safe to call again after a failure
 // or after bus-off recovery has returned the controller to the stopped state.
+// Returns nullptr when the CAN pins from RoguePreferences.h are usable, otherwise why not.
+const char *can_pins_problem() {
+  if (pref_can_tx_pin == pref_can_rx_pin) return "TX and RX are the same pin";
+  if (pref_can_tx_pin < 0 || !GPIO_IS_VALID_OUTPUT_GPIO(pref_can_tx_pin)) return "TX is not an output-capable GPIO";
+  if (pref_can_rx_pin < 0 || !GPIO_IS_VALID_GPIO(pref_can_rx_pin)) return "RX is not a GPIO on this chip";
+#if CONFIG_IDF_TARGET_ESP32
+  if ((pref_can_tx_pin >= 6 && pref_can_tx_pin <= 11) || (pref_can_rx_pin >= 6 && pref_can_rx_pin <= 11)) return "GPIO6-11 are reserved for the SPI flash";
+#endif
+  return nullptr;
+}
+
 bool start_can() {
   last_can_restart_ms = millis();
   if (!can_installed) {
-    twai_general_config_t g_config = TWAI_GENERAL_CONFIG_DEFAULT(CAN_TX_PIN, CAN_RX_PIN, TWAI_MODE_NORMAL); twai_timing_config_t t_config = TWAI_TIMING_CONFIG_250KBITS(); twai_filter_config_t f_config = TWAI_FILTER_CONFIG_ACCEPT_ALL(); g_config.rx_queue_len = 256; g_config.tx_queue_len = 32;
+    const char *problem = can_pins_problem();
+    if (problem != nullptr) {
+      can_pins_invalid = true;
+      Serial.printf("CAN disabled: pref_can_tx_pin=%d pref_can_rx_pin=%d, %s. Fix RoguePreferences.h.\n", pref_can_tx_pin, pref_can_rx_pin, problem);
+      return false;
+    }
+    twai_general_config_t g_config = TWAI_GENERAL_CONFIG_DEFAULT((gpio_num_t) pref_can_tx_pin, (gpio_num_t) pref_can_rx_pin, TWAI_MODE_NORMAL); twai_timing_config_t t_config = TWAI_TIMING_CONFIG_250KBITS(); twai_filter_config_t f_config = TWAI_FILTER_CONFIG_ACCEPT_ALL(); g_config.rx_queue_len = 256; g_config.tx_queue_len = 32;
     esp_err_t err = twai_driver_install(&g_config, &t_config, &f_config); if (err != ESP_OK) { Serial.printf("twai_driver_install failed: %s, retrying in %lus\n", esp_err_to_name(err), (unsigned long) (CAN_RESTART_INTERVAL_MS / 1000UL)); return false; }
     can_installed = true;
   }
   esp_err_t err = twai_start(); if (err != ESP_OK) { Serial.printf("twai_start failed: %s, retrying in %lus\n", esp_err_to_name(err), (unsigned long) (CAN_RESTART_INTERVAL_MS / 1000UL)); return false; }
-  can_running = true; Serial.println("CAN/TWAI started at 250 kbit/s"); return true;
+  can_running = true; Serial.printf("CAN/TWAI started at 250 kbit/s on TX GPIO%d RX GPIO%d\n", pref_can_tx_pin, pref_can_rx_pin); return true;
 }
 
 // Reports dropped TX frames, recovers from bus-off, and retries a failed CAN start.
 void maintain_can() {
   const uint32_t now = millis();
   if (tx_fail_count > 0 && now - last_tx_report_ms >= CAN_TX_REPORT_INTERVAL_MS) { Serial.printf("CAN TX: %lu frames dropped (last error %s); is another node on the bus to ACK?\n", (unsigned long) tx_fail_count, esp_err_to_name(last_tx_error)); tx_fail_count = 0; last_tx_report_ms = now; }
-  if (!can_installed) { if (now - last_can_restart_ms >= CAN_RESTART_INTERVAL_MS) start_can(); return; }
+  if (!can_installed) { if (!can_pins_invalid && now - last_can_restart_ms >= CAN_RESTART_INTERVAL_MS) start_can(); return; }
   if (now - last_can_health_ms < CAN_HEALTH_INTERVAL_MS) return; last_can_health_ms = now;
   twai_status_info_t status; if (twai_get_status_info(&status) != ESP_OK) return;
   switch (status.state) {
@@ -922,7 +960,7 @@ void poll_io_assignments() {
 }
 
 void setup() {
-  Serial.begin(115200); delay(500); Serial.println(); Serial.println("REDARC TVMS Rogue Emulator - Arduino IDE standalone"); rogue_settings_load(prefs, settings); load_config_object(); load_output_capabilities(); validate_io_assignments(); tank_variable_percent[1] = settings.tank1_percent; tank_variable_percent[2] = settings.tank2_percent; configure_io_pins(); Serial.printf("Source address: 0x%02X\n", settings.source_address); Serial.printf("Serial: %lu-%04u  Product: %s\n", (unsigned long) settings.serial_prefix, (unsigned) settings.serial_suffix, settings.product_name); Serial.println("Type help for serial commands."); object2_self_test(); start_can(); send_identity(); send_all_status();
+  load_preference_defaults(); Serial.begin(115200); delay(500); Serial.println(); Serial.println("REDARC TVMS Rogue Emulator - Arduino IDE standalone"); rogue_settings_load(prefs, settings); load_config_object(); load_output_capabilities(); validate_io_assignments(); tank_variable_percent[1] = settings.tank1_percent; tank_variable_percent[2] = settings.tank2_percent; configure_io_pins(); Serial.printf("Source address: 0x%02X\n", settings.source_address); Serial.printf("Serial: %lu-%04u  Product: %s\n", (unsigned long) settings.serial_prefix, (unsigned) settings.serial_suffix, settings.product_name); Serial.println("Type help for serial commands."); object2_self_test(); start_can(); send_identity(); send_all_status();
 }
 
 void loop() {
