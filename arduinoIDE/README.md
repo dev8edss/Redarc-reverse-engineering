@@ -150,15 +150,25 @@ LOW  -> off
 HIGH -> on
 ```
 
-Output GPIO mode uses LEDC PWM, so the Rogue output level sets the duty cycle:
+Whether each output is dimmable comes from the Rogue configuration (Object 2), exactly as a real Rogue's programming defines it. At boot the sketch reads each output's settings from the object (channel `0x0C`..`0x15`, output settings key `0x06`, dimmable flag key `0x01`, switch flag key `0x02`). The result is used for both:
+
+- the `0x1FD0E` capability byte sent on CAN (bit 7 `0x80` = dimmable), and
+- how the output behaves on its GPIO.
+
+| Programmed as | GPIO drive | Output level |
+|---|---|---|
+| dimmable | LEDC PWM, duty = level | 0–100% as commanded; hold-dim works |
+| not dimmable | digital on/off | any non-zero level becomes 100%; hold-dim is ignored |
+
+The embedded captured object programs outputs 1–7 as dimmable and outputs 8–10 as on/off. The boot log shows the result, and `io` shows `dimmable` or `on/off` per output:
 
 ```text
-0%     -> LOW (off)
-1-99%  -> PWM, duty = level
-100%   -> HIGH (fully on)
+Dimmable outputs: 1 2 3 4 5 6 7
 ```
 
-Dimming from RedVision (`0x5A` levels and `0x0F05` hold-dim) therefore dims a load on the GPIO. Frequency and resolution are set in `RoguePreferences.h`:
+If the object cannot be decoded, the captured capability values are used and a message is printed.
+
+PWM frequency and resolution for dimmable outputs are set in `RoguePreferences.h`:
 
 ```cpp
 static uint32_t pref_output_pwm_frequency_hz    = 5000;
@@ -166,8 +176,6 @@ static uint8_t  pref_output_pwm_resolution_bits = 10;
 ```
 
 Duty is linear in the level (no gamma correction). If no LEDC channel is free for a pin (the original ESP32 has 16, ESP32-S3 has 8, ESP32-C3 has 6), that output falls back to on/off and a message is printed.
-
-Do not drive a relay coil or other on/off-only load directly from a PWM output at levels between 1% and 99%. Keep such outputs at 0% or 100%.
 
 Use this to show current mappings:
 
@@ -374,6 +382,7 @@ Use `defaults` to restore the built-in defaults.
 - Compile-tested with arduino-cli and the esp32 core 3.3.12 (M5Stack-ATOM and ESP32 Dev Module). Not yet tested on hardware.
 - Tank GPIO mode currently uses fixed raw ADC scaling `0..4095 -> 0..100%`; calibration can be added later.
 - GPIO output PWM is linear duty with no gamma correction, and is active-high only.
+- Configuration writes (`0x0E81`..`0x0E8A`) are not ported from the ESPHome emulator yet, so the dimmable/on-off programming is always the embedded captured object. Reprogramming outputs from RedVision will not change it.
 - GPIO inputs are read as active-high using `pinMode(pin, INPUT)`.
 - GPIO6–11 are blocked only on the original ESP32; flash/PSRAM pins on other ESP32 variants are not blocked.
 - Master OFF sets all outputs to 0% but does not stop outputs being switched on again while master is off.

@@ -69,6 +69,8 @@ RogueSettings settings;
 // GPIO currently attached to LEDC PWM for each output, or -1 when the output is not
 // using PWM (not a GPIO output, or no free LEDC channel so it falls back to on/off).
 static int8_t output_pwm_pin[ROGUE_OUTPUT_COUNT + 1] = {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
+// 0x1FD0E capability byte per output, decoded from Object 2 at boot. Bit 7 = dimmable.
+static uint8_t output_caps[ROGUE_OUTPUT_COUNT + 1] = {0};
 
 static bool can_installed = false;
 static bool can_running = false;
@@ -165,6 +167,71 @@ void object2_self_test() {
                 (unsigned long) stored_crc,
                 (unsigned long) calc_crc,
                 (stored_crc == calc_crc && declared_len == ROGUE_OBJECT2_SIZE) ? "OK" : "FAIL");
+}
+
+uint32_t object2_u32(uint32_t offset) {
+  return (uint32_t) rogue_object2_byte(offset) |
+         ((uint32_t) rogue_object2_byte(offset + 1) << 8) |
+         ((uint32_t) rogue_object2_byte(offset + 2) << 16) |
+         ((uint32_t) rogue_object2_byte(offset + 3) << 24);
+}
+
+// Object 2 is a tree of nodes, each a u32 header (type << 24 | body length) plus body.
+// Type 0x03 is a map of (u32 key, u32 value) pairs whose values are child-node offsets
+// or tagged integers. Ported from the ESPHome emulated-rogue object decoder.
+bool object2_map_value(uint32_t map_offset, uint32_t key, uint32_t &value) {
+  if (map_offset + 4UL > ROGUE_OBJECT2_SIZE) return false;
+  const uint32_t header = object2_u32(map_offset);
+  const uint32_t length = header & 0x00FFFFFFUL;
+  if ((header >> 24) != 0x03 || (length % 8UL) != 0 || map_offset + 4UL + length > ROGUE_OBJECT2_SIZE) return false;
+  for (uint32_t i = 0; i < length; i += 8) {
+    const uint32_t entry = map_offset + 4UL + i;
+    if (object2_u32(entry) != key) continue;
+    value = object2_u32(entry + 4UL);
+    return true;
+  }
+  return false;
+}
+
+uint32_t object2_tagged_value(uint32_t value) {
+  return (value & 0x03UL) == 0x01UL ? (value - 1UL) / 4UL : value;
+}
+
+// Reads an output's programmed settings: root(@12)[1][2 devices][0x16 Rogue][2 channels]
+// [channel 0x0C..0x15][6 output settings] -> key 1 = dimmable, key 2 = switch flag.
+bool object2_output_settings(uint8_t output, bool &dimmable, bool &switchable) {
+  uint32_t node = 0, dim_tagged = 0, switch_tagged = 0;
+  if (!object2_map_value(12, 0x01, node) || !object2_map_value(node, 0x02, node) ||
+      !object2_map_value(node, 0x16, node) || !object2_map_value(node, 0x02, node) ||
+      !object2_map_value(node, (uint32_t) (CHANNEL_MASTER + output), node) || !object2_map_value(node, 0x06, node) ||
+      !object2_map_value(node, 0x01, dim_tagged) || !object2_map_value(node, 0x02, switch_tagged)) {
+    return false;
+  }
+  dimmable = object2_tagged_value(dim_tagged) != 0;
+  switchable = object2_tagged_value(switch_tagged) != 0;
+  return true;
+}
+
+// Builds each output's 0x1FD0E capability byte from the programmed configuration:
+// bit 7 (0x80) = dimmable. Falls back to the captured values if decoding fails.
+void load_output_capabilities() {
+  static const uint8_t captured[ROGUE_OUTPUT_COUNT] = {0x83, 0x83, 0x83, 0x83, 0x83, 0x83, 0x83, 0x01, 0x03, 0x03};
+  for (uint8_t output = 1; output <= ROGUE_OUTPUT_COUNT; output++) {
+    bool dimmable = false, switchable = false;
+    if (object2_output_settings(output, dimmable, switchable)) {
+      output_caps[output] = dimmable ? 0x83 : (switchable ? 0x03 : 0x01);
+    } else {
+      output_caps[output] = captured[output - 1];
+      Serial.printf("Object2: output %u settings not found, using captured capability\n", (unsigned) output);
+    }
+  }
+  Serial.print("Dimmable outputs:");
+  for (uint8_t output = 1; output <= ROGUE_OUTPUT_COUNT; output++) if (output_caps[output] & 0x80) Serial.printf(" %u", (unsigned) output);
+  Serial.println();
+}
+
+bool output_is_dimmable(uint8_t output) {
+  return output >= 1 && output <= ROGUE_OUTPUT_COUNT && (output_caps[output] & 0x80) != 0;
 }
 
 uint8_t &tank_percent_ref(uint8_t tank) {
@@ -304,7 +371,8 @@ void configure_io_pins() {
       output_levels[output] = 0;
       hold_dim_direction[output] = 0;
     } else if (a.mode == ROGUE_IO_PIN) {
-      attach_output_pwm(output);
+      if (output_is_dimmable(output)) attach_output_pwm(output);
+      else pinMode((uint8_t) a.pin, OUTPUT);
       apply_output_assignment(output);
     }
   }
@@ -383,6 +451,8 @@ void send_direct_ack(uint8_t requester, uint8_t command) {
 void set_output_level(uint8_t output, uint8_t percent, const char *origin) {
   if (output < 1 || output > ROGUE_OUTPUT_COUNT) return;
   if (percent > 100) percent = 100;
+  // Outputs programmed as non-dimmable are on/off only: any non-zero level means fully on.
+  if (percent > 0 && !output_is_dimmable(output)) percent = 100;
   if (settings.outputs[output].mode == ROGUE_IO_DISABLED && percent > 0) {
     Serial.printf("%s: output %u is disabled, ignored\n", origin, output);
     return;
@@ -455,7 +525,7 @@ void send_output_activity() {
 }
 
 void send_active_channels() { send_frame8(with_sa(ID_ACTIVE_CHANNELS), 0x21, 0xFF, 0xFF, 0x1E, 0xFF, 0xFF, 0xFF, 0xFF); }
-uint8_t output_capability(uint8_t output) { static const uint8_t caps[10] = {0x83,0x83,0x83,0x83,0x83,0x83,0x83,0x01,0x03,0x03}; return output >= 1 && output <= 10 ? caps[output - 1] : 0; }
+uint8_t output_capability(uint8_t output) { return output >= 1 && output <= ROGUE_OUTPUT_COUNT ? output_caps[output] : 0; }
 void send_output_capabilities() { for (uint8_t i = 1; i <= 10; i++) send_frame8(with_sa(ID_OUTPUT_CAPABILITIES), CHANNEL_OUTPUT_1 + i - 1, output_capability(i), 0, 0, 0, 0, 0, 0); }
 
 void send_label_chunk(uint8_t channel, uint8_t segment, const char *label) {
@@ -515,7 +585,7 @@ void handle_direct_command(uint8_t requester, const uint8_t *data, uint8_t len) 
   Serial.printf("Unsupported command 0x%02X\n", command); send_direct_ack(requester, command);
 }
 
-void handle_legacy_dim(const uint8_t *data, uint8_t len) { if (len < 3) return; const uint8_t channel = data[0]; const uint8_t direction = data[2]; if (channel < CHANNEL_OUTPUT_1 || channel > CHANNEL_OUTPUT_10) return; const uint8_t output = channel - CHANNEL_MASTER; if (settings.outputs[output].mode == ROGUE_IO_DISABLED) return; if (direction == 0x01) hold_dim_direction[output] = -1; else if (direction == 0x64) hold_dim_direction[output] = 1; else if (direction == 0xFF) hold_dim_direction[output] = 0; Serial.printf("Hold dim output %u direction 0x%02X\n", output, direction); send_output_activity(); }
+void handle_legacy_dim(const uint8_t *data, uint8_t len) { if (len < 3) return; const uint8_t channel = data[0]; const uint8_t direction = data[2]; if (channel < CHANNEL_OUTPUT_1 || channel > CHANNEL_OUTPUT_10) return; const uint8_t output = channel - CHANNEL_MASTER; if (settings.outputs[output].mode == ROGUE_IO_DISABLED || !output_is_dimmable(output)) return; if (direction == 0x01) hold_dim_direction[output] = -1; else if (direction == 0x64) hold_dim_direction[output] = 1; else if (direction == 0xFF) hold_dim_direction[output] = 0; Serial.printf("Hold dim output %u direction 0x%02X\n", output, direction); send_output_activity(); }
 
 void handle_can_message(const twai_message_t &msg) {
   if (!msg.extd || msg.rtr) return; const uint32_t id = msg.identifier & 0x1FFFFFFFUL; const uint16_t service = (uint16_t)((id >> 16) & 0xFFFFUL); const uint8_t destination = (uint8_t)((id >> 8) & 0xFFUL); const uint8_t requester = (uint8_t)(id & 0xFFUL); if (destination != settings.source_address) return;
@@ -533,7 +603,7 @@ void print_io_assignments() {
   Serial.println("Input assignments:");
   for (uint8_t i = 1; i <= ROGUE_INPUT_COUNT; i++) Serial.printf("  input %u: %s state=%s\n", (unsigned) i, rogue_io_describe(settings.inputs[i]).c_str(), input_states[i] ? "ON" : "OFF");
   Serial.println("Output assignments:");
-  for (uint8_t i = 1; i <= ROGUE_OUTPUT_COUNT; i++) Serial.printf("  output %u: %s level=%u%%\n", (unsigned) i, rogue_io_describe(settings.outputs[i]).c_str(), output_levels[i]);
+  for (uint8_t i = 1; i <= ROGUE_OUTPUT_COUNT; i++) Serial.printf("  output %u: %s %s level=%u%%\n", (unsigned) i, rogue_io_describe(settings.outputs[i]).c_str(), output_is_dimmable(i) ? "dimmable" : "on/off", output_levels[i]);
 }
 
 void print_status() {
@@ -661,7 +731,7 @@ void poll_io_assignments() {
 }
 
 void setup() {
-  Serial.begin(115200); delay(500); Serial.println(); Serial.println("REDARC TVMS Rogue Emulator - Arduino IDE standalone"); rogue_settings_load(prefs, settings); validate_io_assignments(); tank_variable_percent[1] = settings.tank1_percent; tank_variable_percent[2] = settings.tank2_percent; configure_io_pins(); Serial.printf("Source address: 0x%02X\n", settings.source_address); Serial.printf("Serial: %lu-%04u  Product: %s\n", (unsigned long) settings.serial_prefix, (unsigned) settings.serial_suffix, settings.product_name); Serial.println("Type help for serial commands."); object2_self_test(); start_can(); send_identity(); send_all_status();
+  Serial.begin(115200); delay(500); Serial.println(); Serial.println("REDARC TVMS Rogue Emulator - Arduino IDE standalone"); rogue_settings_load(prefs, settings); load_output_capabilities(); validate_io_assignments(); tank_variable_percent[1] = settings.tank1_percent; tank_variable_percent[2] = settings.tank2_percent; configure_io_pins(); Serial.printf("Source address: 0x%02X\n", settings.source_address); Serial.printf("Serial: %lu-%04u  Product: %s\n", (unsigned long) settings.serial_prefix, (unsigned) settings.serial_suffix, settings.product_name); Serial.println("Type help for serial commands."); object2_self_test(); start_can(); send_identity(); send_all_status();
 }
 
 void loop() {
