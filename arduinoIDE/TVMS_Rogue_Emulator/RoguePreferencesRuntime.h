@@ -27,9 +27,7 @@ struct RogueSettings {
   uint8_t source_address;
   uint8_t tank1_percent;
   uint8_t tank2_percent;
-  uint32_t serial_prefix;
-  uint16_t serial_suffix;
-  char product_name[64];
+  uint32_t serial_prefix;  // this device's serial; selects its identity record in Object 2
 
   // 1-based arrays. Index 0 is unused so REDARC channel numbering is easy.
   RogueIoAssignment tanks[ROGUE_TANK_COUNT + 1];
@@ -102,12 +100,6 @@ static inline String rogue_io_describe(const RogueIoAssignment &a) {
   return String(rogue_io_mode_name(a.mode));
 }
 
-static inline void rogue_copy_product_name(RogueSettings &s, const char *name) {
-  if (name == nullptr || name[0] == '\0') name = defaults.product_name;
-  strncpy(s.product_name, name, sizeof(s.product_name) - 1);
-  s.product_name[sizeof(s.product_name) - 1] = '\0';
-}
-
 static inline const char *rogue_default_tank(uint8_t tank) {
   switch (tank) {
     case 1: return defaults.tank1;
@@ -158,8 +150,6 @@ static inline void rogue_settings_defaults(RogueSettings &s) {
   s.tank1_percent = defaults.tank1_percent;
   s.tank2_percent = defaults.tank2_percent;
   s.serial_prefix = defaults.serial_prefix;
-  s.serial_suffix = defaults.serial_suffix;
-  rogue_copy_product_name(s, defaults.product_name);
 
   rogue_io_set_simulated(s.tanks[0]);
   rogue_io_set_simulated(s.inputs[0]);
@@ -181,7 +171,6 @@ static inline void rogue_settings_sanitize(RogueSettings &s) {
   if (s.source_address == 0x00 || s.source_address == 0xFF) s.source_address = 0x36;
   if (s.tank1_percent > 100) s.tank1_percent = 100;
   if (s.tank2_percent > 100) s.tank2_percent = 100;
-  if (s.product_name[0] == '\0') rogue_copy_product_name(s, defaults.product_name);
 
   for (uint8_t tank = 1; tank <= ROGUE_TANK_COUNT; tank++) rogue_io_sanitize(s.tanks[tank]);
   for (uint8_t input = 1; input <= ROGUE_INPUT_COUNT; input++) rogue_io_sanitize(s.inputs[input]);
@@ -239,9 +228,9 @@ static inline void rogue_settings_load(Preferences &prefs, RogueSettings &s) {
   s.tank1_percent = prefs.getUChar("t1", s.tank1_percent);
   s.tank2_percent = prefs.getUChar("t2", s.tank2_percent);
   s.serial_prefix = prefs.getUInt("sp", s.serial_prefix);
-  s.serial_suffix = prefs.getUShort("ss", s.serial_suffix);
-  String saved_name = prefs.getString("name", s.product_name);
-  rogue_copy_product_name(s, saved_name.c_str());
+  // Serial suffix and product name now come from Object 2; drop values saved by older builds.
+  if (prefs.isKey("ss")) prefs.remove("ss");
+  if (prefs.isKey("name")) prefs.remove("name");
 
   for (uint8_t tank = 1; tank <= ROGUE_TANK_COUNT; tank++) rogue_io_load(prefs, s.tanks[tank], "ta", "t", "tank", tank);
   for (uint8_t input = 1; input <= ROGUE_INPUT_COUNT; input++) rogue_io_load(prefs, s.inputs[input], "ia", "i", "input", input);
@@ -257,8 +246,6 @@ static inline void rogue_settings_save(Preferences &prefs, RogueSettings &s) {
   prefs.putUChar("t1", s.tank1_percent);
   prefs.putUChar("t2", s.tank2_percent);
   prefs.putUInt("sp", s.serial_prefix);
-  prefs.putUShort("ss", s.serial_suffix);
-  prefs.putString("name", s.product_name);
 
   for (uint8_t tank = 1; tank <= ROGUE_TANK_COUNT; tank++) prefs.putString(rogue_pref_key("ta", tank, "").c_str(), rogue_io_text(s.tanks[tank]));
   for (uint8_t input = 1; input <= ROGUE_INPUT_COUNT; input++) prefs.putString(rogue_pref_key("ia", input, "").c_str(), rogue_io_text(s.inputs[input]));

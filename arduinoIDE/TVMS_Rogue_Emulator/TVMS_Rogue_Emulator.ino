@@ -24,8 +24,6 @@ struct RogueDefaults {
   int8_t      can_rx_pin;
   uint8_t     source_address;
   uint32_t    serial_prefix;
-  uint16_t    serial_suffix;
-  const char *product_name;
   uint8_t     tank1_percent;
   const char *tank1;
   uint8_t     tank2_percent;
@@ -117,7 +115,15 @@ Preferences object_prefs;
 static uint8_t *config_object = nullptr;
 static uint32_t config_object_len = 0;
 static bool config_from_flash = false;
-static bool object2_dgn_warned[256] = {false};   // per DGN low byte; cleared when the object changes
+static bool object2_dgn_warned[256] = {false};
+
+// Identity (0x1F403 name, 0x1F404 serial suffix) from this device's record in Object 2.
+static constexpr uint8_t DEVICE_TYPE_TVMS_ROGUE = 0x16;
+static constexpr uint16_t FALLBACK_SERIAL_SUFFIX = 0x0013;
+static const char FALLBACK_PRODUCT_NAME[] = "TVMS Rogue";
+static char identity_name[64] = "TVMS Rogue";
+static uint16_t identity_suffix = FALLBACK_SERIAL_SUFFIX;
+static bool identity_from_object = false;   // per DGN low byte; cleared when the object changes
 
 // Transactional Object 2 write (0x0E87 start .. 0x0E8A commit), ported from the ESPHome
 // emulated-rogue component. Blocks are staged and only replace the active object after
@@ -286,6 +292,49 @@ bool object2_rogue_root(uint32_t &node) {
 bool object2_channel_record(uint8_t channel, uint32_t &record) {
   uint32_t node = 0;
   return object2_rogue_root(node) && object2_map_value(node, 0x02, node) && object2_map_value(node, channel, record);
+}
+
+// Rogue root[1] lists every device in the RedVision system. Each record: key 1 = serial blob
+// (type 0x05, first 4 bytes = serial prefix), key 2 = serial suffix, key 3 = device type,
+// key 4 = name. This device's record is the TVMS Rogue whose serial prefix matches its own.
+bool object2_identity_record(uint32_t serial_prefix, uint32_t &record) {
+  uint32_t list = 0;
+  if (!object2_rogue_root(list) || !object2_map_value(list, 0x01, list) || list + 4UL > config_object_len) return false;
+  const uint32_t header = object2_u32(list);
+  const uint32_t length = header & 0x00FFFFFFUL;
+  if ((header >> 24) != 0x02 || list + 4UL + length > config_object_len) return false;
+  for (uint32_t i = 0; i + 4UL <= length; i += 4) {
+    const uint32_t candidate = object2_u32(list + 4UL + i);
+    uint32_t blob = 0, type = 0;
+    if (!object2_map_value(candidate, 0x01, blob) || !object2_map_int(candidate, 0x03, type) || type != DEVICE_TYPE_TVMS_ROGUE) continue;
+    if (blob + 8UL > config_object_len) continue;
+    const uint32_t blob_header = object2_u32(blob);
+    if ((blob_header >> 24) != 0x05 || (blob_header & 0x00FFFFFFUL) < 4 || blob + 4UL + (blob_header & 0x00FFFFFFUL) > config_object_len) continue;
+    if (object2_u32(blob + 4UL) != serial_prefix) continue;
+    record = candidate;
+    return true;
+  }
+  return false;
+}
+
+// Sets the name and serial suffix from this device's Object 2 record. Without a matching
+// record it uses the standard TVMS Rogue identity rather than borrowing another Rogue's.
+void load_identity() {
+  uint32_t record = 0, suffix = 0, name = 0, name_offset = 0, name_len = 0;
+  if (object2_identity_record(settings.serial_prefix, record) && object2_map_int(record, 0x02, suffix) && suffix <= 0xFFFF &&
+      object2_map_value(record, 0x04, name) && object2_string(name, name_offset, name_len)) {
+    const uint32_t n = name_len < sizeof(identity_name) - 1 ? name_len : sizeof(identity_name) - 1;
+    memcpy(identity_name, config_object + name_offset, n);
+    identity_name[n] = '\0';
+    identity_suffix = (uint16_t) suffix;
+    identity_from_object = true;
+  } else {
+    strncpy(identity_name, FALLBACK_PRODUCT_NAME, sizeof(identity_name) - 1);
+    identity_suffix = FALLBACK_SERIAL_SUFFIX;
+    identity_from_object = false;
+    Serial.printf("Object2: no TVMS Rogue record with serial %lu, using standard identity\n", (unsigned long) settings.serial_prefix);
+  }
+  Serial.printf("Identity: %lu-%04u \"%s\" (%s)\n", (unsigned long) settings.serial_prefix, (unsigned) identity_suffix, identity_name, identity_from_object ? "Object 2" : "standard");
 }
 
 // Reports once per active object that a DGN reply could not be built from it.
@@ -721,8 +770,8 @@ void send_digital_input_config() { for (uint8_t ch = 1; ch <= 8; ch++) send_fram
 void send_all_status() { send_channel_status(); send_sensor_values(); send_output_levels(); send_output_activity(); send_active_channels(); send_output_capabilities(); }
 
 void send_node_firmware() { send_frame8(with_sa(ID_NODE_FIRMWARE),0x43,0x01,0x01,0x04,0,0,0,0); send_frame8(with_sa(ID_NODE_FIRMWARE),0x43,0x01,0,0x04,0,0,0x01,0); }
-void send_product_name() { const size_t len = strlen(settings.product_name); uint8_t seg_count = (uint8_t)(len / 7 + 1); for (uint8_t seg = 0; seg < seg_count; seg++) { uint8_t data[8] = {seg,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF}; for (uint8_t i = 0; i < 7; i++) { size_t pos = (size_t) seg * 7 + i; if (pos < len) data[1 + i] = (uint8_t) settings.product_name[pos]; } send_frame(with_sa(ID_NODE_PRODUCT_NAME), data, 8); } }
-void send_serial_info() { send_frame8(with_sa(ID_NODE_SERIAL_INFO), (uint8_t)(settings.serial_prefix & 0xFF), (uint8_t)((settings.serial_prefix >> 8) & 0xFF), (uint8_t)((settings.serial_prefix >> 16) & 0xFF), (uint8_t)((settings.serial_prefix >> 24) & 0xFF), (uint8_t)(settings.serial_suffix & 0xFF), (uint8_t)((settings.serial_suffix >> 8) & 0xFF), 0x16, 0); }
+void send_product_name() { const size_t len = strlen(identity_name); uint8_t seg_count = (uint8_t)(len / 7 + 1); for (uint8_t seg = 0; seg < seg_count; seg++) { uint8_t data[8] = {seg,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF}; for (uint8_t i = 0; i < 7; i++) { size_t pos = (size_t) seg * 7 + i; if (pos < len) data[1 + i] = (uint8_t) identity_name[pos]; } send_frame(with_sa(ID_NODE_PRODUCT_NAME), data, 8); } }
+void send_serial_info() { send_frame8(with_sa(ID_NODE_SERIAL_INFO), (uint8_t)(settings.serial_prefix & 0xFF), (uint8_t)((settings.serial_prefix >> 8) & 0xFF), (uint8_t)((settings.serial_prefix >> 16) & 0xFF), (uint8_t)((settings.serial_prefix >> 24) & 0xFF), (uint8_t)(identity_suffix & 0xFF), (uint8_t)((identity_suffix >> 8) & 0xFF), 0x16, 0); }
 void send_device_id() { send_frame8(with_sa(ID_NODE_DEVICE_ID), 0,0,0,0,0, settings.source_address, 0x01, 0); }
 void send_identity() { send_node_firmware(); send_product_name(); send_serial_info(); send_device_id(); send_load_disconnect_config(); }
 
@@ -758,8 +807,10 @@ void end_config_write() {
 // Re-derives everything that comes from Object 2 after it changes, and re-broadcasts it.
 void apply_config_object() {
   memset(object2_dgn_warned, 0, sizeof(object2_dgn_warned));
+  load_identity();
   load_output_capabilities();
   configure_io_pins();
+  send_identity();
   send_output_capabilities();
   send_all_status();
 }
@@ -905,7 +956,7 @@ void print_io_assignments() {
 
 void print_status() {
   Serial.printf("SA=0x%02X object=%u object2=%lu bytes (%s) master=%s tank1=%u%% tank2=%u%% Vin=%.3fV Iin=%.3fA CAN=%s\n", settings.source_address, selected_object, (unsigned long) config_object_len, config_from_flash ? "saved" : "factory", master_state ? "ON" : "OFF", settings.tank1_percent, settings.tank2_percent, input_voltage_mv / 1000.0f, input_current_ma / 1000.0f, can_running ? "running" : "down");
-  Serial.printf("Serial=%lu-%04u name=\"%s\"\n", (unsigned long) settings.serial_prefix, (unsigned) settings.serial_suffix, settings.product_name);
+  Serial.printf("Serial=%lu-%04u name=\"%s\" (%s)\n", (unsigned long) settings.serial_prefix, (unsigned) identity_suffix, identity_name, identity_from_object ? "Object 2" : "standard");
   for (uint8_t output = 1; output <= ROGUE_OUTPUT_COUNT; output++) Serial.printf("O%u=%u%% ", output, output_levels[output]);
   Serial.println(); print_io_assignments();
 }
@@ -913,7 +964,7 @@ void print_status() {
 void print_help() {
   Serial.println("status | io | t1 <0-100> | t2 <0-100> | v <mV> | i <mA> | m <0|1> | o<n> <0-100> | in<n> <0|1>");
   Serial.println("tank <n> <a> | input <n> <a> | output <n> <a>   where <a> = GPIO<n> | simulate | disabled | <variable-name>");
-  Serial.println("set <variable-name> <value> | sa <0x01-0xFE> | serial <prefix> <suffix> | name <text>");
+  Serial.println("set <variable-name> <value> | sa <0x01-0xFE> | serial <prefix>");
   Serial.println("save | defaults | factory | crc | identity | send");
 }
 
@@ -984,8 +1035,8 @@ void handle_serial_line(String raw) {
   if (lower.startsWith("m ")) { set_master(raw.substring(2).toInt() != 0, "Serial"); send_all_status(); return; }
   if (lower.startsWith("in")) { const int space = raw.indexOf(' '); if (space > 2) { const uint8_t input = (uint8_t) raw.substring(2, space).toInt(); if (input < 1 || input > ROGUE_INPUT_COUNT) { Serial.println("Input number must be 1..8."); return; } if (set_input_variable(input, raw.substring(space + 1).toInt() != 0, "Serial")) send_channel_status(); return; } }
   if (lower.startsWith("sa ")) { uint32_t value = parse_u32(raw.substring(3)); if (value == 0 || value > 0xFE) { Serial.println("Invalid source address. Use 0x01..0xFE."); return; } settings.source_address = (uint8_t) value; save_settings(); send_identity(); send_all_status(); return; }
-  if (lower.startsWith("serial ")) { String rest = raw.substring(7); rest.trim(); int space = rest.indexOf(' '); if (space <= 0) { Serial.println("Usage: serial <prefix> <suffix>"); return; } settings.serial_prefix = parse_u32(rest.substring(0, space)); settings.serial_suffix = (uint16_t) parse_u32(rest.substring(space + 1)); save_settings(); send_serial_info(); return; }
-  if (lower.startsWith("name ")) { String new_name = raw.substring(5); new_name.trim(); if (new_name.length() == 0) { Serial.println("Name cannot be empty."); return; } rogue_copy_product_name(settings, new_name.c_str()); save_settings(); send_product_name(); return; }
+  if (lower.startsWith("serial ")) { uint32_t value = parse_u32(raw.substring(7)); if (value == 0) { Serial.println("Usage: serial <prefix>"); return; } settings.serial_prefix = value; save_settings(); load_identity(); send_identity(); return; }
+  if (lower.startsWith("name ")) { Serial.println("The name comes from this device's record in Object 2; change it in RedVision."); return; }
   if (lower.startsWith("o")) { const int space = raw.indexOf(' '); if (space > 1) { const uint8_t output = (uint8_t) raw.substring(1, space).toInt(); const uint8_t percent = clamp_percent(raw.substring(space + 1).toFloat()); set_output_level(output, percent, "Serial"); send_all_status(); return; } }
   Serial.println("Unknown command. Type help.");
 }
@@ -1046,7 +1097,7 @@ void poll_io_assignments() {
 }
 
 void setup() {
-  defaults.load(); Serial.begin(115200); delay(500); Serial.println(); Serial.println("REDARC TVMS Rogue Emulator - Arduino IDE standalone"); rogue_settings_load(prefs, settings); load_config_object(); load_output_capabilities(); validate_io_assignments(); tank_variable_percent[1] = settings.tank1_percent; tank_variable_percent[2] = settings.tank2_percent; configure_io_pins(); Serial.printf("Source address: 0x%02X\n", settings.source_address); Serial.printf("Serial: %lu-%04u  Product: %s\n", (unsigned long) settings.serial_prefix, (unsigned) settings.serial_suffix, settings.product_name); Serial.println("Type help for serial commands."); object2_self_test(); start_can(); send_identity(); send_all_status();
+  defaults.load(); Serial.begin(115200); delay(500); Serial.println(); Serial.println("REDARC TVMS Rogue Emulator - Arduino IDE standalone"); rogue_settings_load(prefs, settings); load_config_object(); load_identity(); load_output_capabilities(); validate_io_assignments(); tank_variable_percent[1] = settings.tank1_percent; tank_variable_percent[2] = settings.tank2_percent; configure_io_pins(); Serial.printf("Source address: 0x%02X\n", settings.source_address); Serial.println("Type help for serial commands."); object2_self_test(); start_can(); send_identity(); send_all_status();
 }
 
 void loop() {

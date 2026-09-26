@@ -19,9 +19,9 @@ can_rx_pin = 19;
 
 source_address = 0x36;        // keep different from a real Rogue at 0x30
 
+// This device's serial number. Its name and serial suffix come from the matching
+// TVMS Rogue record in the configuration object (Object 2), which RedVision writes.
 serial_prefix = 2606260001UL;
-serial_suffix = 0x0013;
-product_name  = "TVMS Rogue";
 
 // Tank levels 1..2
 tank1_percent = 50;

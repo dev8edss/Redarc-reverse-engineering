@@ -226,8 +226,8 @@ The sketch responds to DGN requests for:
 |---|---|---|
 | `0x1F108` | load-disconnect configuration | Object 2: Rogue root key 4 (trigger, disconnect/reconnect mV and SOC) |
 | `0x1F400` | firmware/version records | fixed |
-| `0x1F403` | product name chunks | `name` setting |
-| `0x1F404` | serial/device type information | `serial` setting |
+| `0x1F403` | product name chunks | Object 2: this device's record, key 4 (see [Identity](#identity)) |
+| `0x1F404` | serial/device type information | `serial` setting (prefix) + Object 2 record key 2 (suffix) |
 | `0x1F405` | unique/device ID | fixed |
 | `0x1FD00` | channel status | live state |
 | `0x1FD02` | tanks / voltage / current | live state |
@@ -245,6 +245,30 @@ The sketch responds to DGN requests for:
 Replies marked Object 2 are built from the active configuration each time they are sent, so they follow a configuration written from RedVision straight away. The object paths are the ones confirmed against a real Rogue in `docs/TVMS_ROGUE_DGN_OBJECT_MAPPING.md` on the `emulated-rogue` branch. That document also explains why `0x1FD07`, `0x1FD08`, `0x1FD0C` and `0x1FD10` are not derived from the object yet: a real Rogue's reply does not follow the object fields found so far, so the captured reply is sent unchanged.
 
 If the active object does not contain a field a reply needs, that reply is not sent, and the Serial Monitor prints `Object2: cannot build 0x1FDxx from the active configuration` once per configuration.
+
+## Identity
+
+The device list in Object 2 (Rogue root key 1) holds a record for every device in the RedVision system: serial prefix, serial suffix, device type and name. The captured object lists two TVMS Rogues:
+
+| Record | Serial | Name |
+|---|---|---|
+| 0 | 2506156912-0019 | TVMS Rogue (1) |
+| 6 | 2606260001-0019 | TVMS Rogue (2) |
+
+The emulator uses the **TVMS Rogue record whose serial prefix matches its own** (`serial_prefix` in `RoguePreferences.h`, or `serial <prefix>` from Serial Monitor). That record supplies:
+
+- the name sent on `0x1F403`, and
+- the serial suffix sent on `0x1F404`.
+
+The default serial `2606260001` selects "TVMS Rogue (2)". Renaming the device in RedVision writes a new object, and the new name is sent straight away.
+
+If no TVMS Rogue record matches the serial, the emulator uses the standard identity `TVMS Rogue` / suffix `0x0013` and prints a message. It does not borrow another Rogue's record. Only the serial prefix is a setting; there is no name setting, and `name` in Serial Monitor explains where the name comes from.
+
+The boot log shows the result:
+
+```text
+Identity: 2606260001-0019 "TVMS Rogue (2)" (Object 2)
+```
 
 ## REDARC Object 2 (configuration)
 
@@ -289,7 +313,7 @@ Anything else (a bad block CRC, a missing page, a bad whole-object CRC, a failed
 
 After a successful commit the new object is used immediately, with no reboot:
 
-- output types (dimmable / on-off / always-on) are re-read, and the `0x1FD0E` capabilities are re-broadcast,
+- identity (name and serial suffix) and output types (dimmable / on-off / always-on) are re-read, and identity and `0x1FD0E` capabilities are re-broadcast,
 - GPIO outputs switch between PWM and on/off to match,
 - `0x0E86` reads return the new object byte-for-byte.
 
@@ -347,8 +371,7 @@ input <n> <GPIO<n>|simulate|disabled|variable-name>
 output <n> <GPIO<n>|simulate|disabled|variable-name>
 
 sa <0x01-0xFE>        set/persist source address
-serial <prefix> <suffix>
-name <text>
+serial <prefix>       set/persist this device's serial (selects its Object 2 identity record)
 
 save                  save settings to NVS
 defaults              restore default persisted settings
@@ -362,8 +385,7 @@ Examples:
 
 ```text
 sa 0x36
-serial 2606260001 0x0013
-name TVMS Rogue
+serial 2606260001
 
 tank 1 GPIO34
 tank 2 grey_water
@@ -397,8 +419,6 @@ The following are saved in ESP32 NVS by `RoguePreferencesRuntime.h`:
 - Tank 2 percent,
 - Tank 1–2 assignment text (`ta1`, `ta2`),
 - serial prefix,
-- serial suffix,
-- product name,
 - input 1–8 assignment text (`ia1`..`ia8`),
 - output 1–10 assignment text (`oa1`..`oa10`),
 - the committed Object 2 configuration (separate namespace `rogueobj`, key `obj2`; see [Writing](#writing-programming)).
@@ -413,11 +433,11 @@ Use `defaults` to restore the built-in defaults, and `factory` to erase the save
 - Tank GPIO mode currently uses fixed raw ADC scaling `0..4095 -> 0..100%`; calibration can be added later.
 - GPIO output PWM is linear duty with no gamma correction, and is active-high only.
 - Configuration writes were tested against a simulated write sequence built from the ESPHome emulator notes, not yet against RedVision on a real bus.
-- `0x1FD07`, `0x1FD08`, `0x1FD0C` and `0x1FD10` still send the captured Rogue replies. Identity (`0x1F403`/`0x1F404`) comes from the `name`/`serial` settings, not from Object 2.
+- `0x1FD07`, `0x1FD08`, `0x1FD0C` and `0x1FD10` still send the captured Rogue replies.
 - GPIO inputs are read as active-high using `pinMode(pin, INPUT)`.
 - GPIO6–11 are blocked only on the original ESP32; flash/PSRAM pins on other ESP32 variants are not blocked.
 - Master OFF sets all outputs to 0% but does not stop outputs being switched on again while master is off.
-- Changing serial/name/source address changes the live identity frames but does not rewrite Object 2.
+- Changing the serial or source address from Serial Monitor does not rewrite Object 2.
 - BLE/RBus emulation is not included.
 
 ## CAN safety
