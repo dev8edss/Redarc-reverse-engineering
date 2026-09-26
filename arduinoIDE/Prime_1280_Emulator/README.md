@@ -18,7 +18,7 @@ arduinoIDE/Prime_1280_Emulator/PrimePreferencesRuntime.h
 
 This is a standalone ESP32/TWAI Arduino sketch for a REDARC Prime / TVMS1280 style node.
 
-It is now structured like the Rogue emulator:
+It is structured like the Rogue emulator:
 
 - `PrimePreferences.h` is the editable defaults file.
 - `PrimePreferencesRuntime.h` owns the NVS settings schema and assignment parser.
@@ -32,6 +32,15 @@ Prime-specific channel layout used by this sketch:
 | Outputs | 11 | `0x04..0x0E` |
 | Master switch | 1 | `0x0F` |
 | Tanks / analogue levels | 6 | `0x15..0x1A` |
+
+Prime / TVMS1280 outputs are **on/off only**. GPIO outputs are digital only:
+
+```text
+0%      -> LOW / off
+1..100% -> HIGH / on
+```
+
+The Prime sketch deliberately disables the Rogue-style LEDC PWM path.
 
 ## Captured Object 2
 
@@ -90,7 +99,7 @@ Each assignment can be:
 
 | Assignment text | Mode | Meaning |
 |---|---|---|
-| `GPIO34` | pin | Bound to that ESP32 GPIO. Tanks read analog ADC; inputs read digital; outputs drive PWM. |
+| `GPIO34` | pin | Bound to that ESP32 GPIO. Tanks read analog ADC; inputs read digital; outputs drive digital on/off. |
 | `simulate` | simulated | Internal emulator value only. |
 | `disabled` | disabled | Channel is forced off/zero and commands are ignored. |
 | anything else | variable | Named variable driven with `set <name> <value>`. |
@@ -115,7 +124,7 @@ defaults
 
 - Tank GPIO mode uses `analogRead()` and maps raw ADC `0..4095` to `0..100%`.
 - Input GPIO mode is active-high: LOW = off, HIGH = on.
-- Output GPIO mode uses LEDC PWM, so output level `0..100%` becomes PWM duty.
+- Output GPIO mode is digital only. Any non-zero output level is ON.
 - GPIO6–11 are blocked on original ESP32 because they are flash pins.
 - CAN TX/RX pins cannot be assigned to a tank/input/output.
 - A GPIO can only be assigned to one channel.
@@ -166,6 +175,8 @@ o11 <0-100>
 set <variable-name> <value>
 ```
 
+For outputs, `o<n> 1` through `o<n> 100` all mean ON; `o<n> 0` means OFF.
+
 Example:
 
 ```text
@@ -203,5 +214,5 @@ Runtime status/tank/input/output values are live and come from the assignment sy
 
 - Not compile-tested in Arduino IDE here.
 - Prime config DGN replies are captured frames, not decoded dynamically from Object 2 yet.
-- Output PWM is generic `0..100%` duty; Prime-specific output capability bits are still sent from the captured frames.
+- Runtime GPIO outputs are on/off only, but the captured `0x1FD0E` capability replies still reflect whichever Prime configuration was captured.
 - This emulates a Prime node on CAN only; it does not update the broader RedVision system configuration to add a second Prime module.
