@@ -60,3 +60,19 @@ output_7  = "simulate";
 output_8  = "simulate";
 output_9  = "simulate";
 output_10 = "simulate";
+
+// DGN replies that are not decoded from Object 2 yet. Defaults are the captured real-Rogue
+// replies. Each is a list of 8-byte CAN frames: hex bytes separated by spaces, frames
+// separated by commas (up to 16 frames). "" sends no reply. Known layout:
+//   0x1FD07 D1 base item, D2-D8 status per item (FF = OK/unknown; FC/FD seen on other devices)
+//   0x1FD08 D1 highest channel (0x21), D2-D8 not decoded
+//   0x1FD0C D1 channel, D2 format (64 tank %, 61 analogue), D7-D8 range max LE (100 / 60000)
+//   0x1FD10 D1 input 1-8, D2-D3 not decoded (a real Rogue sends 00 00)
+reply_1fd07_sensor_status   = "09 FF FF FF FF FF FF FF, 16 FF FF FF FF FF FF FF";
+reply_1fd08_active_channels = "21 FF FF 1E FF FF FF FF";
+reply_1fd0c_sensor_format   = "09 64 00 00 00 00 64 00, 0A 64 00 00 00 00 64 00, "
+                              "16 61 00 00 00 00 60 EA, 17 61 00 00 00 00 60 EA";
+reply_1fd10_input_config    = "01 00 00 FF FF FF FF FF, 02 00 00 FF FF FF FF FF, "
+                              "03 00 00 FF FF FF FF FF, 04 00 00 FF FF FF FF FF, "
+                              "05 00 00 FF FF FF FF FF, 06 00 00 FF FF FF FF FF, "
+                              "07 00 00 FF FF FF FF FF, 08 00 00 FF FF FF FF FF";

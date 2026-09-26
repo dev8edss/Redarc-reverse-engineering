@@ -34,6 +34,8 @@ struct RogueDefaults {
   uint8_t     output_pwm_resolution_bits;
   const char *output_1, *output_2, *output_3, *output_4, *output_5,
              *output_6, *output_7, *output_8, *output_9, *output_10;
+  const char *reply_1fd07_sensor_status, *reply_1fd08_active_channels,
+             *reply_1fd0c_sensor_format, *reply_1fd10_input_config;
 
   void load() {
 #include "RoguePreferences.h"
@@ -134,6 +136,11 @@ static uint8_t *write_staging = nullptr;        // MAX_CONFIG_OBJECT_SIZE, alloc
 static uint8_t write_received[MAX_CONFIG_OBJECT_SIZE / 8];
 static uint8_t write_block[WRITE_WINDOW_SIZE];
 static uint32_t write_block_len = 0;
+
+// Replies not yet decoded from Object 2, parsed at boot from the reply_ settings.
+static constexpr uint8_t MAX_REPLY_FRAMES = 16;
+struct FrameList { uint8_t count; uint8_t frames[MAX_REPLY_FRAMES][8]; };
+static FrameList reply_1fd07, reply_1fd08, reply_1fd0c, reply_1fd10;
 static uint8_t output_levels[ROGUE_OUTPUT_COUNT + 1] = {0};
 static bool input_states[ROGUE_INPUT_COUNT + 1] = {false};
 static bool input_variable_state[ROGUE_INPUT_COUNT + 1] = {false};
@@ -149,6 +156,48 @@ static uint32_t last_io_poll_ms = 0;
 
 uint32_t with_sa(uint32_t base_id) {
   return (base_id & 0x1FFFFF00UL) | settings.source_address;
+}
+
+// Parses a reply setting: 8 hex bytes per frame separated by spaces, frames separated by
+// commas, e.g. "09 FF FF FF FF FF FF FF, 16 FF FF FF FF FF FF FF". An empty string means
+// no reply. On a format error the reply is disabled and the problem is printed.
+bool parse_frame_list(const char *setting, const char *text, FrameList &list) {
+  list.count = 0;
+  uint8_t byte_index = 0;
+  const char *error = nullptr;
+  for (const char *p = text != nullptr ? text : ""; *p != '\0' && error == nullptr;) {
+    if (*p == ' ') { p++; continue; }
+    if (*p == ',') {
+      if (byte_index != 8) error = "a frame does not have exactly 8 bytes";
+      else { list.count++; byte_index = 0; p++; }
+      continue;
+    }
+    if (!isxdigit((unsigned char) p[0]) || !isxdigit((unsigned char) p[1]) || isxdigit((unsigned char) p[2])) { error = "bytes must be two hex digits"; continue; }
+    if (byte_index == 8) { error = "a frame has more than 8 bytes (missing comma?)"; continue; }
+    if (list.count == MAX_REPLY_FRAMES) { error = "too many frames"; continue; }
+    const char hex[3] = {p[0], p[1], '\0'};
+    list.frames[list.count][byte_index++] = (uint8_t) strtoul(hex, nullptr, 16);
+    p += 2;
+  }
+  if (error == nullptr && byte_index != 0 && byte_index != 8) error = "the last frame does not have exactly 8 bytes";
+  if (error == nullptr && byte_index == 8) list.count++;
+  if (error != nullptr) {
+    list.count = 0;
+    Serial.printf("RoguePreferences.h: %s is invalid, %s; reply disabled\n", setting, error);
+    return false;
+  }
+  return true;
+}
+
+void parse_frame_lists() {
+  parse_frame_list("reply_1fd07_sensor_status", defaults.reply_1fd07_sensor_status, reply_1fd07);
+  parse_frame_list("reply_1fd08_active_channels", defaults.reply_1fd08_active_channels, reply_1fd08);
+  parse_frame_list("reply_1fd0c_sensor_format", defaults.reply_1fd0c_sensor_format, reply_1fd0c);
+  parse_frame_list("reply_1fd10_input_config", defaults.reply_1fd10_input_config, reply_1fd10);
+}
+
+void send_frame_list(uint32_t base_id, const FrameList &list) {
+  for (uint8_t i = 0; i < list.count; i++) send_frame(with_sa(base_id), list.frames[i], 8);
 }
 
 uint16_t u16_le(const uint8_t *d) {
@@ -699,7 +748,7 @@ void send_output_activity() {
   send_frame8(with_sa(ID_OUTPUT_ACTIVITY), 0x13, hold_dim_direction[8] ? 0x02 : 0x00, hold_dim_direction[9] ? 0x02 : 0x00, hold_dim_direction[10] ? 0x02 : 0x00, 0xFF, 0xFF, 0xFF, 0xFF);
 }
 
-void send_active_channels() { send_frame8(with_sa(ID_ACTIVE_CHANNELS), 0x21, 0xFF, 0xFF, 0x1E, 0xFF, 0xFF, 0xFF, 0xFF); }
+void send_active_channels() { send_frame_list(ID_ACTIVE_CHANNELS, reply_1fd08); }
 uint8_t output_capability(uint8_t output) { return output >= 1 && output <= ROGUE_OUTPUT_COUNT ? output_caps[output] : 0; }
 void send_output_capabilities() { for (uint8_t i = 1; i <= 10; i++) send_frame8(with_sa(ID_OUTPUT_CAPABILITIES), CHANNEL_OUTPUT_1 + i - 1, output_capability(i), 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF); }
 
@@ -761,11 +810,12 @@ void send_alarm_config() {
   for (uint8_t i = 0; i < 4; i++) send_frame8(with_sa(ID_ALARM_CONFIG), channels[i], (uint8_t) v[i][0], (uint8_t) (v[i][1] & 0xFF), (uint8_t) ((v[i][1] >> 8) & 0xFF), (uint8_t) (v[i][2] & 0xFF), (uint8_t) ((v[i][2] >> 8) & 0xFF), 0xFF, 0xFF);
 }
 
-// Not derived from Object 2: a real Rogue's replies to these are not yet decoded, so the
-// captured values are sent (see docs/TVMS_ROGUE_DGN_OBJECT_MAPPING.md on emulated-rogue).
-void send_alarm_status() { send_frame8(with_sa(ID_ALARM_STATUS),0x09,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF); send_frame8(with_sa(ID_ALARM_STATUS),0x16,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF); }
-void send_analog_scaling() { send_frame8(with_sa(ID_ANALOG_SCALING),0x09,0x64,0,0,0,0,0x64,0); send_frame8(with_sa(ID_ANALOG_SCALING),0x0A,0x64,0,0,0,0,0x64,0); send_frame8(with_sa(ID_ANALOG_SCALING),0x16,0x61,0,0,0,0,0x60,0xEA); send_frame8(with_sa(ID_ANALOG_SCALING),0x17,0x61,0,0,0,0,0x60,0xEA); }
-void send_digital_input_config() { for (uint8_t ch = 1; ch <= 8; ch++) send_frame8(with_sa(ID_DIGITAL_INPUT_CONFIG), ch, 0, 0, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF); }
+// Not derived from Object 2: a real Rogue's replies to these are not decoded yet (see
+// docs/TVMS_ROGUE_DGN_OBJECT_MAPPING.md on emulated-rogue), so they are sent exactly as set in
+// RoguePreferences.h. The defaults there are the captured Rogue replies.
+void send_alarm_status() { send_frame_list(ID_ALARM_STATUS, reply_1fd07); }
+void send_analog_scaling() { send_frame_list(ID_ANALOG_SCALING, reply_1fd0c); }
+void send_digital_input_config() { send_frame_list(ID_DIGITAL_INPUT_CONFIG, reply_1fd10); }
 void send_all_status() { send_channel_status(); send_sensor_values(); send_output_levels(); send_output_activity(); send_active_channels(); send_output_capabilities(); }
 
 void send_node_firmware() { send_frame8(with_sa(ID_NODE_FIRMWARE),0x43,0x01,0x01,0x04,0,0,0,0); send_frame8(with_sa(ID_NODE_FIRMWARE),0x43,0x01,0,0x04,0,0,0x01,0); }
@@ -1096,7 +1146,7 @@ void poll_io_assignments() {
 }
 
 void setup() {
-  defaults.load(); Serial.begin(115200); delay(500); Serial.println(); Serial.println("REDARC TVMS Rogue Emulator - Arduino IDE standalone"); rogue_settings_load(prefs, settings); load_config_object(); load_identity(); load_output_capabilities(); validate_io_assignments(); tank_variable_percent[1] = settings.tank1_percent; tank_variable_percent[2] = settings.tank2_percent; configure_io_pins(); Serial.printf("Source address: 0x%02X\n", settings.source_address); Serial.println("Type help for serial commands."); object2_self_test(); start_can(); send_identity(); send_all_status();
+  defaults.load(); Serial.begin(115200); delay(500); Serial.println(); Serial.println("REDARC TVMS Rogue Emulator - Arduino IDE standalone"); parse_frame_lists(); rogue_settings_load(prefs, settings); load_config_object(); load_identity(); load_output_capabilities(); validate_io_assignments(); tank_variable_percent[1] = settings.tank1_percent; tank_variable_percent[2] = settings.tank2_percent; configure_io_pins(); Serial.printf("Source address: 0x%02X\n", settings.source_address); Serial.println("Type help for serial commands."); object2_self_test(); start_can(); send_identity(); send_all_status();
 }
 
 void loop() {

@@ -233,16 +233,32 @@ The sketch responds to DGN requests for:
 | `0x1FD02` | tanks / voltage / current | live state |
 | `0x1FD04` | channel labels | Object 2: channel record key 1 |
 | `0x1FD06` | alarm mode and thresholds (tanks, input V/A) | Object 2: tanks record key 5 → 7, input V/A record key 8 → 1 |
-| `0x1FD07` | sensor validity/status pages | captured Rogue reply |
-| `0x1FD08` | active-channel inventory | captured Rogue reply |
+| `0x1FD07` | sensor validity/status pages | `reply_1fd07_…` setting (default: captured Rogue reply) |
+| `0x1FD08` | active-channel inventory | `reply_1fd08_…` setting (default: captured Rogue reply) |
 | `0x1FD0A` | channel class, subtype, icon, enabled | Object 2: channel record keys 2, 3 (tanks also key 5 → 4) |
-| `0x1FD0C` | sensor engineering metadata | captured Rogue reply |
+| `0x1FD0C` | sensor engineering metadata | `reply_1fd0c_…` setting (default: captured Rogue reply) |
 | `0x1FD0E` | output capabilities | Object 2: channel record key 6 |
-| `0x1FD10` | digital-input secondary configuration | captured Rogue reply |
+| `0x1FD10` | digital-input secondary configuration | `reply_1fd10_…` setting (default: captured Rogue reply) |
 | `0x1FD12` | output levels | live state |
 | `0x1FD14` | output activity | live state |
 
-Replies marked Object 2 are built from the active configuration each time they are sent, so they follow a configuration written from RedVision straight away. The object paths are the ones confirmed against a real Rogue in `docs/TVMS_ROGUE_DGN_OBJECT_MAPPING.md` on the `emulated-rogue` branch. That document also explains why `0x1FD07`, `0x1FD08`, `0x1FD0C` and `0x1FD10` are not derived from the object yet: a real Rogue's reply does not follow the object fields found so far, so the captured reply is sent unchanged.
+Replies marked Object 2 are built from the active configuration each time they are sent, so they follow a configuration written from RedVision straight away. The object paths are the ones confirmed against a real Rogue in `docs/TVMS_ROGUE_DGN_OBJECT_MAPPING.md` on the `emulated-rogue` branch. That document also explains why `0x1FD07`, `0x1FD08`, `0x1FD0C` and `0x1FD10` are not derived from the object yet: a real Rogue's reply does not follow the object fields found so far.
+
+Those four replies are set in `RoguePreferences.h` instead, as raw CAN frames. The defaults are the captured real-Rogue replies:
+
+```cpp
+reply_1fd07_sensor_status   = "09 FF FF FF FF FF FF FF, 16 FF FF FF FF FF FF FF";
+reply_1fd08_active_channels = "21 FF FF 1E FF FF FF FF";
+reply_1fd0c_sensor_format   = "09 64 00 00 00 00 64 00, 0A 64 00 00 00 00 64 00, "
+                              "16 61 00 00 00 00 60 EA, 17 61 00 00 00 00 60 EA";
+reply_1fd10_input_config    = "01 00 00 FF FF FF FF FF, 02 00 00 FF FF FF FF FF, ...";
+```
+
+- Each frame is 8 hex bytes separated by spaces; frames are separated by commas, up to 16 frames. Long values can be split into adjacent `"..." "..."` strings.
+- `""` sends no reply for that DGN.
+- The values are checked at boot. A malformed value disables that reply and prints why, e.g. `RoguePreferences.h: reply_1fd08_active_channels is invalid, the last frame does not have exactly 8 bytes; reply disabled`.
+- The comment above them in `RoguePreferences.h` lists what is known about each byte.
+- `0x1FD08` is also part of the periodic status broadcast, so it is sent as set there too.
 
 If the active object does not contain a field a reply needs, that reply is not sent, and the Serial Monitor prints `Object2: cannot build 0x1FDxx from the active configuration` once per configuration.
 
@@ -431,7 +447,7 @@ Use `defaults` to restore the built-in defaults, and `factory` to erase the save
 - Tank GPIO mode currently uses fixed raw ADC scaling `0..4095 -> 0..100%`; calibration can be added later.
 - GPIO output PWM is linear duty with no gamma correction, and is active-high only.
 - Configuration writes were tested against a simulated write sequence built from the ESPHome emulator notes, not yet against RedVision on a real bus.
-- `0x1FD07`, `0x1FD08`, `0x1FD0C` and `0x1FD10` still send the captured Rogue replies.
+- `0x1FD07`, `0x1FD08`, `0x1FD0C` and `0x1FD10` are raw frames from `RoguePreferences.h` (captured Rogue replies by default), not decoded from Object 2. They are not saved in NVS or changeable from Serial Monitor.
 - GPIO inputs are read as active-high using `pinMode(pin, INPUT)`.
 - GPIO6–11 are blocked only on the original ESP32; flash/PSRAM pins on other ESP32 variants are not blocked.
 - Master OFF sets all outputs to 0% but does not stop outputs being switched on again while master is off.
