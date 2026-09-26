@@ -227,7 +227,7 @@ The sketch responds to DGN requests for:
 | `0x1F108` | load-disconnect configuration | Object 2: Rogue root key 4 (trigger, disconnect/reconnect mV and SOC) |
 | `0x1F400` | firmware/version records | fixed |
 | `0x1F403` | product name chunks | Object 2: this device's record, key 4 (see [Identity](#identity)) |
-| `0x1F404` | serial/device type information | `serial` setting (prefix) + Object 2 record key 2 (suffix) |
+| `0x1F404` | serial/device type information | `serial_prefix` / `serial_suffix` settings |
 | `0x1F405` | unique/device ID | fixed |
 | `0x1FD00` | channel status | live state |
 | `0x1FD02` | tanks / voltage / current | live state |
@@ -255,19 +255,16 @@ The device list in Object 2 (Rogue root key 1) holds a record for every device i
 | 0 | 2506156912-0019 | TVMS Rogue (1) |
 | 6 | 2606260001-0019 | TVMS Rogue (2) |
 
-The emulator uses the **TVMS Rogue record whose serial prefix matches its own** (`serial_prefix` in `RoguePreferences.h`, or `serial <prefix>` from Serial Monitor). That record supplies:
+The serial number is fixed hardware identity on a real Rogue, so both parts are settings: `serial_prefix` and `serial_suffix` in `RoguePreferences.h`, or `serial <prefix> [suffix]` from Serial Monitor. They are sent on `0x1F404`.
 
-- the name sent on `0x1F403`, and
-- the serial suffix sent on `0x1F404`.
+The name comes from Object 2. The emulator uses the **TVMS Rogue record with the same serial, prefix and suffix**, and sends that record's name on `0x1F403`. The default serial `2606260001-0019` selects "TVMS Rogue (2)". Renaming the device in RedVision writes a new object, and the new name is sent straight away.
 
-The default serial `2606260001` selects "TVMS Rogue (2)". Renaming the device in RedVision writes a new object, and the new name is sent straight away.
-
-If no TVMS Rogue record matches the serial, the emulator uses the standard identity `TVMS Rogue` / suffix `0x0013` and prints a message. It does not borrow another Rogue's record. Only the serial prefix is a setting; there is no name setting, and `name` in Serial Monitor explains where the name comes from.
+If no TVMS Rogue record has that serial, the emulator uses the standard name `TVMS Rogue` and prints a message. It does not borrow another Rogue's record. There is no name setting; `name` in Serial Monitor explains where the name comes from.
 
 The boot log shows the result:
 
 ```text
-Identity: 2606260001-0019 "TVMS Rogue (2)" (Object 2)
+Identity: 2606260001-0019 "TVMS Rogue (2)" (name from Object 2)
 ```
 
 ## REDARC Object 2 (configuration)
@@ -313,7 +310,7 @@ Anything else (a bad block CRC, a missing page, a bad whole-object CRC, a failed
 
 After a successful commit the new object is used immediately, with no reboot:
 
-- identity (name and serial suffix) and output types (dimmable / on-off / always-on) are re-read, and identity and `0x1FD0E` capabilities are re-broadcast,
+- the device name and output types (dimmable / on-off / always-on) are re-read, and identity and `0x1FD0E` capabilities are re-broadcast,
 - GPIO outputs switch between PWM and on/off to match,
 - `0x0E86` reads return the new object byte-for-byte.
 
@@ -371,7 +368,7 @@ input <n> <GPIO<n>|simulate|disabled|variable-name>
 output <n> <GPIO<n>|simulate|disabled|variable-name>
 
 sa <0x01-0xFE>        set/persist source address
-serial <prefix>       set/persist this device's serial (selects its Object 2 identity record)
+serial <prefix> [suffix]  set/persist this device's serial (selects its Object 2 name record)
 
 save                  save settings to NVS
 defaults              restore default persisted settings
@@ -385,7 +382,7 @@ Examples:
 
 ```text
 sa 0x36
-serial 2606260001
+serial 2606260001 0x0013
 
 tank 1 GPIO34
 tank 2 grey_water
@@ -419,6 +416,7 @@ The following are saved in ESP32 NVS by `RoguePreferencesRuntime.h`:
 - Tank 2 percent,
 - Tank 1–2 assignment text (`ta1`, `ta2`),
 - serial prefix,
+- serial suffix,
 - input 1–8 assignment text (`ia1`..`ia8`),
 - output 1–10 assignment text (`oa1`..`oa10`),
 - the committed Object 2 configuration (separate namespace `rogueobj`, key `obj2`; see [Writing](#writing-programming)).

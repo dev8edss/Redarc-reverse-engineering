@@ -27,7 +27,8 @@ struct RogueSettings {
   uint8_t source_address;
   uint8_t tank1_percent;
   uint8_t tank2_percent;
-  uint32_t serial_prefix;  // this device's serial; selects its identity record in Object 2
+  uint32_t serial_prefix;  // this device's serial (fixed on a real Rogue); also selects
+  uint16_t serial_suffix;  // its name record in Object 2
 
   // 1-based arrays. Index 0 is unused so REDARC channel numbering is easy.
   RogueIoAssignment tanks[ROGUE_TANK_COUNT + 1];
@@ -150,6 +151,7 @@ static inline void rogue_settings_defaults(RogueSettings &s) {
   s.tank1_percent = defaults.tank1_percent;
   s.tank2_percent = defaults.tank2_percent;
   s.serial_prefix = defaults.serial_prefix;
+  s.serial_suffix = defaults.serial_suffix;
 
   rogue_io_set_simulated(s.tanks[0]);
   rogue_io_set_simulated(s.inputs[0]);
@@ -228,8 +230,8 @@ static inline void rogue_settings_load(Preferences &prefs, RogueSettings &s) {
   s.tank1_percent = prefs.getUChar("t1", s.tank1_percent);
   s.tank2_percent = prefs.getUChar("t2", s.tank2_percent);
   s.serial_prefix = prefs.getUInt("sp", s.serial_prefix);
-  // Serial suffix and product name now come from Object 2; drop values saved by older builds.
-  if (prefs.isKey("ss")) prefs.remove("ss");
+  s.serial_suffix = prefs.getUShort("ss", s.serial_suffix);
+  // The product name now comes from Object 2; drop a name saved by older builds.
   if (prefs.isKey("name")) prefs.remove("name");
 
   for (uint8_t tank = 1; tank <= ROGUE_TANK_COUNT; tank++) rogue_io_load(prefs, s.tanks[tank], "ta", "t", "tank", tank);
@@ -246,6 +248,7 @@ static inline void rogue_settings_save(Preferences &prefs, RogueSettings &s) {
   prefs.putUChar("t1", s.tank1_percent);
   prefs.putUChar("t2", s.tank2_percent);
   prefs.putUInt("sp", s.serial_prefix);
+  prefs.putUShort("ss", s.serial_suffix);
 
   for (uint8_t tank = 1; tank <= ROGUE_TANK_COUNT; tank++) prefs.putString(rogue_pref_key("ta", tank, "").c_str(), rogue_io_text(s.tanks[tank]));
   for (uint8_t input = 1; input <= ROGUE_INPUT_COUNT; input++) prefs.putString(rogue_pref_key("ia", input, "").c_str(), rogue_io_text(s.inputs[input]));
