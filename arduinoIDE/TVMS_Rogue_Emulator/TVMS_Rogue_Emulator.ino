@@ -213,7 +213,8 @@ bool object2_output_settings(uint8_t output, bool &dimmable, bool &switchable) {
 }
 
 // Builds each output's 0x1FD0E capability byte from the programmed configuration:
-// bit 7 (0x80) = dimmable. Falls back to the captured values if decoding fails.
+//   0x83 = dimmable, 0x03 = switched on/off, 0x01 = always on (neither dimmable nor switchable).
+// Falls back to the captured values if decoding fails.
 void load_output_capabilities() {
   static const uint8_t captured[ROGUE_OUTPUT_COUNT] = {0x83, 0x83, 0x83, 0x83, 0x83, 0x83, 0x83, 0x01, 0x03, 0x03};
   for (uint8_t output = 1; output <= ROGUE_OUTPUT_COUNT; output++) {
@@ -225,13 +226,22 @@ void load_output_capabilities() {
       Serial.printf("Object2: output %u settings not found, using captured capability\n", (unsigned) output);
     }
   }
-  Serial.print("Dimmable outputs:");
-  for (uint8_t output = 1; output <= ROGUE_OUTPUT_COUNT; output++) if (output_caps[output] & 0x80) Serial.printf(" %u", (unsigned) output);
+  Serial.print("Outputs:");
+  for (uint8_t output = 1; output <= ROGUE_OUTPUT_COUNT; output++) Serial.printf(" %u=%s", (unsigned) output, output_kind_name(output));
   Serial.println();
 }
 
 bool output_is_dimmable(uint8_t output) {
   return output >= 1 && output <= ROGUE_OUTPUT_COUNT && (output_caps[output] & 0x80) != 0;
+}
+
+bool output_is_always_on(uint8_t output) {
+  return output >= 1 && output <= ROGUE_OUTPUT_COUNT && (output_caps[output] & 0x82) == 0;
+}
+
+const char *output_kind_name(uint8_t output) {
+  if (output_is_dimmable(output)) return "dimmable";
+  return output_is_always_on(output) ? "always-on" : "on/off";
 }
 
 uint8_t &tank_percent_ref(uint8_t tank) {
@@ -370,7 +380,10 @@ void configure_io_pins() {
     if (a.mode == ROGUE_IO_DISABLED) {
       output_levels[output] = 0;
       hold_dim_direction[output] = 0;
-    } else if (a.mode == ROGUE_IO_PIN) {
+      continue;
+    }
+    if (output_is_always_on(output)) output_levels[output] = 100;
+    if (a.mode == ROGUE_IO_PIN) {
       if (output_is_dimmable(output)) attach_output_pwm(output);
       else pinMode((uint8_t) a.pin, OUTPUT);
       apply_output_assignment(output);
@@ -457,6 +470,10 @@ void set_output_level(uint8_t output, uint8_t percent, const char *origin) {
     Serial.printf("%s: output %u is disabled, ignored\n", origin, output);
     return;
   }
+  if (output_is_always_on(output) && settings.outputs[output].mode != ROGUE_IO_DISABLED && percent != 100) {
+    Serial.printf("%s: output %u is programmed always-on, ignored\n", origin, output);
+    return;
+  }
   output_levels[output] = percent;
   apply_output_assignment(output);
   Serial.printf("%s set output %u to %u%% (%s)\n", origin, output, percent, rogue_io_describe(settings.outputs[output]).c_str());
@@ -491,7 +508,7 @@ void set_master(bool on, const char *origin) {
   master_state = on;
   Serial.printf("%s set master %s\n", origin, on ? "ON" : "OFF");
   if (!on) {
-    for (uint8_t output = 1; output <= ROGUE_OUTPUT_COUNT; output++) set_output_level(output, 0, "Master OFF");
+    for (uint8_t output = 1; output <= ROGUE_OUTPUT_COUNT; output++) if (!output_is_always_on(output)) set_output_level(output, 0, "Master OFF");
   }
 }
 
@@ -603,7 +620,7 @@ void print_io_assignments() {
   Serial.println("Input assignments:");
   for (uint8_t i = 1; i <= ROGUE_INPUT_COUNT; i++) Serial.printf("  input %u: %s state=%s\n", (unsigned) i, rogue_io_describe(settings.inputs[i]).c_str(), input_states[i] ? "ON" : "OFF");
   Serial.println("Output assignments:");
-  for (uint8_t i = 1; i <= ROGUE_OUTPUT_COUNT; i++) Serial.printf("  output %u: %s %s level=%u%%\n", (unsigned) i, rogue_io_describe(settings.outputs[i]).c_str(), output_is_dimmable(i) ? "dimmable" : "on/off", output_levels[i]);
+  for (uint8_t i = 1; i <= ROGUE_OUTPUT_COUNT; i++) Serial.printf("  output %u: %s %s level=%u%%\n", (unsigned) i, rogue_io_describe(settings.outputs[i]).c_str(), output_kind_name(i), output_levels[i]);
 }
 
 void print_status() {

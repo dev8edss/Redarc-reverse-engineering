@@ -150,21 +150,24 @@ LOW  -> off
 HIGH -> on
 ```
 
-Whether each output is dimmable comes from the Rogue configuration (Object 2), exactly as a real Rogue's programming defines it. At boot the sketch reads each output's settings from the object (channel `0x0C`..`0x15`, output settings key `0x06`, dimmable flag key `0x01`, switch flag key `0x02`). The result is used for both:
+Whether each output is dimmable comes from the Rogue configuration (Object 2), exactly as a real Rogue's programming defines it. At boot the sketch reads each output's settings from the object (channel `0x0C`..`0x15`, output settings key `0x06`, dimmable flag key `0x01`, switchable flag key `0x02`). The result is used for both:
 
 - the `0x1FD0E` capability byte sent on CAN (bit 7 `0x80` = dimmable), and
 - how the output behaves on its GPIO.
 
-| Programmed as | GPIO drive | Output level |
-|---|---|---|
-| dimmable | LEDC PWM, duty = level | 0–100% as commanded; hold-dim works |
-| not dimmable | digital on/off | any non-zero level becomes 100%; hold-dim is ignored |
+| Programmed as | `0x1FD0E` | GPIO drive | Output level |
+|---|---|---|---|
+| dimmable | `0x83` | LEDC PWM, duty = level | 0–100% as commanded; hold-dim works |
+| on/off (switchable) | `0x03` | digital on/off | any non-zero level becomes 100%; hold-dim ignored |
+| always on | `0x01` | digital, held HIGH | fixed at 100%; on/off, level, hold-dim and master OFF are ignored |
 
-The embedded captured object programs outputs 1–7 as dimmable and outputs 8–10 as on/off. The boot log shows the result, and `io` shows `dimmable` or `on/off` per output:
+The embedded captured object programs outputs 1–7 as dimmable, output 8 as always on, and outputs 9–10 as on/off. The boot log shows the result, and `io` shows the type per output:
 
 ```text
-Dimmable outputs: 1 2 3 4 5 6 7
+Outputs: 1=dimmable 2=dimmable 3=dimmable 4=dimmable 5=dimmable 6=dimmable 7=dimmable 8=always-on 9=on/off 10=on/off
 ```
+
+An output assigned `disabled` stays at 0% even if it is programmed always on.
 
 If the object cannot be decoded, the captured capability values are used and a message is printed.
 
@@ -382,7 +385,7 @@ Use `defaults` to restore the built-in defaults.
 - Compile-tested with arduino-cli and the esp32 core 3.3.12 (M5Stack-ATOM and ESP32 Dev Module). Not yet tested on hardware.
 - Tank GPIO mode currently uses fixed raw ADC scaling `0..4095 -> 0..100%`; calibration can be added later.
 - GPIO output PWM is linear duty with no gamma correction, and is active-high only.
-- Configuration writes (`0x0E81`..`0x0E8A`) are not ported from the ESPHome emulator yet, so the dimmable/on-off programming is always the embedded captured object. Reprogramming outputs from RedVision will not change it.
+- Configuration writes (`0x0E81`..`0x0E8A`) are not ported from the ESPHome emulator yet, so the dimmable / on-off / always-on programming is always the embedded captured object. Reprogramming outputs from RedVision will not change it.
 - GPIO inputs are read as active-high using `pinMode(pin, INPUT)`.
 - GPIO6–11 are blocked only on the original ESP32; flash/PSRAM pins on other ESP32 variants are not blocked.
 - Master OFF sets all outputs to 0% but does not stop outputs being switched on again while master is off.
