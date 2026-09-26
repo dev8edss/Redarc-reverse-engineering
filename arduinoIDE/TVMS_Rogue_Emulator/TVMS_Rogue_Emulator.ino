@@ -55,13 +55,23 @@ static constexpr uint32_t STATUS_INTERVAL_MS        = 1000UL;
 static constexpr uint32_t IO_POLL_INTERVAL_MS       = 50UL;
 static constexpr uint32_t HOLD_DIM_STEP_MS          = 100UL;
 static constexpr uint8_t HOLD_DIM_STEP_PERCENT      = 2;
+static constexpr uint32_t CAN_HEALTH_INTERVAL_MS    = 100UL;
+static constexpr uint32_t CAN_RESTART_INTERVAL_MS   = 5000UL;
+static constexpr uint32_t CAN_TX_REPORT_INTERVAL_MS = 5000UL;
 
 Preferences prefs;
 RogueSettings settings;
 
+static bool can_installed = false;
+static bool can_running = false;
+static uint32_t last_can_health_ms = 0;
+static uint32_t last_can_restart_ms = 0;
+static uint32_t last_tx_report_ms = 0;
+static uint32_t tx_fail_count = 0;
+static esp_err_t last_tx_error = ESP_OK;
+
 static uint8_t selected_object = 0xFF;
 static uint8_t output_levels[ROGUE_OUTPUT_COUNT + 1] = {0};
-static uint8_t output_variable_percent[ROGUE_OUTPUT_COUNT + 1] = {0};
 static bool input_states[ROGUE_INPUT_COUNT + 1] = {false};
 static bool input_variable_state[ROGUE_INPUT_COUNT + 1] = {false};
 static uint8_t tank_variable_percent[ROGUE_TANK_COUNT + 1] = {0};
@@ -164,15 +174,60 @@ void reset_settings_to_defaults() {
   memset(input_states, 0, sizeof(input_states));
   memset(input_variable_state, 0, sizeof(input_variable_state));
   memset(output_levels, 0, sizeof(output_levels));
-  memset(output_variable_percent, 0, sizeof(output_variable_percent));
   memset(tank_variable_percent, 0, sizeof(tank_variable_percent));
   tank_variable_percent[1] = settings.tank1_percent;
   tank_variable_percent[2] = settings.tank2_percent;
   Serial.println("Settings restored to defaults");
 }
 
-bool valid_gpio_pin(int8_t pin) {
-  return pin >= 0 && pin <= 48;
+// Returns nullptr when the GPIO can be used this way, otherwise why it cannot.
+const char *gpio_pin_problem(int8_t pin, bool needs_output, bool needs_adc) {
+  if (pin < 0 || !GPIO_IS_VALID_GPIO(pin)) return "is not a GPIO on this chip";
+#if CONFIG_IDF_TARGET_ESP32
+  if (pin >= 6 && pin <= 11) return "is reserved for the SPI flash";
+#endif
+  if (pin == CAN_TX_PIN || pin == CAN_RX_PIN) return "is used by CAN";
+  if (needs_output && !GPIO_IS_VALID_OUTPUT_GPIO(pin)) return "is input-only";
+  if (needs_adc && digitalPinToAnalogChannel(pin) < 0) return "is not an ADC pin";
+  return nullptr;
+}
+
+// True when a tank/input/output other than `slot` is already bound to this GPIO.
+bool gpio_pin_taken(int8_t pin, const RogueIoAssignment *slot) {
+  for (uint8_t i = 1; i <= ROGUE_TANK_COUNT; i++) if (&settings.tanks[i] != slot && settings.tanks[i].mode == ROGUE_IO_PIN && settings.tanks[i].pin == pin) return true;
+  for (uint8_t i = 1; i <= ROGUE_INPUT_COUNT; i++) if (&settings.inputs[i] != slot && settings.inputs[i].mode == ROGUE_IO_PIN && settings.inputs[i].pin == pin) return true;
+  for (uint8_t i = 1; i <= ROGUE_OUTPUT_COUNT; i++) if (&settings.outputs[i] != slot && settings.outputs[i].mode == ROGUE_IO_PIN && settings.outputs[i].pin == pin) return true;
+  return false;
+}
+
+// Checks `candidate` as the new assignment for `slot`. Returns nullptr when usable.
+const char *io_assignment_problem(const RogueIoAssignment &candidate, const RogueIoAssignment *slot, bool needs_output, bool needs_adc) {
+  if (candidate.mode != ROGUE_IO_PIN) return nullptr;
+  const char *problem = gpio_pin_problem(candidate.pin, needs_output, needs_adc);
+  if (problem == nullptr && gpio_pin_taken(candidate.pin, slot)) problem = "is already assigned to another channel";
+  return problem;
+}
+
+// Returns a GPIO to high-impedance input when a channel stops using it, so an
+// output that was driven HIGH does not stay on after being reassigned.
+void release_io_pin(const RogueIoAssignment &old, bool was_output) {
+  if (old.mode != ROGUE_IO_PIN || old.pin < 0) return;
+  if (was_output) digitalWrite((uint8_t) old.pin, LOW);
+  pinMode((uint8_t) old.pin, INPUT);
+}
+
+void disable_unusable_assignment(RogueIoAssignment &a, const char *kind, uint8_t n, bool needs_output, bool needs_adc) {
+  const char *problem = io_assignment_problem(a, &a, needs_output, needs_adc);
+  if (problem == nullptr) return;
+  Serial.printf("%s %u: GPIO%d %s, channel disabled\n", kind, (unsigned) n, a.pin, problem);
+  a.mode = ROGUE_IO_DISABLED;
+  a.pin = -1;
+}
+
+void validate_io_assignments() {
+  for (uint8_t i = 1; i <= ROGUE_TANK_COUNT; i++) disable_unusable_assignment(settings.tanks[i], "Tank", i, false, true);
+  for (uint8_t i = 1; i <= ROGUE_INPUT_COUNT; i++) disable_unusable_assignment(settings.inputs[i], "Input", i, false, false);
+  for (uint8_t i = 1; i <= ROGUE_OUTPUT_COUNT; i++) disable_unusable_assignment(settings.outputs[i], "Output", i, true, false);
 }
 
 uint8_t analog_raw_to_percent(int raw) {
@@ -184,11 +239,7 @@ uint8_t analog_raw_to_percent(int raw) {
 void apply_output_assignment(uint8_t output) {
   if (output < 1 || output > ROGUE_OUTPUT_COUNT) return;
   const RogueIoAssignment &a = settings.outputs[output];
-  if (a.mode == ROGUE_IO_VARIABLE) {
-    output_variable_percent[output] = output_levels[output];
-    return;
-  }
-  if (a.mode == ROGUE_IO_PIN && valid_gpio_pin(a.pin)) {
+  if (a.mode == ROGUE_IO_PIN) {
     digitalWrite((uint8_t) a.pin, output_levels[output] > 0 ? HIGH : LOW);
   }
 }
@@ -196,21 +247,28 @@ void apply_output_assignment(uint8_t output) {
 void configure_io_pins() {
   for (uint8_t tank = 1; tank <= ROGUE_TANK_COUNT; tank++) {
     const RogueIoAssignment &a = settings.tanks[tank];
-    if (a.mode == ROGUE_IO_PIN && valid_gpio_pin(a.pin)) {
+    if (a.mode == ROGUE_IO_PIN) {
       pinMode((uint8_t) a.pin, INPUT);
       tank_percent_ref(tank) = analog_raw_to_percent(analogRead((uint8_t) a.pin));
+    } else if (a.mode == ROGUE_IO_DISABLED) {
+      tank_percent_ref(tank) = 0;
     }
   }
   for (uint8_t input = 1; input <= ROGUE_INPUT_COUNT; input++) {
     const RogueIoAssignment &a = settings.inputs[input];
-    if (a.mode == ROGUE_IO_PIN && valid_gpio_pin(a.pin)) {
+    if (a.mode == ROGUE_IO_PIN) {
       pinMode((uint8_t) a.pin, INPUT);
       input_states[input] = digitalRead((uint8_t) a.pin) == HIGH;
+    } else if (a.mode == ROGUE_IO_DISABLED) {
+      input_states[input] = false;
     }
   }
   for (uint8_t output = 1; output <= ROGUE_OUTPUT_COUNT; output++) {
     const RogueIoAssignment &a = settings.outputs[output];
-    if (a.mode == ROGUE_IO_PIN && valid_gpio_pin(a.pin)) {
+    if (a.mode == ROGUE_IO_DISABLED) {
+      output_levels[output] = 0;
+      hold_dim_direction[output] = 0;
+    } else if (a.mode == ROGUE_IO_PIN) {
       pinMode((uint8_t) a.pin, OUTPUT);
       apply_output_assignment(output);
     }
@@ -222,18 +280,18 @@ bool poll_tank_assignments() {
   for (uint8_t tank = 1; tank <= ROGUE_TANK_COUNT; tank++) {
     uint8_t next = tank_percent_ref(tank);
     const RogueIoAssignment &a = settings.tanks[tank];
-    if (a.mode == ROGUE_IO_PIN && valid_gpio_pin(a.pin)) {
+    if (a.mode == ROGUE_IO_PIN) {
       next = analog_raw_to_percent(analogRead((uint8_t) a.pin));
     } else if (a.mode == ROGUE_IO_VARIABLE) {
       next = tank_variable_percent[tank];
+    } else if (a.mode == ROGUE_IO_DISABLED) {
+      next = 0;
     }
     uint8_t &target = tank_percent_ref(tank);
     if (target != next) {
       target = next;
       changed = true;
-      Serial.printf("Tank %u changed to %u%% from %s", (unsigned) tank, (unsigned) next, rogue_io_mode_name(a.mode));
-      if (a.mode == ROGUE_IO_PIN) Serial.printf(" GPIO%d", a.pin);
-      Serial.println();
+      Serial.printf("Tank %u changed to %u%% from %s\n", (unsigned) tank, (unsigned) next, rogue_io_describe(a).c_str());
     }
   }
   return changed;
@@ -244,30 +302,36 @@ bool poll_input_assignments() {
   for (uint8_t input = 1; input <= ROGUE_INPUT_COUNT; input++) {
     bool next = input_states[input];
     const RogueIoAssignment &a = settings.inputs[input];
-    if (a.mode == ROGUE_IO_PIN && valid_gpio_pin(a.pin)) {
+    if (a.mode == ROGUE_IO_PIN) {
       next = digitalRead((uint8_t) a.pin) == HIGH;
     } else if (a.mode == ROGUE_IO_VARIABLE) {
       next = input_variable_state[input];
+    } else if (a.mode == ROGUE_IO_DISABLED) {
+      next = false;
     }
     if (input_states[input] != next) {
       input_states[input] = next;
       changed = true;
-      Serial.printf("Input %u changed to %s from %s\n", (unsigned) input, next ? "ON" : "OFF", rogue_io_mode_name(a.mode));
+      Serial.printf("Input %u changed to %s from %s\n", (unsigned) input, next ? "ON" : "OFF", rogue_io_describe(a).c_str());
     }
   }
   return changed;
 }
 
 void send_frame(uint32_t id, const uint8_t *data, uint8_t len) {
+  if (!can_running) return;
   twai_message_t msg = {};
   msg.identifier = id & 0x1FFFFFFFUL;
   msg.extd = 1;
   msg.rtr = 0;
   msg.data_length_code = len > 8 ? 8 : len;
   for (uint8_t i = 0; i < msg.data_length_code; i++) msg.data[i] = data[i];
-  esp_err_t err = twai_transmit(&msg, pdMS_TO_TICKS(10));
+  // Never block: if the TX queue is full (e.g. no other node is ACKing), drop the frame.
+  // Failures are counted and reported periodically by maintain_can().
+  esp_err_t err = twai_transmit(&msg, 0);
   if (err != ESP_OK) {
-    Serial.printf("CAN TX failed id=0x%08lX err=%d\n", (unsigned long) id, (int) err);
+    tx_fail_count++;
+    last_tx_error = err;
   }
 }
 
@@ -284,22 +348,38 @@ void send_direct_ack(uint8_t requester, uint8_t command) {
 void set_output_level(uint8_t output, uint8_t percent, const char *origin) {
   if (output < 1 || output > ROGUE_OUTPUT_COUNT) return;
   if (percent > 100) percent = 100;
+  if (settings.outputs[output].mode == ROGUE_IO_DISABLED && percent > 0) {
+    Serial.printf("%s: output %u is disabled, ignored\n", origin, output);
+    return;
+  }
   output_levels[output] = percent;
   apply_output_assignment(output);
-  Serial.printf("%s set output %u to %u%% (%s", origin, output, percent, rogue_io_mode_name(settings.outputs[output].mode));
-  if (settings.outputs[output].mode == ROGUE_IO_PIN) Serial.printf(" GPIO%d", settings.outputs[output].pin);
-  Serial.println(")");
+  Serial.printf("%s set output %u to %u%% (%s)\n", origin, output, percent, rogue_io_describe(settings.outputs[output]).c_str());
 }
 
 void set_tank_percent(uint8_t tank, uint8_t percent, const char *origin, bool persist) {
   if (tank < 1 || tank > ROGUE_TANK_COUNT) return;
+  if (settings.tanks[tank].mode == ROGUE_IO_DISABLED) {
+    Serial.printf("%s: tank %u is disabled, ignored\n", origin, (unsigned) tank);
+    return;
+  }
   if (percent > 100) percent = 100;
   tank_percent_ref(tank) = percent;
   tank_variable_percent[tank] = percent;
   if (persist) save_settings();
-  Serial.printf("%s set tank %u to %u%% (%s", origin, (unsigned) tank, (unsigned) percent, rogue_io_mode_name(settings.tanks[tank].mode));
-  if (settings.tanks[tank].mode == ROGUE_IO_PIN) Serial.printf(" GPIO%d", settings.tanks[tank].pin);
-  Serial.println(")");
+  Serial.printf("%s set tank %u to %u%% (%s)\n", origin, (unsigned) tank, (unsigned) percent, rogue_io_describe(settings.tanks[tank]).c_str());
+}
+
+bool set_input_variable(uint8_t input, bool on, const char *origin) {
+  if (input < 1 || input > ROGUE_INPUT_COUNT) return false;
+  if (settings.inputs[input].mode == ROGUE_IO_DISABLED) {
+    Serial.printf("%s: input %u is disabled, ignored\n", origin, (unsigned) input);
+    return false;
+  }
+  input_variable_state[input] = on;
+  if (settings.inputs[input].mode != ROGUE_IO_PIN) input_states[input] = on;
+  Serial.printf("%s set input %u %s (%s)\n", origin, (unsigned) input, on ? "ON" : "OFF", rogue_io_describe(settings.inputs[input]).c_str());
+  return true;
 }
 
 void set_master(bool on, const char *origin) {
@@ -400,7 +480,7 @@ void handle_direct_command(uint8_t requester, const uint8_t *data, uint8_t len) 
   Serial.printf("Unsupported command 0x%02X\n", command); send_direct_ack(requester, command);
 }
 
-void handle_legacy_dim(const uint8_t *data, uint8_t len) { if (len < 3) return; const uint8_t channel = data[0]; const uint8_t direction = data[2]; if (channel < CHANNEL_OUTPUT_1 || channel > CHANNEL_OUTPUT_10) return; const uint8_t output = channel - CHANNEL_MASTER; if (direction == 0x01) hold_dim_direction[output] = -1; else if (direction == 0x64) hold_dim_direction[output] = 1; else if (direction == 0xFF) hold_dim_direction[output] = 0; Serial.printf("Hold dim output %u direction 0x%02X\n", output, direction); send_output_activity(); }
+void handle_legacy_dim(const uint8_t *data, uint8_t len) { if (len < 3) return; const uint8_t channel = data[0]; const uint8_t direction = data[2]; if (channel < CHANNEL_OUTPUT_1 || channel > CHANNEL_OUTPUT_10) return; const uint8_t output = channel - CHANNEL_MASTER; if (settings.outputs[output].mode == ROGUE_IO_DISABLED) return; if (direction == 0x01) hold_dim_direction[output] = -1; else if (direction == 0x64) hold_dim_direction[output] = 1; else if (direction == 0xFF) hold_dim_direction[output] = 0; Serial.printf("Hold dim output %u direction 0x%02X\n", output, direction); send_output_activity(); }
 
 void handle_can_message(const twai_message_t &msg) {
   if (!msg.extd || msg.rtr) return; const uint32_t id = msg.identifier & 0x1FFFFFFFUL; const uint16_t service = (uint16_t)((id >> 16) & 0xFFFFUL); const uint8_t destination = (uint8_t)((id >> 8) & 0xFFUL); const uint8_t requester = (uint8_t)(id & 0xFFUL); if (destination != settings.source_address) return;
@@ -410,71 +490,96 @@ void handle_can_message(const twai_message_t &msg) {
   if (service == SERVICE_LEGACY_DIM) { handle_legacy_dim(msg.data, msg.data_length_code); return; }
 }
 
-void receive_can() { twai_message_t msg = {}; while (twai_receive(&msg, 0) == ESP_OK) handle_can_message(msg); }
+void receive_can() { if (!can_installed) return; twai_message_t msg = {}; while (twai_receive(&msg, 0) == ESP_OK) handle_can_message(msg); }
 
 void print_io_assignments() {
   Serial.println("Tank assignments:");
-  for (uint8_t i = 1; i <= ROGUE_TANK_COUNT; i++) { Serial.printf("  tank %u: %s", (unsigned) i, rogue_io_mode_name(settings.tanks[i].mode)); if (settings.tanks[i].mode == ROGUE_IO_PIN) Serial.printf(" GPIO%d", settings.tanks[i].pin); Serial.printf(" value=%u%%\n", tank_percent_ref(i)); }
+  for (uint8_t i = 1; i <= ROGUE_TANK_COUNT; i++) Serial.printf("  tank %u: %s value=%u%%\n", (unsigned) i, rogue_io_describe(settings.tanks[i]).c_str(), tank_percent_ref(i));
   Serial.println("Input assignments:");
-  for (uint8_t i = 1; i <= ROGUE_INPUT_COUNT; i++) { Serial.printf("  input %u: %s", (unsigned) i, rogue_io_mode_name(settings.inputs[i].mode)); if (settings.inputs[i].mode == ROGUE_IO_PIN) Serial.printf(" GPIO%d", settings.inputs[i].pin); Serial.printf(" state=%s\n", input_states[i] ? "ON" : "OFF"); }
+  for (uint8_t i = 1; i <= ROGUE_INPUT_COUNT; i++) Serial.printf("  input %u: %s state=%s\n", (unsigned) i, rogue_io_describe(settings.inputs[i]).c_str(), input_states[i] ? "ON" : "OFF");
   Serial.println("Output assignments:");
-  for (uint8_t i = 1; i <= ROGUE_OUTPUT_COUNT; i++) { Serial.printf("  output %u: %s", (unsigned) i, rogue_io_mode_name(settings.outputs[i].mode)); if (settings.outputs[i].mode == ROGUE_IO_PIN) Serial.printf(" GPIO%d", settings.outputs[i].pin); Serial.printf(" level=%u%%\n", output_levels[i]); }
+  for (uint8_t i = 1; i <= ROGUE_OUTPUT_COUNT; i++) Serial.printf("  output %u: %s level=%u%%\n", (unsigned) i, rogue_io_describe(settings.outputs[i]).c_str(), output_levels[i]);
 }
 
 void print_status() {
-  Serial.printf("SA=0x%02X object=%u object2=%lu bytes master=%s tank1=%u%% tank2=%u%% Vin=%.3fV Iin=%.3fA\n", settings.source_address, selected_object, (unsigned long) ROGUE_OBJECT2_SIZE, master_state ? "ON" : "OFF", settings.tank1_percent, settings.tank2_percent, input_voltage_mv / 1000.0f, input_current_ma / 1000.0f);
+  Serial.printf("SA=0x%02X object=%u object2=%lu bytes master=%s tank1=%u%% tank2=%u%% Vin=%.3fV Iin=%.3fA CAN=%s\n", settings.source_address, selected_object, (unsigned long) ROGUE_OBJECT2_SIZE, master_state ? "ON" : "OFF", settings.tank1_percent, settings.tank2_percent, input_voltage_mv / 1000.0f, input_current_ma / 1000.0f, can_running ? "running" : "down");
   Serial.printf("Serial=%lu-%04u name=\"%s\"\n", (unsigned long) settings.serial_prefix, (unsigned) settings.serial_suffix, settings.product_name);
-  for (uint8_t output = 1; output <= ROGUE_OUTPUT_COUNT; output++) Serial.printf("O%u=%u%% ", output, output_levels[output]); Serial.println(); print_io_assignments();
+  for (uint8_t output = 1; output <= ROGUE_OUTPUT_COUNT; output++) Serial.printf("O%u=%u%% ", output, output_levels[output]);
+  Serial.println(); print_io_assignments();
 }
 
 void print_help() {
-  Serial.println("status | io | t1 <0-100> | t2 <0-100> | v <mV> | i <mA> | m <0|1> | o<n> <0-100>");
-  Serial.println("tank <n> <simulated|variable|pin> [gpio] | in<n> <0|1> | input <n> <simulated|variable|pin> [gpio]");
-  Serial.println("output <n> <simulated|variable|pin> [gpio] | sa <0x01-0xFE> | serial <prefix> <suffix> | name <text>");
+  Serial.println("status | io | t1 <0-100> | t2 <0-100> | v <mV> | i <mA> | m <0|1> | o<n> <0-100> | in<n> <0|1>");
+  Serial.println("tank <n> <a> | input <n> <a> | output <n> <a>   where <a> = GPIO<n> | simulate | disabled | <variable-name>");
+  Serial.println("set <variable-name> <value> | sa <0x01-0xFE> | serial <prefix> <suffix> | name <text>");
   Serial.println("save | defaults | crc | identity | send");
 }
 
-bool parse_assignment_common(String raw, const char *word, uint8_t max_channel, uint8_t &channel, RogueIoMode &mode, int8_t &pin) {
-  raw.trim(); int first = raw.indexOf(' '); if (first <= 0) return false; String rest = raw.substring(first + 1); rest.trim(); int second = rest.indexOf(' '); if (second <= 0) return false; channel = (uint8_t) rest.substring(0, second).toInt(); if (channel < 1 || channel > max_channel) { Serial.printf("%s number must be 1..%u.\n", word, max_channel); return true; }
-  rest = rest.substring(second + 1); rest.trim(); int third = rest.indexOf(' '); String mode_text = third < 0 ? rest : rest.substring(0, third); if (!rogue_io_mode_from_text(mode_text, mode)) return false;
-  pin = -1; if (mode == ROGUE_IO_PIN) { if (third < 0) { Serial.println("Pin mode needs a GPIO number."); return true; } pin = (int8_t) parse_u32(rest.substring(third + 1)); if (!valid_gpio_pin(pin)) { Serial.println("Invalid GPIO pin."); return true; } }
-  return true;
+// Parses "<word> <n> <GPIO<n>|simulate|disabled|variable-name>".
+bool parse_assignment_common(String raw, uint8_t max_channel, uint8_t &channel, RogueIoAssignment &assignment) {
+  raw.trim(); int first = raw.indexOf(' '); if (first <= 0) return false; String rest = raw.substring(first + 1); rest.trim(); int second = rest.indexOf(' '); if (second <= 0) return false;
+  channel = (uint8_t) rest.substring(0, second).toInt(); if (channel < 1 || channel > max_channel) return false;
+  return rogue_io_parse(rest.substring(second + 1), assignment);
+}
+
+bool assign_io(RogueIoAssignment &slot, const RogueIoAssignment &next, const char *kind, uint8_t n, bool is_output, bool needs_adc) {
+  const char *problem = io_assignment_problem(next, &slot, is_output, needs_adc);
+  if (problem != nullptr) { Serial.printf("%s %u not changed: GPIO%d %s\n", kind, (unsigned) n, next.pin, problem); return false; }
+  if (!(slot.mode == ROGUE_IO_PIN && next.mode == ROGUE_IO_PIN && slot.pin == next.pin)) release_io_pin(slot, is_output);
+  slot = next;
+  configure_io_pins(); save_settings(); Serial.printf("%s %u assigned to %s\n", kind, (unsigned) n, rogue_io_describe(slot).c_str()); return true;
 }
 
 bool parse_tank_assignment(String raw) {
-  uint8_t tank = 0; RogueIoMode mode; int8_t pin = -1;
-  if (!parse_assignment_common(raw, "Tank", ROGUE_TANK_COUNT, tank, mode, pin)) return false;
-  settings.tanks[tank].mode = mode; settings.tanks[tank].pin = pin;
-  if (mode == ROGUE_IO_VARIABLE) tank_variable_percent[tank] = tank_percent_ref(tank);
-  configure_io_pins(); save_settings(); Serial.printf("Tank %u assigned to %s", (unsigned) tank, rogue_io_mode_name(mode)); if (mode == ROGUE_IO_PIN) Serial.printf(" GPIO%d", pin); Serial.println(); send_sensor_values(); return true;
+  uint8_t tank = 0; RogueIoAssignment next;
+  if (!parse_assignment_common(raw, ROGUE_TANK_COUNT, tank, next)) return false;
+  if (next.mode == ROGUE_IO_VARIABLE) tank_variable_percent[tank] = tank_percent_ref(tank);
+  if (assign_io(settings.tanks[tank], next, "Tank", tank, false, true)) send_sensor_values(); return true;
 }
 
 bool parse_input_assignment(String raw) {
-  uint8_t input = 0; RogueIoMode mode; int8_t pin = -1;
-  if (!parse_assignment_common(raw, "Input", ROGUE_INPUT_COUNT, input, mode, pin)) return false;
-  settings.inputs[input].mode = mode; settings.inputs[input].pin = pin;
-  configure_io_pins(); save_settings(); Serial.printf("Input %u assigned to %s", (unsigned) input, rogue_io_mode_name(mode)); if (mode == ROGUE_IO_PIN) Serial.printf(" GPIO%d", pin); Serial.println(); send_channel_status(); return true;
+  uint8_t input = 0; RogueIoAssignment next;
+  if (!parse_assignment_common(raw, ROGUE_INPUT_COUNT, input, next)) return false;
+  if (next.mode == ROGUE_IO_VARIABLE) input_variable_state[input] = input_states[input];
+  if (assign_io(settings.inputs[input], next, "Input", input, false, false)) send_channel_status(); return true;
 }
 
 bool parse_output_assignment(String raw) {
-  uint8_t output = 0; RogueIoMode mode; int8_t pin = -1;
-  if (!parse_assignment_common(raw, "Output", ROGUE_OUTPUT_COUNT, output, mode, pin)) return false;
-  settings.outputs[output].mode = mode; settings.outputs[output].pin = pin;
-  configure_io_pins(); save_settings(); Serial.printf("Output %u assigned to %s", (unsigned) output, rogue_io_mode_name(mode)); if (mode == ROGUE_IO_PIN) Serial.printf(" GPIO%d", pin); Serial.println(); send_output_levels(); return true;
+  uint8_t output = 0; RogueIoAssignment next;
+  if (!parse_assignment_common(raw, ROGUE_OUTPUT_COUNT, output, next)) return false;
+  if (assign_io(settings.outputs[output], next, "Output", output, true, false)) { send_output_levels(); send_channel_status(); } return true;
+}
+
+// Sets every tank/input/output assigned to the named variable (case-insensitive).
+// Tanks and outputs take 0-100, inputs take 0/1.
+void set_named_variable(const String &name, const String &value_text) {
+  uint8_t matches = 0;
+  for (uint8_t i = 1; i <= ROGUE_TANK_COUNT; i++) if (settings.tanks[i].mode == ROGUE_IO_VARIABLE && name.equalsIgnoreCase(settings.tanks[i].variable)) { set_tank_percent(i, clamp_percent(value_text.toFloat()), "Variable", false); matches++; }
+  for (uint8_t i = 1; i <= ROGUE_INPUT_COUNT; i++) if (settings.inputs[i].mode == ROGUE_IO_VARIABLE && name.equalsIgnoreCase(settings.inputs[i].variable)) { set_input_variable(i, value_text.toInt() != 0, "Variable"); matches++; }
+  for (uint8_t i = 1; i <= ROGUE_OUTPUT_COUNT; i++) if (settings.outputs[i].mode == ROGUE_IO_VARIABLE && name.equalsIgnoreCase(settings.outputs[i].variable)) { set_output_level(i, clamp_percent(value_text.toFloat()), "Variable"); matches++; }
+  if (matches == 0) { Serial.printf("No tank/input/output is assigned to variable \"%s\"\n", name.c_str()); return; }
+  send_all_status();
+}
+
+void release_all_io_pins() {
+  for (uint8_t i = 1; i <= ROGUE_TANK_COUNT; i++) release_io_pin(settings.tanks[i], false);
+  for (uint8_t i = 1; i <= ROGUE_INPUT_COUNT; i++) release_io_pin(settings.inputs[i], false);
+  for (uint8_t i = 1; i <= ROGUE_OUTPUT_COUNT; i++) release_io_pin(settings.outputs[i], true);
 }
 
 void handle_serial_line(String raw) {
   raw.trim(); if (raw.length() == 0) return; String lower = raw; lower.toLowerCase();
-  if (lower == "help") { print_help(); return; } if (lower == "status") { print_status(); return; } if (lower == "io") { print_io_assignments(); return; } if (lower == "identity") { send_identity(); return; } if (lower == "send") { send_all_status(); return; } if (lower == "save") { save_settings(); return; } if (lower == "defaults") { reset_settings_to_defaults(); configure_io_pins(); send_identity(); send_all_status(); return; } if (lower == "crc") { object2_self_test(); return; }
-  if (lower.startsWith("tank ")) { if (!parse_tank_assignment(raw)) Serial.println("Usage: tank <1-2> <simulated|variable|pin> [gpio]"); return; }
-  if (lower.startsWith("input ")) { if (!parse_input_assignment(raw)) Serial.println("Usage: input <1-8> <simulated|variable|pin> [gpio]"); return; }
-  if (lower.startsWith("output ")) { if (!parse_output_assignment(raw)) Serial.println("Usage: output <1-10> <simulated|variable|pin> [gpio]"); return; }
+  if (lower == "help") { print_help(); return; } if (lower == "status") { print_status(); return; } if (lower == "io") { print_io_assignments(); return; } if (lower == "identity") { send_identity(); return; } if (lower == "send") { send_all_status(); return; } if (lower == "save") { save_settings(); return; } if (lower == "defaults") { release_all_io_pins(); reset_settings_to_defaults(); validate_io_assignments(); configure_io_pins(); send_identity(); send_all_status(); return; } if (lower == "crc") { object2_self_test(); return; }
+  if (lower.startsWith("tank ")) { if (!parse_tank_assignment(raw)) Serial.println("Usage: tank <1-2> <GPIO<n>|simulate|disabled|variable-name>"); return; }
+  if (lower.startsWith("input ")) { if (!parse_input_assignment(raw)) Serial.println("Usage: input <1-8> <GPIO<n>|simulate|disabled|variable-name>"); return; }
+  if (lower.startsWith("output ")) { if (!parse_output_assignment(raw)) Serial.println("Usage: output <1-10> <GPIO<n>|simulate|disabled|variable-name>"); return; }
+  if (lower.startsWith("set ")) { String rest = raw.substring(4); rest.trim(); int space = rest.indexOf(' '); if (space <= 0) { Serial.println("Usage: set <variable-name> <value>"); return; } set_named_variable(rest.substring(0, space), rest.substring(space + 1)); return; }
   if (lower.startsWith("t1 ")) { set_tank_percent(1, clamp_percent(raw.substring(3).toFloat()), "Serial", true); send_sensor_values(); return; }
   if (lower.startsWith("t2 ")) { set_tank_percent(2, clamp_percent(raw.substring(3).toFloat()), "Serial", true); send_sensor_values(); return; }
   if (lower.startsWith("v ")) { input_voltage_mv = (uint16_t) constrain(raw.substring(2).toInt(), 0, 65535); send_sensor_values(); return; }
   if (lower.startsWith("i ")) { input_current_ma = (uint16_t) constrain(raw.substring(2).toInt(), 0, 65535); send_sensor_values(); return; }
   if (lower.startsWith("m ")) { set_master(raw.substring(2).toInt() != 0, "Serial"); send_all_status(); return; }
-  if (lower.startsWith("in")) { const int space = raw.indexOf(' '); if (space > 2) { const uint8_t input = (uint8_t) raw.substring(2, space).toInt(); if (input < 1 || input > ROGUE_INPUT_COUNT) { Serial.println("Input number must be 1..8."); return; } input_variable_state[input] = raw.substring(space + 1).toInt() != 0; input_states[input] = input_variable_state[input]; send_channel_status(); return; } }
+  if (lower.startsWith("in")) { const int space = raw.indexOf(' '); if (space > 2) { const uint8_t input = (uint8_t) raw.substring(2, space).toInt(); if (input < 1 || input > ROGUE_INPUT_COUNT) { Serial.println("Input number must be 1..8."); return; } if (set_input_variable(input, raw.substring(space + 1).toInt() != 0, "Serial")) send_channel_status(); return; } }
   if (lower.startsWith("sa ")) { uint32_t value = parse_u32(raw.substring(3)); if (value == 0 || value > 0xFE) { Serial.println("Invalid source address. Use 0x01..0xFE."); return; } settings.source_address = (uint8_t) value; save_settings(); send_identity(); send_all_status(); return; }
   if (lower.startsWith("serial ")) { String rest = raw.substring(7); rest.trim(); int space = rest.indexOf(' '); if (space <= 0) { Serial.println("Usage: serial <prefix> <suffix>"); return; } settings.serial_prefix = parse_u32(rest.substring(0, space)); settings.serial_suffix = (uint16_t) parse_u32(rest.substring(space + 1)); save_settings(); send_serial_info(); return; }
   if (lower.startsWith("name ")) { String new_name = raw.substring(5); new_name.trim(); if (new_name.length() == 0) { Serial.println("Name cannot be empty."); return; } rogue_copy_product_name(settings, new_name.c_str()); save_settings(); send_product_name(); return; }
@@ -484,9 +589,32 @@ void handle_serial_line(String raw) {
 
 void poll_serial() { static String line; while (Serial.available()) { char ch = (char) Serial.read(); if (ch == '\n' || ch == '\r') { if (line.length()) { handle_serial_line(line); line = ""; } } else { line += ch; if (line.length() > 160) line = ""; } } }
 
+// Installs the TWAI driver (once) and starts it. Safe to call again after a failure
+// or after bus-off recovery has returned the controller to the stopped state.
 bool start_can() {
-  twai_general_config_t g_config = TWAI_GENERAL_CONFIG_DEFAULT(CAN_TX_PIN, CAN_RX_PIN, TWAI_MODE_NORMAL); twai_timing_config_t t_config = TWAI_TIMING_CONFIG_250KBITS(); twai_filter_config_t f_config = TWAI_FILTER_CONFIG_ACCEPT_ALL(); g_config.rx_queue_len = 64; g_config.tx_queue_len = 32;
-  esp_err_t err = twai_driver_install(&g_config, &t_config, &f_config); if (err != ESP_OK) { Serial.printf("twai_driver_install failed: %d\n", (int) err); return false; } err = twai_start(); if (err != ESP_OK) { Serial.printf("twai_start failed: %d\n", (int) err); return false; } Serial.println("CAN/TWAI started at 250 kbit/s"); return true;
+  last_can_restart_ms = millis();
+  if (!can_installed) {
+    twai_general_config_t g_config = TWAI_GENERAL_CONFIG_DEFAULT(CAN_TX_PIN, CAN_RX_PIN, TWAI_MODE_NORMAL); twai_timing_config_t t_config = TWAI_TIMING_CONFIG_250KBITS(); twai_filter_config_t f_config = TWAI_FILTER_CONFIG_ACCEPT_ALL(); g_config.rx_queue_len = 64; g_config.tx_queue_len = 32;
+    esp_err_t err = twai_driver_install(&g_config, &t_config, &f_config); if (err != ESP_OK) { Serial.printf("twai_driver_install failed: %s, retrying in %lus\n", esp_err_to_name(err), (unsigned long) (CAN_RESTART_INTERVAL_MS / 1000UL)); return false; }
+    can_installed = true;
+  }
+  esp_err_t err = twai_start(); if (err != ESP_OK) { Serial.printf("twai_start failed: %s, retrying in %lus\n", esp_err_to_name(err), (unsigned long) (CAN_RESTART_INTERVAL_MS / 1000UL)); return false; }
+  can_running = true; Serial.println("CAN/TWAI started at 250 kbit/s"); return true;
+}
+
+// Reports dropped TX frames, recovers from bus-off, and retries a failed CAN start.
+void maintain_can() {
+  const uint32_t now = millis();
+  if (tx_fail_count > 0 && now - last_tx_report_ms >= CAN_TX_REPORT_INTERVAL_MS) { Serial.printf("CAN TX: %lu frames dropped (last error %s); is another node on the bus to ACK?\n", (unsigned long) tx_fail_count, esp_err_to_name(last_tx_error)); tx_fail_count = 0; last_tx_report_ms = now; }
+  if (!can_installed) { if (now - last_can_restart_ms >= CAN_RESTART_INTERVAL_MS) start_can(); return; }
+  if (now - last_can_health_ms < CAN_HEALTH_INTERVAL_MS) return; last_can_health_ms = now;
+  twai_status_info_t status; if (twai_get_status_info(&status) != ESP_OK) return;
+  switch (status.state) {
+    case TWAI_STATE_BUS_OFF: if (can_running) Serial.println("CAN bus-off, starting recovery"); can_running = false; twai_initiate_recovery(); break;
+    case TWAI_STATE_RECOVERING: can_running = false; break;
+    case TWAI_STATE_STOPPED: can_running = false; if (now - last_can_restart_ms >= CAN_RESTART_INTERVAL_MS) start_can(); break;
+    default: break;
+  }
 }
 
 void update_hold_dim() { const uint32_t now = millis(); for (uint8_t output = 1; output <= ROGUE_OUTPUT_COUNT; output++) { if (hold_dim_direction[output] == 0) continue; if (now - hold_dim_last_step_ms[output] < HOLD_DIM_STEP_MS) continue; hold_dim_last_step_ms[output] = now; int next = (int) output_levels[output] + (hold_dim_direction[output] > 0 ? HOLD_DIM_STEP_PERCENT : -HOLD_DIM_STEP_PERCENT); if (next <= 0) { next = 0; hold_dim_direction[output] = 0; } if (next >= 100) { next = 100; hold_dim_direction[output] = 0; } set_output_level(output, (uint8_t) next, "Hold dim"); send_output_levels(); send_output_activity(); send_channel_status(); } }
@@ -498,9 +626,9 @@ void poll_io_assignments() {
 }
 
 void setup() {
-  Serial.begin(115200); delay(500); Serial.println(); Serial.println("REDARC TVMS Rogue Emulator - Arduino IDE standalone"); rogue_settings_load(prefs, settings); tank_variable_percent[1] = settings.tank1_percent; tank_variable_percent[2] = settings.tank2_percent; configure_io_pins(); Serial.printf("Source address: 0x%02X\n", settings.source_address); Serial.printf("Serial: %lu-%04u  Product: %s\n", (unsigned long) settings.serial_prefix, (unsigned) settings.serial_suffix, settings.product_name); Serial.println("Type help for serial commands."); object2_self_test(); start_can(); send_identity(); send_all_status();
+  Serial.begin(115200); delay(500); Serial.println(); Serial.println("REDARC TVMS Rogue Emulator - Arduino IDE standalone"); rogue_settings_load(prefs, settings); validate_io_assignments(); tank_variable_percent[1] = settings.tank1_percent; tank_variable_percent[2] = settings.tank2_percent; configure_io_pins(); Serial.printf("Source address: 0x%02X\n", settings.source_address); Serial.printf("Serial: %lu-%04u  Product: %s\n", (unsigned long) settings.serial_prefix, (unsigned) settings.serial_suffix, settings.product_name); Serial.println("Type help for serial commands."); object2_self_test(); start_can(); send_identity(); send_all_status();
 }
 
 void loop() {
-  receive_can(); poll_serial(); poll_io_assignments(); update_hold_dim(); const uint32_t now = millis(); if (now - last_identity_ms >= IDENTITY_INTERVAL_MS) { last_identity_ms = now; send_identity(); } if (now - last_status_ms >= STATUS_INTERVAL_MS) { last_status_ms = now; send_all_status(); }
+  maintain_can(); receive_can(); poll_serial(); poll_io_assignments(); update_hold_dim(); const uint32_t now = millis(); if (now - last_identity_ms >= IDENTITY_INTERVAL_MS) { last_identity_ms = now; send_identity(); } if (now - last_status_ms >= STATUS_INTERVAL_MS) { last_status_ms = now; send_all_status(); }
 }

@@ -6,16 +6,21 @@
 static constexpr uint8_t ROGUE_TANK_COUNT = 2;
 static constexpr uint8_t ROGUE_INPUT_COUNT = 8;
 static constexpr uint8_t ROGUE_OUTPUT_COUNT = 10;
+static constexpr size_t ROGUE_VARIABLE_NAME_MAX = 15;
 
+// The mode is never configured directly; it is derived from the assignment text.
+// See RoguePreferences.h for the text format.
 enum RogueIoMode : uint8_t {
-  ROGUE_IO_SIMULATED = 0,  // internal emulator-only value
-  ROGUE_IO_VARIABLE  = 1,  // internal variable hook; can be driven from sketch/serial
-  ROGUE_IO_PIN       = 2,  // ESP32 GPIO pin
+  ROGUE_IO_SIMULATED = 0,  // "simulate": internal emulator-only value
+  ROGUE_IO_VARIABLE  = 1,  // any other text: named variable, driven from sketch/serial
+  ROGUE_IO_PIN       = 2,  // "GPIO<n>": ESP32 GPIO pin
+  ROGUE_IO_DISABLED  = 3,  // "disabled": held at 0/off, commands ignored
 };
 
 struct RogueIoAssignment {
   RogueIoMode mode;
-  int8_t pin;              // -1 when no GPIO is assigned
+  int8_t pin;                                   // -1 unless mode is ROGUE_IO_PIN
+  char variable[ROGUE_VARIABLE_NAME_MAX + 1];   // empty unless mode is ROGUE_IO_VARIABLE
 };
 
 struct RogueSettings {
@@ -37,31 +42,64 @@ static inline const char *rogue_io_mode_name(RogueIoMode mode) {
     case ROGUE_IO_SIMULATED: return "simulated";
     case ROGUE_IO_VARIABLE:  return "variable";
     case ROGUE_IO_PIN:       return "pin";
+    case ROGUE_IO_DISABLED:  return "disabled";
     default:                 return "unknown";
   }
 }
 
-static inline bool rogue_io_mode_from_text(String text, RogueIoMode &mode) {
-  text.trim();
-  text.toLowerCase();
-  if (text == "sim" || text == "simulated" || text == "simulate") {
-    mode = ROGUE_IO_SIMULATED;
-    return true;
-  }
-  if (text == "var" || text == "variable") {
-    mode = ROGUE_IO_VARIABLE;
-    return true;
-  }
-  if (text == "pin" || text == "gpio" || text == "esp") {
-    mode = ROGUE_IO_PIN;
-    return true;
-  }
-  return false;
+static inline void rogue_io_set_simulated(RogueIoAssignment &a) {
+  a.mode = ROGUE_IO_SIMULATED;
+  a.pin = -1;
+  a.variable[0] = '\0';
 }
 
-static inline RogueIoMode rogue_sanitize_io_mode(uint8_t raw) {
-  if (raw <= (uint8_t) ROGUE_IO_PIN) return (RogueIoMode) raw;
-  return ROGUE_IO_SIMULATED;
+// Parses assignment text into mode/pin/variable. Returns false for malformed text,
+// leaving the assignment untouched. GPIO numbers are only range-checked here; the
+// sketch checks whether a pin is usable for a given tank/input/output.
+static inline bool rogue_io_parse(String text, RogueIoAssignment &a) {
+  text.trim();
+  String lower = text;
+  lower.toLowerCase();
+  RogueIoAssignment out;
+  rogue_io_set_simulated(out);
+
+  if (lower.startsWith("gpio")) {
+    const String num = text.substring(4);
+    if (num.length() == 0 || num.length() > 2) return false;
+    for (unsigned i = 0; i < num.length(); i++) {
+      if (!isDigit(num[i])) return false;
+    }
+    out.mode = ROGUE_IO_PIN;
+    out.pin = (int8_t) num.toInt();
+  } else if (lower == "simulate" || lower == "simulated") {
+    // already simulated
+  } else if (lower == "disabled" || lower == "disable") {
+    out.mode = ROGUE_IO_DISABLED;
+  } else {
+    if (text.length() == 0 || text.length() > ROGUE_VARIABLE_NAME_MAX || text.indexOf(' ') >= 0) return false;
+    out.mode = ROGUE_IO_VARIABLE;
+    strncpy(out.variable, text.c_str(), sizeof(out.variable) - 1);
+    out.variable[sizeof(out.variable) - 1] = '\0';
+  }
+  a = out;
+  return true;
+}
+
+// Canonical assignment text, as stored in NVS: "GPIO34", "simulate", "disabled" or the variable name.
+static inline String rogue_io_text(const RogueIoAssignment &a) {
+  switch (a.mode) {
+    case ROGUE_IO_PIN:      return String("GPIO") + String((int) a.pin);
+    case ROGUE_IO_VARIABLE: return String(a.variable);
+    case ROGUE_IO_DISABLED: return String("disabled");
+    default:                return String("simulate");
+  }
+}
+
+// Human-readable assignment for Serial Monitor output.
+static inline String rogue_io_describe(const RogueIoAssignment &a) {
+  if (a.mode == ROGUE_IO_VARIABLE) return String("variable ") + a.variable;
+  if (a.mode == ROGUE_IO_PIN) return rogue_io_text(a);
+  return String(rogue_io_mode_name(a.mode));
 }
 
 static inline void rogue_copy_product_name(RogueSettings &s, const char *name) {
@@ -70,79 +108,48 @@ static inline void rogue_copy_product_name(RogueSettings &s, const char *name) {
   s.product_name[sizeof(s.product_name) - 1] = '\0';
 }
 
-static inline uint8_t rogue_pref_tank_mode(uint8_t tank) {
+static inline const char *rogue_pref_tank(uint8_t tank) {
   switch (tank) {
-    case 1: return pref_tank1_mode;
-    case 2: return pref_tank2_mode;
-    default: return ROGUE_IO_SIMULATED;
+    case 1: return pref_tank1;
+    case 2: return pref_tank2;
+    default: return "simulate";
   }
 }
 
-static inline int8_t rogue_pref_tank_pin(uint8_t tank) {
-  switch (tank) {
-    case 1: return pref_tank1_pin;
-    case 2: return pref_tank2_pin;
-    default: return -1;
-  }
-}
-
-static inline uint8_t rogue_pref_input_mode(uint8_t input) {
+static inline const char *rogue_pref_input(uint8_t input) {
   switch (input) {
-    case 1: return pref_input_1_mode;
-    case 2: return pref_input_2_mode;
-    case 3: return pref_input_3_mode;
-    case 4: return pref_input_4_mode;
-    case 5: return pref_input_5_mode;
-    case 6: return pref_input_6_mode;
-    case 7: return pref_input_7_mode;
-    case 8: return pref_input_8_mode;
-    default: return ROGUE_IO_SIMULATED;
+    case 1: return pref_input_1;
+    case 2: return pref_input_2;
+    case 3: return pref_input_3;
+    case 4: return pref_input_4;
+    case 5: return pref_input_5;
+    case 6: return pref_input_6;
+    case 7: return pref_input_7;
+    case 8: return pref_input_8;
+    default: return "simulate";
   }
 }
 
-static inline int8_t rogue_pref_input_pin(uint8_t input) {
-  switch (input) {
-    case 1: return pref_input_1_pin;
-    case 2: return pref_input_2_pin;
-    case 3: return pref_input_3_pin;
-    case 4: return pref_input_4_pin;
-    case 5: return pref_input_5_pin;
-    case 6: return pref_input_6_pin;
-    case 7: return pref_input_7_pin;
-    case 8: return pref_input_8_pin;
-    default: return -1;
-  }
-}
-
-static inline uint8_t rogue_pref_output_mode(uint8_t output) {
+static inline const char *rogue_pref_output(uint8_t output) {
   switch (output) {
-    case 1: return pref_output_1_mode;
-    case 2: return pref_output_2_mode;
-    case 3: return pref_output_3_mode;
-    case 4: return pref_output_4_mode;
-    case 5: return pref_output_5_mode;
-    case 6: return pref_output_6_mode;
-    case 7: return pref_output_7_mode;
-    case 8: return pref_output_8_mode;
-    case 9: return pref_output_9_mode;
-    case 10: return pref_output_10_mode;
-    default: return ROGUE_IO_SIMULATED;
+    case 1: return pref_output_1;
+    case 2: return pref_output_2;
+    case 3: return pref_output_3;
+    case 4: return pref_output_4;
+    case 5: return pref_output_5;
+    case 6: return pref_output_6;
+    case 7: return pref_output_7;
+    case 8: return pref_output_8;
+    case 9: return pref_output_9;
+    case 10: return pref_output_10;
+    default: return "simulate";
   }
 }
 
-static inline int8_t rogue_pref_output_pin(uint8_t output) {
-  switch (output) {
-    case 1: return pref_output_1_pin;
-    case 2: return pref_output_2_pin;
-    case 3: return pref_output_3_pin;
-    case 4: return pref_output_4_pin;
-    case 5: return pref_output_5_pin;
-    case 6: return pref_output_6_pin;
-    case 7: return pref_output_7_pin;
-    case 8: return pref_output_8_pin;
-    case 9: return pref_output_9_pin;
-    case 10: return pref_output_10_pin;
-    default: return -1;
+static inline void rogue_io_from_pref(RogueIoAssignment &a, const char *kind, uint8_t n, const char *text) {
+  rogue_io_set_simulated(a);
+  if (!rogue_io_parse(text, a)) {
+    Serial.printf("RoguePreferences.h: invalid %s %u assignment \"%s\", using simulate\n", kind, (unsigned) n, text);
   }
 }
 
@@ -154,31 +161,20 @@ static inline void rogue_settings_defaults(RogueSettings &s) {
   s.serial_suffix = pref_serial_suffix;
   rogue_copy_product_name(s, pref_product_name);
 
-  for (uint8_t i = 0; i <= ROGUE_TANK_COUNT; i++) {
-    s.tanks[i].mode = ROGUE_IO_SIMULATED;
-    s.tanks[i].pin = -1;
-  }
-  for (uint8_t i = 0; i <= ROGUE_INPUT_COUNT; i++) {
-    s.inputs[i].mode = ROGUE_IO_SIMULATED;
-    s.inputs[i].pin = -1;
-  }
-  for (uint8_t i = 0; i <= ROGUE_OUTPUT_COUNT; i++) {
-    s.outputs[i].mode = ROGUE_IO_SIMULATED;
-    s.outputs[i].pin = -1;
-  }
+  rogue_io_set_simulated(s.tanks[0]);
+  rogue_io_set_simulated(s.inputs[0]);
+  rogue_io_set_simulated(s.outputs[0]);
+  for (uint8_t tank = 1; tank <= ROGUE_TANK_COUNT; tank++) rogue_io_from_pref(s.tanks[tank], "tank", tank, rogue_pref_tank(tank));
+  for (uint8_t input = 1; input <= ROGUE_INPUT_COUNT; input++) rogue_io_from_pref(s.inputs[input], "input", input, rogue_pref_input(input));
+  for (uint8_t output = 1; output <= ROGUE_OUTPUT_COUNT; output++) rogue_io_from_pref(s.outputs[output], "output", output, rogue_pref_output(output));
+}
 
-  for (uint8_t tank = 1; tank <= ROGUE_TANK_COUNT; tank++) {
-    s.tanks[tank].mode = rogue_sanitize_io_mode(rogue_pref_tank_mode(tank));
-    s.tanks[tank].pin = rogue_pref_tank_pin(tank);
-  }
-  for (uint8_t input = 1; input <= ROGUE_INPUT_COUNT; input++) {
-    s.inputs[input].mode = rogue_sanitize_io_mode(rogue_pref_input_mode(input));
-    s.inputs[input].pin = rogue_pref_input_pin(input);
-  }
-  for (uint8_t output = 1; output <= ROGUE_OUTPUT_COUNT; output++) {
-    s.outputs[output].mode = rogue_sanitize_io_mode(rogue_pref_output_mode(output));
-    s.outputs[output].pin = rogue_pref_output_pin(output);
-  }
+static inline void rogue_io_sanitize(RogueIoAssignment &a) {
+  if ((uint8_t) a.mode > (uint8_t) ROGUE_IO_DISABLED) a.mode = ROGUE_IO_SIMULATED;
+  a.variable[sizeof(a.variable) - 1] = '\0';
+  if (a.mode == ROGUE_IO_VARIABLE && a.variable[0] == '\0') a.mode = ROGUE_IO_SIMULATED;
+  if (a.mode != ROGUE_IO_PIN) a.pin = -1;
+  if (a.mode != ROGUE_IO_VARIABLE) a.variable[0] = '\0';
 }
 
 static inline void rogue_settings_sanitize(RogueSettings &s) {
@@ -187,24 +183,52 @@ static inline void rogue_settings_sanitize(RogueSettings &s) {
   if (s.tank2_percent > 100) s.tank2_percent = 100;
   if (s.product_name[0] == '\0') rogue_copy_product_name(s, pref_product_name);
 
-  for (uint8_t tank = 1; tank <= ROGUE_TANK_COUNT; tank++) {
-    s.tanks[tank].mode = rogue_sanitize_io_mode((uint8_t) s.tanks[tank].mode);
-    if (s.tanks[tank].mode != ROGUE_IO_PIN) s.tanks[tank].pin = -1;
-  }
-  for (uint8_t input = 1; input <= ROGUE_INPUT_COUNT; input++) {
-    s.inputs[input].mode = rogue_sanitize_io_mode((uint8_t) s.inputs[input].mode);
-    if (s.inputs[input].mode != ROGUE_IO_PIN) s.inputs[input].pin = -1;
-  }
-  for (uint8_t output = 1; output <= ROGUE_OUTPUT_COUNT; output++) {
-    s.outputs[output].mode = rogue_sanitize_io_mode((uint8_t) s.outputs[output].mode);
-    if (s.outputs[output].mode != ROGUE_IO_PIN) s.outputs[output].pin = -1;
-  }
+  for (uint8_t tank = 1; tank <= ROGUE_TANK_COUNT; tank++) rogue_io_sanitize(s.tanks[tank]);
+  for (uint8_t input = 1; input <= ROGUE_INPUT_COUNT; input++) rogue_io_sanitize(s.inputs[input]);
+  for (uint8_t output = 1; output <= ROGUE_OUTPUT_COUNT; output++) rogue_io_sanitize(s.outputs[output]);
 }
 
 static inline String rogue_pref_key(const char *prefix, uint8_t n, const char *suffix) {
   char key[12];
   snprintf(key, sizeof(key), "%s%u%s", prefix, (unsigned) n, suffix);
   return String(key);
+}
+
+// Older builds stored separate mode ("t1m": 0 simulated, 1 variable, 2 pin) and pin ("t1p")
+// keys. They are converted to assignment text once, then removed from NVS.
+static inline void rogue_io_migrate_legacy(Preferences &prefs, RogueIoAssignment &a, const String &key,
+                                           const char *legacy_prefix, const char *kind, uint8_t n) {
+  const String mode_key = rogue_pref_key(legacy_prefix, n, "m");
+  const String pin_key = rogue_pref_key(legacy_prefix, n, "p");
+  if (!prefs.isKey(mode_key.c_str())) return;
+  const uint8_t legacy_mode = prefs.getUChar(mode_key.c_str(), 0);
+  const int8_t legacy_pin = prefs.getChar(pin_key.c_str(), -1);
+  if (!prefs.isKey(key.c_str())) {
+    RogueIoAssignment migrated;
+    rogue_io_set_simulated(migrated);
+    if (legacy_mode == 2 && legacy_pin >= 0) {
+      migrated.mode = ROGUE_IO_PIN;
+      migrated.pin = legacy_pin;
+    } else if (legacy_mode == 1) {
+      migrated.mode = ROGUE_IO_VARIABLE;
+      snprintf(migrated.variable, sizeof(migrated.variable), "%s%u", kind, (unsigned) n);
+    }
+    prefs.putString(key.c_str(), rogue_io_text(migrated));
+    Serial.printf("NVS: migrated %s %u to \"%s\"\n", kind, (unsigned) n, rogue_io_text(migrated).c_str());
+  }
+  prefs.remove(mode_key.c_str());
+  if (prefs.isKey(pin_key.c_str())) prefs.remove(pin_key.c_str());
+}
+
+static inline void rogue_io_load(Preferences &prefs, RogueIoAssignment &a, const char *key_prefix,
+                                 const char *legacy_prefix, const char *kind, uint8_t n) {
+  const String key = rogue_pref_key(key_prefix, n, "");
+  rogue_io_migrate_legacy(prefs, a, key, legacy_prefix, kind, n);
+  if (!prefs.isKey(key.c_str())) return;
+  const String text = prefs.getString(key.c_str(), rogue_io_text(a));
+  if (!rogue_io_parse(text, a)) {
+    Serial.printf("NVS: ignoring invalid assignment %s=\"%s\"\n", key.c_str(), text.c_str());
+  }
 }
 
 static inline void rogue_settings_load(Preferences &prefs, RogueSettings &s) {
@@ -219,24 +243,9 @@ static inline void rogue_settings_load(Preferences &prefs, RogueSettings &s) {
   String saved_name = prefs.getString("name", s.product_name);
   rogue_copy_product_name(s, saved_name.c_str());
 
-  for (uint8_t tank = 1; tank <= ROGUE_TANK_COUNT; tank++) {
-    s.tanks[tank].mode = rogue_sanitize_io_mode(
-        prefs.getUChar(rogue_pref_key("t", tank, "m").c_str(), (uint8_t) s.tanks[tank].mode));
-    s.tanks[tank].pin =
-        prefs.getChar(rogue_pref_key("t", tank, "p").c_str(), s.tanks[tank].pin);
-  }
-  for (uint8_t input = 1; input <= ROGUE_INPUT_COUNT; input++) {
-    s.inputs[input].mode = rogue_sanitize_io_mode(
-        prefs.getUChar(rogue_pref_key("i", input, "m").c_str(), (uint8_t) s.inputs[input].mode));
-    s.inputs[input].pin =
-        prefs.getChar(rogue_pref_key("i", input, "p").c_str(), s.inputs[input].pin);
-  }
-  for (uint8_t output = 1; output <= ROGUE_OUTPUT_COUNT; output++) {
-    s.outputs[output].mode = rogue_sanitize_io_mode(
-        prefs.getUChar(rogue_pref_key("o", output, "m").c_str(), (uint8_t) s.outputs[output].mode));
-    s.outputs[output].pin =
-        prefs.getChar(rogue_pref_key("o", output, "p").c_str(), s.outputs[output].pin);
-  }
+  for (uint8_t tank = 1; tank <= ROGUE_TANK_COUNT; tank++) rogue_io_load(prefs, s.tanks[tank], "ta", "t", "tank", tank);
+  for (uint8_t input = 1; input <= ROGUE_INPUT_COUNT; input++) rogue_io_load(prefs, s.inputs[input], "ia", "i", "input", input);
+  for (uint8_t output = 1; output <= ROGUE_OUTPUT_COUNT; output++) rogue_io_load(prefs, s.outputs[output], "oa", "o", "output", output);
 
   rogue_settings_sanitize(s);
 }
@@ -251,18 +260,9 @@ static inline void rogue_settings_save(Preferences &prefs, RogueSettings &s) {
   prefs.putUShort("ss", s.serial_suffix);
   prefs.putString("name", s.product_name);
 
-  for (uint8_t tank = 1; tank <= ROGUE_TANK_COUNT; tank++) {
-    prefs.putUChar(rogue_pref_key("t", tank, "m").c_str(), (uint8_t) s.tanks[tank].mode);
-    prefs.putChar(rogue_pref_key("t", tank, "p").c_str(), s.tanks[tank].pin);
-  }
-  for (uint8_t input = 1; input <= ROGUE_INPUT_COUNT; input++) {
-    prefs.putUChar(rogue_pref_key("i", input, "m").c_str(), (uint8_t) s.inputs[input].mode);
-    prefs.putChar(rogue_pref_key("i", input, "p").c_str(), s.inputs[input].pin);
-  }
-  for (uint8_t output = 1; output <= ROGUE_OUTPUT_COUNT; output++) {
-    prefs.putUChar(rogue_pref_key("o", output, "m").c_str(), (uint8_t) s.outputs[output].mode);
-    prefs.putChar(rogue_pref_key("o", output, "p").c_str(), s.outputs[output].pin);
-  }
+  for (uint8_t tank = 1; tank <= ROGUE_TANK_COUNT; tank++) prefs.putString(rogue_pref_key("ta", tank, "").c_str(), rogue_io_text(s.tanks[tank]));
+  for (uint8_t input = 1; input <= ROGUE_INPUT_COUNT; input++) prefs.putString(rogue_pref_key("ia", input, "").c_str(), rogue_io_text(s.inputs[input]));
+  for (uint8_t output = 1; output <= ROGUE_OUTPUT_COUNT; output++) prefs.putString(rogue_pref_key("oa", output, "").c_str(), rogue_io_text(s.outputs[output]));
 }
 
 static inline void rogue_settings_reset(Preferences &prefs, RogueSettings &s) {

@@ -98,63 +98,43 @@ Edit this file for built-in defaults:
 arduinoIDE/TVMS_Rogue_Emulator/RoguePreferences.h
 ```
 
-It is deliberately simple variable/value configuration. Mode values are:
+It is deliberately simple variable/value configuration. Each tank, input and output has one assignment string, and its mode is derived from that text:
 
-```text
-0 = simulated
-1 = variable
-2 = pin
-```
+| Assignment text | Mode | Meaning |
+|---|---|---|
+| `GPIO34` | pin | Bound to that ESP32 GPIO. Tanks read analog ADC; inputs read digital; outputs drive digital. |
+| `simulate` | simulated | Internal emulator-only value. No GPIO is used. |
+| `disabled` | disabled | Channel unused. Tank reads 0%, input reads off, output stays 0% and on/level/dim commands for it are ignored. |
+| anything else | variable | A named variable, e.g. `fresh_water`. Max 15 characters, no spaces. Driven with `set <name> <value>`. |
 
-Pin value `-1` means no GPIO assigned.
+Matching is case-insensitive (`gpio34`, `Simulate`, `DISABLED` all work). Text starting with `GPIO` that is not followed by a number is rejected rather than treated as a variable name.
 
 Example defaults:
 
 ```cpp
-static uint8_t pref_tank1_mode = 2;
-static int8_t  pref_tank1_pin  = 34;
-
-static uint8_t pref_input_1_mode = 2;
-static int8_t  pref_input_1_pin  = 33;
-
-static uint8_t pref_output_1_mode = 2;
-static int8_t  pref_output_1_pin  = 25;
+static const char pref_tank1[]    = "GPIO34";
+static const char pref_tank2[]    = "grey_water";
+static const char pref_input_1[]  = "GPIO33";
+static const char pref_input_2[]  = "disabled";
+static const char pref_output_1[] = "GPIO25";
 ```
+
+The shipped defaults are `simulate` for every tank, input and output.
 
 After changing the defaults file, run `defaults` from Serial Monitor to clear NVS and reload the built-in defaults.
 
-## Tank/input/output assignment modes
+## GPIO checks
 
-Tank 1–2, digital input 1–8, and output 1–10 all have the same persisted assignment pattern.
+A GPIO assignment is refused (from Serial) or the channel is set to `disabled` with a message (at boot) when the pin:
 
-| Mode | Meaning |
-|---|---|
-| `simulated` | Internal emulator-only value. No ESP32 pin is used. |
-| `variable` | Internal variable hook. Can be driven by sketch code or Serial commands. |
-| `pin` | Bound to an ESP32 GPIO pin. Tanks read analog ADC; inputs read digital; outputs drive digital. |
+- is not a GPIO on the chip,
+- is GPIO6–11 on the original ESP32 (wired to the SPI flash),
+- is the CAN TX/RX pin (`GPIO22` / `GPIO19`),
+- is input-only (GPIO34–39) and is assigned to an output,
+- is not an ADC pin and is assigned to a tank,
+- is already used by another tank/input/output.
 
-Defaults:
-
-- all tanks are `simulated`, no GPIO pin,
-- all inputs are `simulated`, no GPIO pin,
-- all outputs are `simulated`, no GPIO pin.
-
-Examples:
-
-```text
-tank 1 pin 34
-tank 2 variable
-
-input 1 pin 33
-input 2 variable
-input 3 simulated
-
-output 1 pin 25
-output 2 variable
-output 3 simulated
-```
-
-GPIO assignments are saved in NVS. After reboot, the sketch loads them and configures the relevant pins.
+When a channel is moved off a GPIO, that pin is driven LOW (outputs) and returned to high-impedance input, so it does not stay on.
 
 Tank GPIO mode uses `analogRead()`:
 
@@ -185,14 +165,16 @@ Use this to show current mappings:
 io
 ```
 
-Use these to drive variable/simulated tanks and inputs from Serial Monitor:
+Use these to drive tanks, inputs and outputs from Serial Monitor:
 
 ```text
-t1 25
-t2 80
-in1 1
-in1 0
+set grey_water 80     every channel assigned to variable grey_water
+t1 25                 tank 1 (simulated or variable)
+in1 1                 input 1 (simulated or variable)
+o1 75                 output 1
 ```
+
+`set` applies to every tank, input and output using that variable name. Tanks and outputs take `0-100`; inputs take `0` or `1`.
 
 ## Runtime broadcasts
 
@@ -290,6 +272,12 @@ crc
 | `0x0F05` | legacy/display hold dimming |
 | `0x0F04` | direct-command ACK reply |
 
+## CAN health
+
+- Frames are queued without blocking. If the TX queue is full (typically no other node on the bus to ACK), frames are dropped and a single summary line is printed every 5 s instead of one line per frame.
+- If the controller goes bus-off, the sketch starts recovery automatically and restarts CAN when recovery completes.
+- If the TWAI driver fails to install or start at boot, it is retried every 5 s. `status` shows `CAN=running` or `CAN=down`.
+
 ## Serial Monitor commands
 
 Open Serial Monitor at `115200`.
@@ -305,11 +293,12 @@ v <millivolts>        set input voltage, e.g. v 13600
 i <milliamps>         set input current, e.g. i 2500
 m <0|1>               master off/on
 o<n> <0-100>          set output, e.g. o1 75
-in<n> <0|1>           set input variable/simulated state, e.g. in1 1
+in<n> <0|1>           set input simulated/variable state, e.g. in1 1
+set <name> <value>    set every channel assigned to a named variable
 
-tank <n> <simulated|variable|pin> [gpio]
-input <n> <simulated|variable|pin> [gpio]
-output <n> <simulated|variable|pin> [gpio]
+tank <n> <GPIO<n>|simulate|disabled|variable-name>
+input <n> <GPIO<n>|simulate|disabled|variable-name>
+output <n> <GPIO<n>|simulate|disabled|variable-name>
 
 sa <0x01-0xFE>        set/persist source address
 serial <prefix> <suffix>
@@ -329,18 +318,20 @@ sa 0x36
 serial 2606260001 0x0013
 name TVMS Rogue
 
-tank 1 pin 34
-tank 2 variable
-t2 80
+tank 1 GPIO34
+tank 2 grey_water
+set grey_water 80
 
-input 1 pin 33
-input 2 variable
-in2 1
+input 1 GPIO33
+input 2 door_switch
+input 3 disabled
+set door_switch 1
 
-output 1 pin 25
-output 2 variable
+output 1 GPIO25
+output 2 awning
+output 3 disabled
 o1 100
-o2 55
+set awning 55
 
 t1 25
 m 1
@@ -348,7 +339,7 @@ v 13750
 i 3200
 ```
 
-Tank values are expected as percentages in `simulated` and `variable` mode. In `pin` mode, the tank pin is read with `analogRead()` and converted to `0–100%` before being sent on `0x1FD02`.
+Tank values are expected as percentages in `simulate` and variable mode. In GPIO mode, the tank pin is read with `analogRead()` and converted to `0–100%` before being sent on `0x1FD02`.
 
 ## NVS persistence
 
@@ -357,24 +348,25 @@ The following are saved in ESP32 NVS by `RoguePreferencesRuntime.h`:
 - source address,
 - Tank 1 percent,
 - Tank 2 percent,
-- Tank 1–2 assignment mode,
-- Tank 1–2 GPIO pin,
+- Tank 1–2 assignment text (`ta1`, `ta2`),
 - serial prefix,
 - serial suffix,
 - product name,
-- input 1–8 assignment mode,
-- input 1–8 GPIO pin,
-- output 1–10 assignment mode,
-- output 1–10 GPIO pin.
+- input 1–8 assignment text (`ia1`..`ia8`),
+- output 1–10 assignment text (`oa1`..`oa10`).
+
+Assignments saved by older builds as separate mode/pin keys (`t1m`/`t1p` etc.) are converted to assignment text on first boot and the old keys are removed. Old `variable` assignments had no name, so they become `tank1`, `input1`, `output1` and so on.
 
 Use `defaults` to restore the built-in defaults.
 
 ## Current limits
 
-- It has not been compile-tested in this chat environment.
+- Compile-tested with arduino-cli and the esp32 core 3.3.12 (M5Stack-ATOM and ESP32 Dev Module). Not yet tested on hardware.
 - Tank GPIO mode currently uses fixed raw ADC scaling `0..4095 -> 0..100%`; calibration can be added later.
 - GPIO outputs are currently digital on/off only, not PWM brightness.
 - GPIO inputs are read as active-high using `pinMode(pin, INPUT)`.
+- GPIO6–11 are blocked only on the original ESP32; flash/PSRAM pins on other ESP32 variants are not blocked.
+- Master OFF sets all outputs to 0% but does not stop outputs being switched on again while master is off.
 - Object 2 is still the captured/static object image; changing serial/name/source address changes live identity frames but does not rewrite the embedded Object 2 image.
 - BLE/RBus emulation is not included.
 

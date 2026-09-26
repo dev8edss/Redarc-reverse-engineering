@@ -5,15 +5,13 @@
 // RoguePreferences.h is intentionally only editable variables and values.
 // The sketch/runtime owns all structs, NVS load/save code, validation, and logic.
 //
-// I/O mode values:
-//   0 = simulated  (internal emulator value only)
-//   1 = variable   (internal variable hook; can be driven from Serial/sketch code)
-//   2 = pin        (ESP32 GPIO pin)
+// Tank / input / output assignment text:
+//   "GPIO34"      = bound to ESP32 GPIO 34
+//   "simulate"    = internal emulator-only value
+//   "disabled"    = not used; value held at 0/off and commands ignored
+//   anything else = a named variable, e.g. "fresh_water" (max 15 chars, no spaces)
 //
-// Pin value:
-//   -1 = no pin assigned
-//
-// Tank pin mode uses analogRead() and maps raw ADC 0..4095 to 0..100%.
+// Tank GPIO mode uses analogRead() and maps raw ADC 0..4095 to 0..100%.
 
 static uint8_t pref_source_address = 0x36;        // keep different from a real Rogue at 0x30
 
@@ -23,51 +21,31 @@ static char pref_product_name[] = "TVMS Rogue";
 
 // Tank levels 1..2
 static uint8_t pref_tank1_percent = 50;
-static uint8_t pref_tank1_mode    = 0;
-static int8_t  pref_tank1_pin     = -1;
+static const char pref_tank1[] = "simulate";
 
 static uint8_t pref_tank2_percent = 75;
-static uint8_t pref_tank2_mode    = 0;
-static int8_t  pref_tank2_pin     = -1;
+static const char pref_tank2[] = "simulate";
 
 // Digital inputs 1..8
-static uint8_t pref_input_1_mode = 0;
-static int8_t  pref_input_1_pin  = -1;
-static uint8_t pref_input_2_mode = 0;
-static int8_t  pref_input_2_pin  = -1;
-static uint8_t pref_input_3_mode = 0;
-static int8_t  pref_input_3_pin  = -1;
-static uint8_t pref_input_4_mode = 0;
-static int8_t  pref_input_4_pin  = -1;
-static uint8_t pref_input_5_mode = 0;
-static int8_t  pref_input_5_pin  = -1;
-static uint8_t pref_input_6_mode = 0;
-static int8_t  pref_input_6_pin  = -1;
-static uint8_t pref_input_7_mode = 0;
-static int8_t  pref_input_7_pin  = -1;
-static uint8_t pref_input_8_mode = 0;
-static int8_t  pref_input_8_pin  = -1;
+static const char pref_input_1[] = "simulate";
+static const char pref_input_2[] = "simulate";
+static const char pref_input_3[] = "simulate";
+static const char pref_input_4[] = "simulate";
+static const char pref_input_5[] = "simulate";
+static const char pref_input_6[] = "simulate";
+static const char pref_input_7[] = "simulate";
+static const char pref_input_8[] = "simulate";
 
 // Outputs 1..10
-static uint8_t pref_output_1_mode = 0;
-static int8_t  pref_output_1_pin  = -1;
-static uint8_t pref_output_2_mode = 0;
-static int8_t  pref_output_2_pin  = -1;
-static uint8_t pref_output_3_mode = 0;
-static int8_t  pref_output_3_pin  = -1;
-static uint8_t pref_output_4_mode = 0;
-static int8_t  pref_output_4_pin  = -1;
-static uint8_t pref_output_5_mode = 0;
-static int8_t  pref_output_5_pin  = -1;
-static uint8_t pref_output_6_mode = 0;
-static int8_t  pref_output_6_pin  = -1;
-static uint8_t pref_output_7_mode = 0;
-static int8_t  pref_output_7_pin  = -1;
-static uint8_t pref_output_8_mode = 0;
-static int8_t  pref_output_8_pin  = -1;
-static uint8_t pref_output_9_mode = 0;
-static int8_t  pref_output_9_pin  = -1;
-static uint8_t pref_output_10_mode = 0;
-static int8_t  pref_output_10_pin  = -1;
+static const char pref_output_1[]  = "simulate";
+static const char pref_output_2[]  = "simulate";
+static const char pref_output_3[]  = "simulate";
+static const char pref_output_4[]  = "simulate";
+static const char pref_output_5[]  = "simulate";
+static const char pref_output_6[]  = "simulate";
+static const char pref_output_7[]  = "simulate";
+static const char pref_output_8[]  = "simulate";
+static const char pref_output_9[]  = "simulate";
+static const char pref_output_10[] = "simulate";
 
 #include "RoguePreferencesRuntime.h"
