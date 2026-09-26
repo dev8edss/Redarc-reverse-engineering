@@ -12,6 +12,17 @@
 //   anything else = a named variable, e.g. "fresh_water" (max 15 chars, no spaces)
 //
 // Tank GPIO mode uses analogRead() and maps raw ADC 0..4095 to 0..100%.
+// Prime / TVMS1280 outputs are on/off only. Output GPIO mode is digital only:
+//   0% = LOW/off
+//   1..100% = HIGH/on
+// The PWM values below are kept only because the shared Rogue-style sketch struct still
+// declares them; they are ignored for Prime outputs.
+
+// Force the Rogue-style runtime path to use its digital fallback for Prime outputs.
+// Prime / TVMS1280 is on/off only, so LEDC PWM must not be attached.
+#define ledcAttach(pin, frequency, resolution) false
+#define ledcWrite(pin, duty) ((void)0)
+#define ledcDetach(pin) ((void)0)
 
 // CAN bus (250 kbit/s, extended IDs). M5Stack Atomic CAN Base: TX 22, RX 19.
 can_tx_pin = 22;
@@ -44,9 +55,9 @@ input_1 = "simulate";
 input_2 = "simulate";
 input_3 = "simulate";
 
-// GPIO outputs are PWM-capable by default so 0..100% levels can be represented.
-output_pwm_frequency_hz    = 5000;
-output_pwm_resolution_bits = 10;
+// Ignored for Prime. Present only to satisfy the shared defaults structure.
+output_pwm_frequency_hz    = 0;
+output_pwm_resolution_bits = 0;
 
 // Prime / TVMS1280 outputs 1..11, captured as channels 0x04..0x0E.
 // Output 11 is the inverter output in the captured labels.
