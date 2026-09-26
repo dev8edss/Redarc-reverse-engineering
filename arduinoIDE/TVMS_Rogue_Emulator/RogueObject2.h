@@ -4,7 +4,8 @@
 #include <pgmspace.h>
 
 // Captured/decoded TVMS Rogue Object 2 from the emulated-rogue branch.
-// The Arduino sketch serves this object through the REDARC object-read protocol.
+// This is the factory configuration; the sketch serves it until RedVision commits a
+// configuration write, which is then saved to NVS and used instead.
 // Object header length: 4748 bytes. Stored whole-object CRC in bytes 8..11: 0xFA84819A.
 static constexpr uint32_t ROGUE_OBJECT2_SIZE = 4748UL;
 

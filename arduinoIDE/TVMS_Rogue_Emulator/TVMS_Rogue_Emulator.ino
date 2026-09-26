@@ -41,6 +41,7 @@ static constexpr uint32_t ID_NODE_PRODUCT_NAME      = 0x17F40300UL;
 static constexpr uint32_t ID_NODE_SERIAL_INFO       = 0x17F40400UL;
 static constexpr uint32_t ID_NODE_DEVICE_ID         = 0x17F40500UL;
 static constexpr uint32_t ID_DIRECT_ACK_BASE        = 0x0F040000UL;
+static constexpr uint32_t ID_SERVICE_ACK_BASE       = 0x02800000UL;
 static constexpr uint32_t ID_SERVICE_DATA_BASE      = 0x02810000UL;
 static constexpr uint32_t ID_SERVICE_TRAILER_BASE   = 0x02840000UL;
 
@@ -81,6 +82,29 @@ static uint32_t tx_fail_count = 0;
 static esp_err_t last_tx_error = ESP_OK;
 
 static uint8_t selected_object = 0xFF;
+
+// Active Object 2 (factory capture or the last committed configuration write). Everything
+// that reads the configuration uses this buffer, so a commit takes effect immediately.
+static constexpr uint32_t MAX_CONFIG_OBJECT_SIZE = 8192UL;
+static constexpr uint32_t WRITE_WINDOW_SIZE = 1024UL;   // captured 0x0E83 write-transfer window
+static constexpr uint8_t PROGRAMMING_STATUS_OK = 0x00;
+static constexpr uint8_t PROGRAMMING_STATUS_BUSY = 0x01;
+static constexpr uint8_t PROGRAMMING_STATUS_ERROR = 0x03;
+Preferences object_prefs;
+static uint8_t *config_object = nullptr;
+static uint32_t config_object_len = 0;
+static bool config_from_flash = false;
+
+// Transactional Object 2 write (0x0E87 start .. 0x0E8A commit), ported from the ESPHome
+// emulated-rogue component. Blocks are staged and only replace the active object after
+// the complete image passes its length and CRC-32C checks and is saved to NVS.
+static bool write_active = false;
+static bool write_closed = false;
+static bool write_overflow = false;
+static uint8_t *write_staging = nullptr;        // MAX_CONFIG_OBJECT_SIZE, allocated per write
+static uint8_t write_received[MAX_CONFIG_OBJECT_SIZE / 8];
+static uint8_t write_block[WRITE_WINDOW_SIZE];
+static uint32_t write_block_len = 0;
 static uint8_t output_levels[ROGUE_OUTPUT_COUNT + 1] = {0};
 static bool input_states[ROGUE_INPUT_COUNT + 1] = {false};
 static bool input_variable_state[ROGUE_INPUT_COUNT + 1] = {false};
@@ -133,57 +157,71 @@ uint32_t crc32c(const uint8_t *data, size_t len) {
   return ~crc;
 }
 
-uint32_t object2_stored_crc() {
-  return (uint32_t) rogue_object2_byte(8) |
-         ((uint32_t) rogue_object2_byte(9) << 8) |
-         ((uint32_t) rogue_object2_byte(10) << 16) |
-         ((uint32_t) rogue_object2_byte(11) << 24);
-}
-
-uint32_t object2_declared_length() {
-  return (uint32_t) rogue_object2_byte(4) |
-         ((uint32_t) rogue_object2_byte(5) << 8) |
-         ((uint32_t) rogue_object2_byte(6) << 16) |
-         ((uint32_t) rogue_object2_byte(7) << 24);
-}
-
-uint32_t object2_calculated_crc_zeroed() {
+// Validates a complete Object 2 image: header length at bytes 4..7 and whole-object
+// CRC-32C at bytes 8..11 (calculated with those four bytes zeroed).
+bool validate_config_object(const uint8_t *data, uint32_t available, uint32_t &declared_len, uint32_t &stored_crc, uint32_t &calc_crc) {
+  declared_len = 0; stored_crc = 0; calc_crc = 0;
+  if (data == nullptr || available < 12UL) return false;
+  declared_len = u32_le(data + 4);
+  if (declared_len < 12UL || declared_len > available || declared_len > MAX_CONFIG_OBJECT_SIZE) return false;
+  stored_crc = u32_le(data + 8);
   uint32_t crc = 0xFFFFFFFFUL;
-  for (uint32_t i = 0; i < ROGUE_OBJECT2_SIZE; i++) {
-    uint8_t b = rogue_object2_byte(i);
-    if (i >= 8 && i <= 11) b = 0x00;
-    crc = crc32c_update_byte(crc, b);
+  for (uint32_t i = 0; i < declared_len; i++) crc = crc32c_update_byte(crc, (i >= 8 && i <= 11) ? 0x00 : data[i]);
+  calc_crc = ~crc;
+  return stored_crc == calc_crc;
+}
+
+void load_factory_config_object() {
+  for (uint32_t i = 0; i < ROGUE_OBJECT2_SIZE; i++) config_object[i] = rogue_object2_byte(i);
+  config_object_len = ROGUE_OBJECT2_SIZE;
+  config_from_flash = false;
+}
+
+// Loads the active Object 2: the last committed configuration write saved in NVS,
+// or the embedded factory capture when nothing valid is saved.
+void load_config_object() {
+  config_object = (uint8_t *) malloc(MAX_CONFIG_OBJECT_SIZE);
+  if (config_object == nullptr) { Serial.println("Object2: out of memory"); while (true) delay(1000); }
+  object_prefs.begin("rogueobj", false);
+  const size_t saved_len = object_prefs.isKey("obj2") ? object_prefs.getBytesLength("obj2") : 0;
+  if (saved_len >= 12 && saved_len <= MAX_CONFIG_OBJECT_SIZE && object_prefs.getBytes("obj2", config_object, saved_len) == saved_len) {
+    uint32_t declared_len = 0, stored_crc = 0, calc_crc = 0;
+    if (validate_config_object(config_object, saved_len, declared_len, stored_crc, calc_crc) && declared_len == saved_len) {
+      config_object_len = saved_len;
+      config_from_flash = true;
+      Serial.printf("Object2: loaded saved configuration, %lu bytes CRC-32C=0x%08lX\n", (unsigned long) saved_len, (unsigned long) stored_crc);
+      return;
+    }
+    Serial.println("Object2: saved configuration is invalid, using factory object");
   }
-  return ~crc;
+  load_factory_config_object();
 }
 
 void object2_self_test() {
-  const uint32_t declared_len = object2_declared_length();
-  const uint32_t stored_crc = object2_stored_crc();
-  const uint32_t calc_crc = object2_calculated_crc_zeroed();
-  Serial.printf("Object2 size=%lu declared_len=%lu stored_crc=0x%08lX calc_crc=0x%08lX %s\n",
-                (unsigned long) ROGUE_OBJECT2_SIZE,
+  uint32_t declared_len = 0, stored_crc = 0, calc_crc = 0;
+  const bool ok = validate_config_object(config_object, config_object_len, declared_len, stored_crc, calc_crc) && declared_len == config_object_len;
+  Serial.printf("Object2 (%s) size=%lu declared_len=%lu stored_crc=0x%08lX calc_crc=0x%08lX %s\n",
+                config_from_flash ? "saved" : "factory",
+                (unsigned long) config_object_len,
                 (unsigned long) declared_len,
                 (unsigned long) stored_crc,
                 (unsigned long) calc_crc,
-                (stored_crc == calc_crc && declared_len == ROGUE_OBJECT2_SIZE) ? "OK" : "FAIL");
+                ok ? "OK" : "FAIL");
 }
 
 uint32_t object2_u32(uint32_t offset) {
-  return (uint32_t) rogue_object2_byte(offset) |
-         ((uint32_t) rogue_object2_byte(offset + 1) << 8) |
-         ((uint32_t) rogue_object2_byte(offset + 2) << 16) |
-         ((uint32_t) rogue_object2_byte(offset + 3) << 24);
+  if (offset + 4UL > config_object_len) return 0;
+  return u32_le(config_object + offset);
 }
 
 // Object 2 is a tree of nodes, each a u32 header (type << 24 | body length) plus body.
 // Type 0x03 is a map of (u32 key, u32 value) pairs whose values are child-node offsets
 // or tagged integers. Ported from the ESPHome emulated-rogue object decoder.
 bool object2_map_value(uint32_t map_offset, uint32_t key, uint32_t &value) {
-  if (map_offset + 4UL > ROGUE_OBJECT2_SIZE) return false;
+  if (map_offset + 4UL > config_object_len) return false;
   const uint32_t header = object2_u32(map_offset);
   const uint32_t length = header & 0x00FFFFFFUL;
-  if ((header >> 24) != 0x03 || (length % 8UL) != 0 || map_offset + 4UL + length > ROGUE_OBJECT2_SIZE) return false;
+  if ((header >> 24) != 0x03 || (length % 8UL) != 0 || map_offset + 4UL + length > config_object_len) return false;
   for (uint32_t i = 0; i < length; i += 8) {
     const uint32_t entry = map_offset + 4UL + i;
     if (object2_u32(entry) != key) continue;
@@ -382,10 +420,17 @@ void configure_io_pins() {
       hold_dim_direction[output] = 0;
       continue;
     }
+    // Re-applied after every configuration commit, so a reprogrammed output picks up its new type.
     if (output_is_always_on(output)) output_levels[output] = 100;
+    else if (!output_is_dimmable(output) && output_levels[output] > 0) output_levels[output] = 100;
+    if (!output_is_dimmable(output)) hold_dim_direction[output] = 0;
     if (a.mode == ROGUE_IO_PIN) {
-      if (output_is_dimmable(output)) attach_output_pwm(output);
-      else pinMode((uint8_t) a.pin, OUTPUT);
+      if (output_is_dimmable(output)) {
+        attach_output_pwm(output);
+      } else {
+        if (output_pwm_pin[output] == a.pin) { ledcDetach((uint8_t) a.pin); output_pwm_pin[output] = -1; }
+        pinMode((uint8_t) a.pin, OUTPUT);
+      }
       apply_output_assignment(output);
     }
   }
@@ -575,19 +620,147 @@ void send_serial_info() { send_frame8(with_sa(ID_NODE_SERIAL_INFO), (uint8_t)(se
 void send_device_id() { send_frame8(with_sa(ID_NODE_DEVICE_ID), 0,0,0,0,0, settings.source_address, 0x01, 0); }
 void send_identity() { send_node_firmware(); send_product_name(); send_serial_info(); send_device_id(); send_load_disconnect_config(); }
 
-void handle_object_select(const uint8_t *data, uint8_t len) { if (len < 1) return; selected_object = data[0]; Serial.printf("Selected REDARC object %u\n", selected_object); }
+void send_programming_status(uint8_t requester, uint8_t status, uint8_t opcode) {
+  send_frame8(ID_SERVICE_ACK_BASE | ((uint32_t) requester << 8) | settings.source_address, status, 0x00, opcode, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF);
+}
+
+void handle_object_select(uint8_t requester, const uint8_t *data, uint8_t len) {
+  selected_object = len >= 1 ? data[0] : 0xFF;
+  send_programming_status(requester, PROGRAMMING_STATUS_OK, 0x85);
+  Serial.printf("Selected REDARC object %u\n", selected_object);
+}
+
 void handle_object_read(uint8_t requester, const uint8_t *data, uint8_t len) {
   if (len < 8) return;
   const uint32_t offset = u32_le(data); const uint32_t requested_length = u32_le(data + 4);
-  if (requested_length > 8192UL) { Serial.printf("Refusing oversized object read length %lu\n", (unsigned long) requested_length); return; }
+  if (requested_length > MAX_CONFIG_OBJECT_SIZE) { Serial.printf("Refusing oversized object read length %lu\n", (unsigned long) requested_length); return; }
   uint8_t *block = (uint8_t *) malloc(requested_length == 0 ? 1 : requested_length); if (block == nullptr) { Serial.println("Object read malloc failed"); return; }
   memset(block, 0xFF, requested_length);
-  if (selected_object == MAIN_CONFIGURATION_OBJECT && offset < ROGUE_OBJECT2_SIZE) { const uint32_t available = ROGUE_OBJECT2_SIZE - offset; const uint32_t copy_len = requested_length < available ? requested_length : available; for (uint32_t i = 0; i < copy_len; i++) block[i] = rogue_object2_byte(offset + i); }
+  if (selected_object == MAIN_CONFIGURATION_OBJECT && offset < config_object_len) { const uint32_t available = config_object_len - offset; memcpy(block, config_object + offset, requested_length < available ? requested_length : available); }
   const uint32_t data_id = ID_SERVICE_DATA_BASE | ((uint32_t) requester << 8) | settings.source_address;
   for (uint32_t pos = 0; pos < requested_length; pos += 8) { uint8_t frame[8] = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF}; const uint8_t chunk = (uint8_t)((requested_length - pos) < 8UL ? (requested_length - pos) : 8UL); memcpy(frame, block + pos, chunk); send_frame(data_id, frame, 8); }
   const uint32_t block_crc = crc32c(block, requested_length); const uint32_t trailer_id = ID_SERVICE_TRAILER_BASE | ((uint32_t) requester << 8) | settings.source_address;
   send_frame8(trailer_id, (uint8_t)(requested_length & 0xFF), (uint8_t)((requested_length >> 8) & 0xFF), (uint8_t)((requested_length >> 16) & 0xFF), (uint8_t)((requested_length >> 24) & 0xFF), (uint8_t)(block_crc & 0xFF), (uint8_t)((block_crc >> 8) & 0xFF), (uint8_t)((block_crc >> 16) & 0xFF), (uint8_t)((block_crc >> 24) & 0xFF));
   Serial.printf("Object %u read offset=%lu length=%lu crc=0x%08lX\n", selected_object, (unsigned long) offset, (unsigned long) requested_length, (unsigned long) block_crc); free(block);
+}
+
+void end_config_write() {
+  write_active = false; write_closed = false; write_overflow = false; write_block_len = 0;
+  free(write_staging); write_staging = nullptr;
+}
+
+// Re-derives everything that comes from Object 2 after it changes, and re-broadcasts it.
+void apply_config_object() {
+  load_output_capabilities();
+  configure_io_pins();
+  send_output_capabilities();
+  send_all_status();
+}
+
+// 0x0E83: captured pre-write capability reply (1,024-byte transfer window).
+void handle_write_capability(uint8_t requester) {
+  send_frame8(ID_SERVICE_DATA_BASE | ((uint32_t) requester << 8) | settings.source_address, 0x00, 0x04, 0x00, 0x00, 0xFF, 0xFF, 0xFF, 0xFF);
+  send_frame8(ID_SERVICE_TRAILER_BASE | ((uint32_t) requester << 8) | settings.source_address, 0x04, 0x00, 0x00, 0x00, 0xDD, 0xEF, 0xB9, 0xD6);
+  Serial.printf("Reported write capability to 0x%02X: window=%lu bytes\n", requester, (unsigned long) WRITE_WINDOW_SIZE);
+}
+
+// 0x0E87: start a new staging transaction for the selected object.
+void handle_write_start(uint8_t requester) {
+  end_config_write();
+  if (selected_object == MAIN_CONFIGURATION_OBJECT) write_staging = (uint8_t *) malloc(MAX_CONFIG_OBJECT_SIZE);
+  if (write_staging == nullptr) {
+    send_programming_status(requester, PROGRAMMING_STATUS_ERROR, 0x87);
+    Serial.printf("Rejected write for object %u from 0x%02X\n", selected_object, requester);
+    return;
+  }
+  memset(write_staging, 0xFF, MAX_CONFIG_OBJECT_SIZE);
+  memset(write_received, 0, sizeof(write_received));
+  write_active = true;
+  send_programming_status(requester, PROGRAMMING_STATUS_OK, 0x87);
+  Serial.printf("Started configuration write from 0x%02X\n", requester);
+}
+
+// 0x0E81: write data frames, collected into the current block.
+void handle_write_data(const uint8_t *data, uint8_t len) {
+  if (!write_active) return;
+  if (write_block_len + len > WRITE_WINDOW_SIZE) { write_overflow = true; return; }
+  memcpy(write_block + write_block_len, data, len);
+  write_block_len += len;
+}
+
+// 0x0E88: end of block. Payload is the block's offset and CRC-32C.
+void handle_write_block(uint8_t requester, const uint8_t *data, uint8_t len) {
+  send_programming_status(requester, PROGRAMMING_STATUS_BUSY, 0x88);
+  const uint32_t offset = len >= 4 ? u32_le(data) : 0;
+  const uint32_t expected_crc = len >= 8 ? u32_le(data + 4) : 0;
+  const uint32_t actual_crc = crc32c(write_block, write_block_len);
+  const bool valid = write_active && len >= 8 && !write_overflow && write_block_len > 0 &&
+                     offset <= MAX_CONFIG_OBJECT_SIZE && write_block_len <= MAX_CONFIG_OBJECT_SIZE - offset &&
+                     actual_crc == expected_crc;
+  if (valid) {
+    memcpy(write_staging + offset, write_block, write_block_len);
+    for (uint32_t i = offset; i < offset + write_block_len; i++) write_received[i >> 3] |= (uint8_t) (1U << (i & 7));
+    send_programming_status(requester, PROGRAMMING_STATUS_OK, 0x88);
+    Serial.printf("Accepted write block offset=0x%04lX length=%lu\n", (unsigned long) offset, (unsigned long) write_block_len);
+  } else {
+    send_programming_status(requester, PROGRAMMING_STATUS_ERROR, 0x88);
+    Serial.printf("Rejected write block offset=0x%04lX length=%lu expected_crc=0x%08lX actual_crc=0x%08lX%s\n", (unsigned long) offset, (unsigned long) write_block_len, (unsigned long) expected_crc, (unsigned long) actual_crc, write_overflow ? " (overflow)" : "");
+  }
+  write_block_len = 0;
+  write_overflow = false;
+}
+
+// 0x0E89: close. Ends a read session, or closes the write session ready for commit.
+void handle_object_close(uint8_t requester) {
+  selected_object = 0xFF;
+  if (!write_active) { send_programming_status(requester, PROGRAMMING_STATUS_OK, 0x89); return; }
+  const bool valid = write_block_len == 0 && !write_overflow;
+  write_active = false;
+  write_closed = valid;
+  send_programming_status(requester, valid ? PROGRAMMING_STATUS_OK : PROGRAMMING_STATUS_ERROR, 0x89);
+  Serial.printf("%s configuration write session from 0x%02X\n", valid ? "Closed" : "Rejected close of", requester);
+  if (!valid) end_config_write();
+}
+
+bool write_range_received(uint32_t length) {
+  for (uint32_t i = 0; i < length; i++) if ((write_received[i >> 3] & (uint8_t) (1U << (i & 7))) == 0) return false;
+  return true;
+}
+
+// 0x0E8A: commit. The staged image must be complete, pass its length/CRC checks and be
+// saved to NVS before it replaces the active object; otherwise nothing changes.
+void handle_write_commit(uint8_t requester) {
+  uint32_t declared_len = 0, stored_crc = 0, calc_crc = 0;
+  bool complete = false, saved = false;
+  bool valid = write_closed && write_staging != nullptr && validate_config_object(write_staging, MAX_CONFIG_OBJECT_SIZE, declared_len, stored_crc, calc_crc);
+  if (valid) valid = complete = write_range_received(declared_len);
+  if (valid) valid = saved = object_prefs.putBytes("obj2", write_staging, declared_len) == declared_len;
+  if (valid) {
+    memcpy(config_object, write_staging, declared_len);
+    config_object_len = declared_len;
+    config_from_flash = true;
+    send_programming_status(requester, PROGRAMMING_STATUS_OK, 0x8A);
+    Serial.printf("Committed and saved Object 2: %lu bytes CRC-32C=0x%08lX\n", (unsigned long) declared_len, (unsigned long) stored_crc);
+  } else {
+    send_programming_status(requester, PROGRAMMING_STATUS_ERROR, 0x8A);
+    Serial.printf("Rejected configuration commit: length=%lu stored_crc=0x%08lX calc_crc=0x%08lX complete=%s saved=%s\n", (unsigned long) declared_len, (unsigned long) stored_crc, (unsigned long) calc_crc, complete ? "yes" : "no", saved ? "yes" : "no");
+  }
+  end_config_write();
+  if (valid) apply_config_object();
+}
+
+void handle_object_service(uint8_t requester, uint8_t opcode, const uint8_t *data, uint8_t len) {
+  switch (opcode) {
+    case 0x81: handle_write_data(data, len); return;
+    case 0x83: handle_write_capability(requester); return;
+    case 0x85: handle_object_select(requester, data, len); return;
+    case 0x86: handle_object_read(requester, data, len); return;
+    case 0x87: handle_write_start(requester); return;
+    case 0x88: handle_write_block(requester, data, len); return;
+    case 0x89: handle_object_close(requester); return;
+    case 0x8A: handle_write_commit(requester); return;
+    default: Serial.printf("Unhandled object service 0x0E%02X from 0x%02X\n", opcode, requester); return;
+  }
 }
 
 void handle_dgn_request(uint8_t requester, uint16_t dgn) {
@@ -606,7 +779,7 @@ void handle_legacy_dim(const uint8_t *data, uint8_t len) { if (len < 3) return; 
 
 void handle_can_message(const twai_message_t &msg) {
   if (!msg.extd || msg.rtr) return; const uint32_t id = msg.identifier & 0x1FFFFFFFUL; const uint16_t service = (uint16_t)((id >> 16) & 0xFFFFUL); const uint8_t destination = (uint8_t)((id >> 8) & 0xFFUL); const uint8_t requester = (uint8_t)(id & 0xFFUL); if (destination != settings.source_address) return;
-  if ((service & 0xFF00U) == SERVICE_OBJECT_PREFIX) { const uint8_t object_service = (uint8_t)(service & 0x00FFU); if (object_service == 0x85) { handle_object_select(msg.data, msg.data_length_code); return; } if (object_service == 0x86) { handle_object_read(requester, msg.data, msg.data_length_code); return; } }
+  if ((service & 0xFF00U) == SERVICE_OBJECT_PREFIX) { handle_object_service(requester, (uint8_t)(service & 0x00FFU), msg.data, msg.data_length_code); return; }
   if (service == SERVICE_DGN_REQUEST && msg.data_length_code >= 2) { handle_dgn_request(requester, u16_le(msg.data)); return; }
   if (service == SERVICE_DIRECT_COMMAND) { handle_direct_command(requester, msg.data, msg.data_length_code); return; }
   if (service == SERVICE_LEGACY_DIM) { handle_legacy_dim(msg.data, msg.data_length_code); return; }
@@ -624,7 +797,7 @@ void print_io_assignments() {
 }
 
 void print_status() {
-  Serial.printf("SA=0x%02X object=%u object2=%lu bytes master=%s tank1=%u%% tank2=%u%% Vin=%.3fV Iin=%.3fA CAN=%s\n", settings.source_address, selected_object, (unsigned long) ROGUE_OBJECT2_SIZE, master_state ? "ON" : "OFF", settings.tank1_percent, settings.tank2_percent, input_voltage_mv / 1000.0f, input_current_ma / 1000.0f, can_running ? "running" : "down");
+  Serial.printf("SA=0x%02X object=%u object2=%lu bytes (%s) master=%s tank1=%u%% tank2=%u%% Vin=%.3fV Iin=%.3fA CAN=%s\n", settings.source_address, selected_object, (unsigned long) config_object_len, config_from_flash ? "saved" : "factory", master_state ? "ON" : "OFF", settings.tank1_percent, settings.tank2_percent, input_voltage_mv / 1000.0f, input_current_ma / 1000.0f, can_running ? "running" : "down");
   Serial.printf("Serial=%lu-%04u name=\"%s\"\n", (unsigned long) settings.serial_prefix, (unsigned) settings.serial_suffix, settings.product_name);
   for (uint8_t output = 1; output <= ROGUE_OUTPUT_COUNT; output++) Serial.printf("O%u=%u%% ", output, output_levels[output]);
   Serial.println(); print_io_assignments();
@@ -634,7 +807,7 @@ void print_help() {
   Serial.println("status | io | t1 <0-100> | t2 <0-100> | v <mV> | i <mA> | m <0|1> | o<n> <0-100> | in<n> <0|1>");
   Serial.println("tank <n> <a> | input <n> <a> | output <n> <a>   where <a> = GPIO<n> | simulate | disabled | <variable-name>");
   Serial.println("set <variable-name> <value> | sa <0x01-0xFE> | serial <prefix> <suffix> | name <text>");
-  Serial.println("save | defaults | crc | identity | send");
+  Serial.println("save | defaults | factory | crc | identity | send");
 }
 
 // Parses "<word> <n> <GPIO<n>|simulate|disabled|variable-name>".
@@ -692,6 +865,7 @@ void release_all_io_pins() {
 void handle_serial_line(String raw) {
   raw.trim(); if (raw.length() == 0) return; String lower = raw; lower.toLowerCase();
   if (lower == "help") { print_help(); return; } if (lower == "status") { print_status(); return; } if (lower == "io") { print_io_assignments(); return; } if (lower == "identity") { send_identity(); return; } if (lower == "send") { send_all_status(); return; } if (lower == "save") { save_settings(); return; } if (lower == "defaults") { release_all_io_pins(); reset_settings_to_defaults(); validate_io_assignments(); configure_io_pins(); send_identity(); send_all_status(); return; } if (lower == "crc") { object2_self_test(); return; }
+  if (lower == "factory") { if (object_prefs.isKey("obj2")) object_prefs.remove("obj2"); load_factory_config_object(); Serial.println("Saved configuration erased, factory Object 2 restored"); object2_self_test(); apply_config_object(); return; }
   if (lower.startsWith("tank ")) { if (!parse_tank_assignment(raw)) Serial.println("Usage: tank <1-2> <GPIO<n>|simulate|disabled|variable-name>"); return; }
   if (lower.startsWith("input ")) { if (!parse_input_assignment(raw)) Serial.println("Usage: input <1-8> <GPIO<n>|simulate|disabled|variable-name>"); return; }
   if (lower.startsWith("output ")) { if (!parse_output_assignment(raw)) Serial.println("Usage: output <1-10> <GPIO<n>|simulate|disabled|variable-name>"); return; }
@@ -716,7 +890,7 @@ void poll_serial() { static String line; while (Serial.available()) { char ch = 
 bool start_can() {
   last_can_restart_ms = millis();
   if (!can_installed) {
-    twai_general_config_t g_config = TWAI_GENERAL_CONFIG_DEFAULT(CAN_TX_PIN, CAN_RX_PIN, TWAI_MODE_NORMAL); twai_timing_config_t t_config = TWAI_TIMING_CONFIG_250KBITS(); twai_filter_config_t f_config = TWAI_FILTER_CONFIG_ACCEPT_ALL(); g_config.rx_queue_len = 64; g_config.tx_queue_len = 32;
+    twai_general_config_t g_config = TWAI_GENERAL_CONFIG_DEFAULT(CAN_TX_PIN, CAN_RX_PIN, TWAI_MODE_NORMAL); twai_timing_config_t t_config = TWAI_TIMING_CONFIG_250KBITS(); twai_filter_config_t f_config = TWAI_FILTER_CONFIG_ACCEPT_ALL(); g_config.rx_queue_len = 256; g_config.tx_queue_len = 32;
     esp_err_t err = twai_driver_install(&g_config, &t_config, &f_config); if (err != ESP_OK) { Serial.printf("twai_driver_install failed: %s, retrying in %lus\n", esp_err_to_name(err), (unsigned long) (CAN_RESTART_INTERVAL_MS / 1000UL)); return false; }
     can_installed = true;
   }
@@ -748,7 +922,7 @@ void poll_io_assignments() {
 }
 
 void setup() {
-  Serial.begin(115200); delay(500); Serial.println(); Serial.println("REDARC TVMS Rogue Emulator - Arduino IDE standalone"); rogue_settings_load(prefs, settings); load_output_capabilities(); validate_io_assignments(); tank_variable_percent[1] = settings.tank1_percent; tank_variable_percent[2] = settings.tank2_percent; configure_io_pins(); Serial.printf("Source address: 0x%02X\n", settings.source_address); Serial.printf("Serial: %lu-%04u  Product: %s\n", (unsigned long) settings.serial_prefix, (unsigned) settings.serial_suffix, settings.product_name); Serial.println("Type help for serial commands."); object2_self_test(); start_can(); send_identity(); send_all_status();
+  Serial.begin(115200); delay(500); Serial.println(); Serial.println("REDARC TVMS Rogue Emulator - Arduino IDE standalone"); rogue_settings_load(prefs, settings); load_config_object(); load_output_capabilities(); validate_io_assignments(); tank_variable_percent[1] = settings.tank1_percent; tank_variable_percent[2] = settings.tank2_percent; configure_io_pins(); Serial.printf("Source address: 0x%02X\n", settings.source_address); Serial.printf("Serial: %lu-%04u  Product: %s\n", (unsigned long) settings.serial_prefix, (unsigned) settings.serial_suffix, settings.product_name); Serial.println("Type help for serial commands."); object2_self_test(); start_can(); send_identity(); send_all_status();
 }
 
 void loop() {

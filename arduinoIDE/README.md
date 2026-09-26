@@ -150,7 +150,7 @@ LOW  -> off
 HIGH -> on
 ```
 
-Whether each output is dimmable comes from the Rogue configuration (Object 2), exactly as a real Rogue's programming defines it. At boot the sketch reads each output's settings from the object (channel `0x0C`..`0x15`, output settings key `0x06`, dimmable flag key `0x01`, switchable flag key `0x02`). The result is used for both:
+Whether each output is dimmable comes from the Rogue configuration (Object 2), exactly as a real Rogue's programming defines it. At boot, and after every configuration write, the sketch reads each output's settings from the object (channel `0x0C`..`0x15`, output settings key `0x06`, dimmable flag key `0x01`, switchable flag key `0x02`). The result is used for both:
 
 - the `0x1FD0E` capability byte sent on CAN (bit 7 `0x80` = dimmable), and
 - how the output behaves on its GPIO.
@@ -161,7 +161,7 @@ Whether each output is dimmable comes from the Rogue configuration (Object 2), e
 | on/off (switchable) | `0x03` | digital on/off | any non-zero level becomes 100%; hold-dim ignored |
 | always on | `0x01` | digital, held HIGH | fixed at 100%; on/off, level, hold-dim and master OFF are ignored |
 
-The embedded captured object programs outputs 1–7 as dimmable, output 8 as always on, and outputs 9–10 as on/off. The boot log shows the result, and `io` shows the type per output:
+The factory captured object programs outputs 1–7 as dimmable, output 8 as always on, and outputs 9–10 as on/off. The boot log shows the result, and `io` shows the type per output:
 
 ```text
 Outputs: 1=dimmable 2=dimmable 3=dimmable 4=dimmable 5=dimmable 6=dimmable 7=dimmable 8=always-on 9=on/off 10=on/off
@@ -237,52 +237,68 @@ The sketch responds to DGN requests for:
 
 Some bytes are still conservative/capture-matched placeholders rather than fully understood semantics. They are ported from the ESPHome emulator work so the RedVision side sees familiar responses.
 
-## REDARC Object 2 readback
+## REDARC Object 2 (configuration)
 
-The sketch embeds the captured Rogue **Object 2** image from the ESPHome emulator and serves it through the REDARC object-read protocol.
+Object 2 is the Rogue's main configuration object. The sketch starts from the captured factory image embedded in `RogueObject2.h` (4748 bytes, CRC field `0xFA84819A`). RedVision can read it and write a new configuration, as with a real Rogue. The active object lives in RAM, and every part of the sketch that uses the configuration reads from it.
+
+### Reading
 
 | CAN service / response | Meaning |
 |---|---|
-| `0x0E85` | select object, for example object `0x02` |
+| `0x0E85` | select object, for example object `0x02`; acknowledged on `0x0280` |
 | `0x0E86` | read object block, offset + length little-endian |
 | `0x0281` | returned object data, 8-byte chunks |
 | `0x0284` | returned length and CRC-32C trailer |
+| `0x0E89` | close the session; acknowledged on `0x0280` |
 
-Current embedded object:
-
-```text
-Object: 2 / main configuration object
-ROGUE_OBJECT2_SIZE: 4748 bytes
-Stored object CRC field: 0xFA84819A
-```
-
-Readback behavior:
-
-- If selected object is `0x02`, reads return bytes from the captured Rogue object.
-- If the request reads beyond the object end, the sketch pads with `0xFF`, matching the ESPHome emulator behavior.
+- If the selected object is `0x02`, reads return bytes from the active object.
+- If the request reads beyond the object end, the sketch pads with `0xFF`.
 - Unsupported selected objects return `0xFF` data with a valid block CRC.
 - Trailer CRC uses CRC-32C / Castagnoli reflected polynomial `0x82F63B78`.
-- Oversized block reads above `8192` bytes are refused to protect ESP32 RAM.
+- Block reads above `8192` bytes are refused to protect ESP32 RAM.
 
-## Startup Object 2 self-test
+### Writing (programming)
 
-At boot, the sketch checks the embedded Object 2 image:
+Writes are transactional, ported from the ESPHome `emulated-rogue` emulator:
 
-- object header declared length,
-- stored whole-object CRC field,
-- calculated whole-object CRC-32C with bytes `8..11` zeroed.
+| CAN service | Meaning | Reply on `0x0280` |
+|---|---|---|
+| `0x0E83` | pre-write query | captured 1,024-byte transfer window on `0x0281`/`0x0284` |
+| `0x0E87` | start a write to the selected object (must be `0x02`) | `00` OK / `03` error |
+| `0x0E81` | write data frames, collected into the current block (max 1,024 bytes) | none |
+| `0x0E88` | end of block: offset + CRC-32C of the block | `01` busy, then `00` OK / `03` error |
+| `0x0E89` | close the write session | `00` OK / `03` error |
+| `0x0E8A` | commit | `00` OK / `03` error |
 
-Expected Serial Monitor line:
+Blocks can arrive in any order and may repeat; RedVision writes page `0x0000` (the header and whole-object CRC) last. The commit is accepted only when:
+
+- every byte up to the declared length has been received,
+- the declared length is 12–8192 bytes and the whole-object CRC-32C matches, and
+- the object was saved to NVS.
+
+Anything else (a bad block CRC, a missing page, a bad whole-object CRC, a failed save or an interrupted write) is answered with `03` and leaves the previous configuration in place.
+
+After a successful commit the new object is used immediately, with no reboot:
+
+- output types (dimmable / on-off / always-on) are re-read, and the `0x1FD0E` capabilities are re-broadcast,
+- GPIO outputs switch between PWM and on/off to match,
+- `0x0E86` reads return the new object byte-for-byte.
+
+The committed object is saved in NVS (namespace `rogueobj`, key `obj2`) and loaded at the next boot. If the saved object fails its length/CRC checks at boot, the factory object is used instead.
+
+To go back to the factory configuration, run `factory` from Serial Monitor. `defaults` does not touch the saved configuration.
+
+NVS size: the default partition has 20 KB of NVS, and replacing a saved object briefly needs room for two copies. Objects up to about 7 KB save reliably; the captured object is 4.7 KB. If a save fails, the commit is rejected and the previous configuration stays.
+
+### Self-test
+
+At boot, and when you run `crc`, the sketch checks the active object's declared length and whole-object CRC-32C (with bytes `8..11` zeroed):
 
 ```text
-Object2 size=4748 declared_len=4748 stored_crc=0xFA84819A calc_crc=0xFA84819A OK
+Object2 (factory) size=4748 declared_len=4748 stored_crc=0xFA84819A calc_crc=0xFA84819A OK
 ```
 
-You can run it again:
-
-```text
-crc
-```
+After a configuration write it shows `(saved)` and the new CRC.
 
 ## Commands handled over CAN
 
@@ -327,6 +343,7 @@ name <text>
 
 save                  save settings to NVS
 defaults              restore default persisted settings
+factory               erase the saved Object 2 configuration and use the factory one
 crc                   run Object 2 CRC self-test
 identity              send identity frames now
 send                  send status frames now
@@ -374,22 +391,24 @@ The following are saved in ESP32 NVS by `RoguePreferencesRuntime.h`:
 - serial suffix,
 - product name,
 - input 1–8 assignment text (`ia1`..`ia8`),
-- output 1–10 assignment text (`oa1`..`oa10`).
+- output 1–10 assignment text (`oa1`..`oa10`),
+- the committed Object 2 configuration (separate namespace `rogueobj`, key `obj2`; see [Writing](#writing-programming)).
 
 Assignments saved by older builds as separate mode/pin keys (`t1m`/`t1p` etc.) are converted to assignment text on first boot and the old keys are removed. Old `variable` assignments had no name, so they become `tank1`, `input1`, `output1` and so on.
 
-Use `defaults` to restore the built-in defaults.
+Use `defaults` to restore the built-in defaults, and `factory` to erase the saved Object 2 configuration.
 
 ## Current limits
 
 - Compile-tested with arduino-cli and the esp32 core 3.3.12 (M5Stack-ATOM and ESP32 Dev Module). Not yet tested on hardware.
 - Tank GPIO mode currently uses fixed raw ADC scaling `0..4095 -> 0..100%`; calibration can be added later.
 - GPIO output PWM is linear duty with no gamma correction, and is active-high only.
-- Configuration writes (`0x0E81`..`0x0E8A`) are not ported from the ESPHome emulator yet, so the dimmable / on-off / always-on programming is always the embedded captured object. Reprogramming outputs from RedVision will not change it.
+- Configuration writes were tested against a simulated write sequence built from the ESPHome emulator notes, not yet against RedVision on a real bus.
+- Only output types are read from a written configuration. Labels, alarm/scaling and other configuration DGN replies (`0x1FD04`, `0x1FD06`, `0x1FD0A`, `0x1FD0C`, `0x1FD10`) still send the captured values.
 - GPIO inputs are read as active-high using `pinMode(pin, INPUT)`.
 - GPIO6–11 are blocked only on the original ESP32; flash/PSRAM pins on other ESP32 variants are not blocked.
 - Master OFF sets all outputs to 0% but does not stop outputs being switched on again while master is off.
-- Object 2 is still the captured/static object image; changing serial/name/source address changes live identity frames but does not rewrite the embedded Object 2 image.
+- Changing serial/name/source address changes the live identity frames but does not rewrite Object 2.
 - BLE/RBus emulation is not included.
 
 ## CAN safety
