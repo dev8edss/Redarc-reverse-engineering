@@ -53,7 +53,7 @@ Do not feed the REDARC supply directly into the ESP32. Use a suitable regulator 
 
 ## Arduino setup
 
-Use Arduino IDE with an ESP32 board package that exposes the ESP-IDF TWAI driver.
+Use Arduino IDE with the esp32 board package **3.x** (Espressif). The sketch uses the ESP-IDF TWAI driver and the 3.x `ledcAttach`/`ledcWrite` PWM API, and will not build on 2.x.
 
 Select an ESP32 board such as:
 
@@ -150,14 +150,24 @@ LOW  -> off
 HIGH -> on
 ```
 
-Output GPIO mode is currently digital-only:
+Output GPIO mode uses LEDC PWM, so the Rogue output level sets the duty cycle:
 
 ```text
-0%    -> LOW
-1-100 -> HIGH
+0%     -> LOW (off)
+1-99%  -> PWM, duty = level
+100%   -> HIGH (fully on)
 ```
 
-Brightness percentages are still sent on CAN as normal Rogue output levels. GPIO PWM can be added later if needed.
+Dimming from RedVision (`0x5A` levels and `0x0F05` hold-dim) therefore dims a load on the GPIO. Frequency and resolution are set in `RoguePreferences.h`:
+
+```cpp
+static uint32_t pref_output_pwm_frequency_hz    = 5000;
+static uint8_t  pref_output_pwm_resolution_bits = 10;
+```
+
+Duty is linear in the level (no gamma correction). If no LEDC channel is free for a pin (the original ESP32 has 16, ESP32-S3 has 8, ESP32-C3 has 6), that output falls back to on/off and a message is printed.
+
+Do not drive a relay coil or other on/off-only load directly from a PWM output at levels between 1% and 99%. Keep such outputs at 0% or 100%.
 
 Use this to show current mappings:
 
@@ -363,7 +373,7 @@ Use `defaults` to restore the built-in defaults.
 
 - Compile-tested with arduino-cli and the esp32 core 3.3.12 (M5Stack-ATOM and ESP32 Dev Module). Not yet tested on hardware.
 - Tank GPIO mode currently uses fixed raw ADC scaling `0..4095 -> 0..100%`; calibration can be added later.
-- GPIO outputs are currently digital on/off only, not PWM brightness.
+- GPIO output PWM is linear duty with no gamma correction, and is active-high only.
 - GPIO inputs are read as active-high using `pinMode(pin, INPUT)`.
 - GPIO6–11 are blocked only on the original ESP32; flash/PSRAM pins on other ESP32 variants are not blocked.
 - Master OFF sets all outputs to 0% but does not stop outputs being switched on again while master is off.

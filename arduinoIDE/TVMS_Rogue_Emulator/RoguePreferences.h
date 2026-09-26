@@ -36,6 +36,12 @@ static const char pref_input_6[] = "simulate";
 static const char pref_input_7[] = "simulate";
 static const char pref_input_8[] = "simulate";
 
+// GPIO outputs are driven with LEDC PWM so the Rogue output level (0-100%) sets the duty
+// cycle: 0% = LOW, 100% = HIGH, anything between dims the load.
+// frequency * 2^resolution must not exceed 80 MHz (e.g. 5000 Hz at 10 bits is fine).
+static uint32_t pref_output_pwm_frequency_hz    = 5000;
+static uint8_t  pref_output_pwm_resolution_bits = 10;
+
 // Outputs 1..10
 static const char pref_output_1[]  = "simulate";
 static const char pref_output_2[]  = "simulate";

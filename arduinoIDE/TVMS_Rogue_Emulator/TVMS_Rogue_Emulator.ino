@@ -16,6 +16,10 @@
 #include "RogueObject2.h"
 #include "RoguePreferences.h"
 
+#if !defined(ESP_ARDUINO_VERSION_MAJOR) || ESP_ARDUINO_VERSION_MAJOR < 3
+#error "This sketch needs the esp32 Arduino core 3.x (uses the ledcAttach/ledcWrite PWM API)."
+#endif
+
 static constexpr gpio_num_t CAN_TX_PIN = GPIO_NUM_22;
 static constexpr gpio_num_t CAN_RX_PIN = GPIO_NUM_19;
 
@@ -61,6 +65,10 @@ static constexpr uint32_t CAN_TX_REPORT_INTERVAL_MS = 5000UL;
 
 Preferences prefs;
 RogueSettings settings;
+
+// GPIO currently attached to LEDC PWM for each output, or -1 when the output is not
+// using PWM (not a GPIO output, or no free LEDC channel so it falls back to on/off).
+static int8_t output_pwm_pin[ROGUE_OUTPUT_COUNT + 1] = {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
 
 static bool can_installed = false;
 static bool can_running = false;
@@ -212,7 +220,15 @@ const char *io_assignment_problem(const RogueIoAssignment &candidate, const Rogu
 // output that was driven HIGH does not stay on after being reassigned.
 void release_io_pin(const RogueIoAssignment &old, bool was_output) {
   if (old.mode != ROGUE_IO_PIN || old.pin < 0) return;
-  if (was_output) digitalWrite((uint8_t) old.pin, LOW);
+  if (was_output) {
+    for (uint8_t i = 1; i <= ROGUE_OUTPUT_COUNT; i++) {
+      if (output_pwm_pin[i] != old.pin) continue;
+      ledcWrite((uint8_t) old.pin, 0);
+      ledcDetach((uint8_t) old.pin);
+      output_pwm_pin[i] = -1;
+    }
+    digitalWrite((uint8_t) old.pin, LOW);
+  }
   pinMode((uint8_t) old.pin, INPUT);
 }
 
@@ -239,9 +255,28 @@ uint8_t analog_raw_to_percent(int raw) {
 void apply_output_assignment(uint8_t output) {
   if (output < 1 || output > ROGUE_OUTPUT_COUNT) return;
   const RogueIoAssignment &a = settings.outputs[output];
-  if (a.mode == ROGUE_IO_PIN) {
+  if (a.mode != ROGUE_IO_PIN) return;
+  if (output_pwm_pin[output] == a.pin) {
+    // The core turns max_duty into a true 100% duty, so 100% is fully on.
+    const uint32_t max_duty = (1UL << pref_output_pwm_resolution_bits) - 1UL;
+    ledcWrite((uint8_t) a.pin, (output_levels[output] * max_duty + 50UL) / 100UL);
+  } else {
     digitalWrite((uint8_t) a.pin, output_levels[output] > 0 ? HIGH : LOW);
   }
+}
+
+// Attaches an output GPIO to LEDC PWM once. Falls back to plain on/off when no
+// LEDC channel is free (the original ESP32 has 16, S3 has 8, C3 has 6).
+void attach_output_pwm(uint8_t output) {
+  const RogueIoAssignment &a = settings.outputs[output];
+  if (output_pwm_pin[output] == a.pin) return;
+  if (ledcAttach((uint8_t) a.pin, pref_output_pwm_frequency_hz, pref_output_pwm_resolution_bits)) {
+    output_pwm_pin[output] = a.pin;
+    return;
+  }
+  output_pwm_pin[output] = -1;
+  pinMode((uint8_t) a.pin, OUTPUT);
+  Serial.printf("Output %u: PWM unavailable on GPIO%d, using on/off only\n", (unsigned) output, a.pin);
 }
 
 void configure_io_pins() {
@@ -269,7 +304,7 @@ void configure_io_pins() {
       output_levels[output] = 0;
       hold_dim_direction[output] = 0;
     } else if (a.mode == ROGUE_IO_PIN) {
-      pinMode((uint8_t) a.pin, OUTPUT);
+      attach_output_pwm(output);
       apply_output_assignment(output);
     }
   }
