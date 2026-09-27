@@ -6,16 +6,14 @@
   void set_random_update_interval_ms(uint32_t v) { random_update_interval_ms_ = v; }
   void set_randomize_inputs(bool v) { randomize_inputs_ = v; }
   void set_serial_prefix(uint32_t v) { serial_prefix_ = v; }
-  void set_serial_suffix(uint16_t v) {
-    (void) v;
-    serial_suffix_ = 0x0013;
-  }
+  void set_serial_suffix(uint16_t v) { serial_suffix_ = v; }
   void set_device_subtype(uint8_t v) { device_subtype_ = v; }
   void add_version_record(uint16_t p, uint8_t a, uint8_t b, uint8_t i) {
-    (void) p;
-    (void) a;
-    (void) b;
-    (void) i;
+    if (!version_records_overridden_) {
+      version_records_.clear();
+      version_records_overridden_ = true;
+    }
+    version_records_.push_back({p, a, b, i});
   }
   void set_manufacturing_date(uint8_t d, uint8_t m, uint16_t y) {
     manufacturing_day_ = d;
