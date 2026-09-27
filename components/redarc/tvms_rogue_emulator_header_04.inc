@@ -55,6 +55,3 @@
          0x00});
     return true;
   }
-
-  void sync_identity_from_active_object_() {
-    uint32_t rogue_root = 0;
