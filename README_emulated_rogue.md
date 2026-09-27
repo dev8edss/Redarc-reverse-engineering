@@ -20,8 +20,8 @@ directed `0x0F03<destination><requester>` requests for:
 - `0x1F404` serial identity.
 - `0x1F405` unique identifier.
 
-The captured configuration object is paired with the real Rogue firmware
-records `1.4` and `0.4`.
+The default version records are the captured Rogue firmware records `1.4` and
+`0.4`; `version_records` in YAML can override them.
 
 ### Configuration reads
 
@@ -36,7 +36,7 @@ structure, including:
 - Input voltage and input current channels.
 - Remote input records and captured channel labels/settings.
 
-The configured emulator serial number and a product name up to 12 ASCII
+The configured emulator serial prefix/suffix and a product name up to 12 ASCII
 characters are patched into the factory object before its whole-object CRC-32C
 is recalculated. Longer product names are still returned correctly through DGN
 `0x1F403`, while the factory object retains the captured `TVMS Rogue` name.
@@ -183,9 +183,31 @@ redarc:
   tvms_rogue_emulator:
     - id: virtual_rogue
       source_address: 0x36
-      serial_prefix: 2606260001
-      product_name: "TVMS Rogue"
+      identity_interval: 1s
+      status_interval: 1s
+      random_update_interval: 5s
       randomize_inputs: false
+      serial_prefix: 2606260001
+      serial_suffix: 0x0013
+      device_subtype: 0x00
+      version_records:
+        - product_number: 323
+          major: 1
+          minor: 4
+          record_index: 0
+        - product_number: 323
+          major: 0
+          minor: 4
+          record_index: 1
+      manufacturing_date:
+        day: 1
+        month: 1
+        year: 2026
+      product_name: "TVMS Rogue"
+      unique_identifier: "00:00:00:00:00:00:01"
+      unique_identifier_record_index: 0
+      # tank1_source: fresh_tank_percent  # Optional: existing sensor ID
+      # tank2_source: waste_tank_percent  # Optional: existing sensor ID
 ```
 
 The `redarc:` block requires **exactly one** of `canbus:` (as above) or
@@ -212,9 +234,9 @@ in the schema but is recommended for stable Home Assistant entity names.
 | `random_update_interval` | No | `5s` | Random tank/voltage/current updates. Schema requires a positive duration; `0s` is rejected. Supplying a tank source disables the random update timer at runtime. |
 | `randomize_inputs` | No | `true` | Whether random updates also toggle a digital input. `false` still permits random sensor updates. |
 | `serial_prefix` | No | `0` | Four-byte identity prefix; set it to the intended module's serial prefix. |
-| `serial_suffix` | No | `1` | **Ignored by the current C++ setter:** effective suffix is forced to `0x0013` (decimal 19), unless later changed by a saved configuration object. |
+| `serial_suffix` | No | `0x0013` (19) | Two-byte serial suffix; used in identity and patched into the factory configuration object. A persisted object can replace the advertised identity on boot. |
 | `device_subtype` | No | `0` | Identity subtype byte. |
-| `version_records` | No | One record: product `323`, major `1`, minor `0`, index `0` | **Ignored by the current C++ adder:** transmitted records are fixed at product `323`, versions `1.4` (index `0`) and `0.4` (index `1`). |
+| `version_records` | No | Two records: product `323`, version `1.4` (index `0`), and product `323`, version `0.4` (index `1`) | Transmitted as DGN `0x1F400`; provide at least one record to override the defaults. |
 | `manufacturing_date` | No | `day: 1`, `month: 1`, `year: 2026` | All three fields are required if supplied; must form a valid date. |
 | `product_name` | No | `TVMS Rogue` | ASCII only. Names of at most 12 characters are also patched into the factory configuration object. |
 | `unique_identifier` | No | `00:00:00:00:00:00:01` | Exactly seven bytes, as hex text or a seven-item byte list. |
@@ -224,9 +246,10 @@ in the schema but is recommended for stable Home Assistant entity names.
 
 If you specify `version_records`, each entry requires `product_number`,
 `major` and `minor`; `record_index` defaults to `0` and indexes must be unique.
-The current implementation accepts but does not use those entries. Do not
-configure `serial_suffix` or `version_records` expecting them to change the
-advertised values until the C++ setters are updated.
+The YAML example lists every emulator option with a value. The two commented
+`tank*_source` lines are optional references that require sensors defined
+elsewhere in the same configuration. The supplied serial number and version
+records are examples; use the identity intended for your own virtual device.
 
 An optional external tank source can be declared with ESPHome's `sensor:`
 component and referenced by its ID, for example:
