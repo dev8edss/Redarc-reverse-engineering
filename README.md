@@ -324,9 +324,11 @@ When a source sensor updates, the emulator:
 3. immediately broadcasts `0x1FD02`, and
 4. disables the demo random sensor generator so real tank values are not overwritten.
 
-If `tank1_source` or `tank2_source` is not set, the emulator keeps using its
-internal/default tank values. Set `random_update_interval: 0s` when you do not
-want demo/random tank, voltage or current updates.
+If neither `tank1_source` nor `tank2_source` is set, the emulator uses its
+internal tank values and periodically randomizes tank, voltage and current
+readings. `random_update_interval` must be positive in the current schema;
+`0s` is rejected. Setting either tank source disables the random update timer
+for the whole emulator.
 
 ### Emulator notes and limits
 
