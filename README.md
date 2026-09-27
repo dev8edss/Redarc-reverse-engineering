@@ -193,6 +193,37 @@ the same source address as a real Rogue. A common setup is to leave the real
 Rogue at `0x30` and run the emulator at `0x36`.
 
 ```yaml
+esphome:
+  name: virtual-tvms-rogue
+  friendly_name: Virtual TVMS Rogue
+
+esp32:
+  board: m5stack-atom
+  framework:
+    type: esp-idf
+
+logger:
+  level: INFO
+
+api:
+  encryption:
+    key: !secret api_encryption_key
+
+ota:
+  - platform: esphome
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+external_components:
+  - source:
+      type: git
+      url: https://github.com/dev8edss/Redarc-reverse-engineering
+      ref: emulated-rogue
+    components:
+      - redarc
+
 redarc:
   canbus:
     tx_pin: GPIO22
@@ -201,16 +232,15 @@ redarc:
     mode: NORMAL
 
   tvms_rogue_emulator:
-    - id: TVMS_Rogue_Emulator
+    - id: virtual_rogue
       source_address: 0x36
-      product_name: "TVMS Rogue"
       serial_prefix: 2606260001
-      serial_suffix: 0x0013
-      status_interval: 1s
-      identity_interval: 1s
-      random_update_interval: 0s
+      product_name: "TVMS Rogue"
       randomize_inputs: false
 ```
+
+For the required fields, optional emulator settings and their effective defaults,
+see [the Rogue emulator configuration guide](README_emulated_rogue.md#emulator-options).
 
 ### What the emulator currently supports
 
