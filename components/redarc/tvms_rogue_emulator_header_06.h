@@ -1,16 +1,3 @@
-    this->serial_prefix_ = object_prefix;
-    if (decoded_suffix <= 0xFFFFU)
-      this->serial_suffix_ = (uint16_t) decoded_suffix;
-    this->product_name_ = object_name;
-
-    if (changed) {
-      ESP_LOGI("redarc_tvms_rogue_emulator",
-               "Active object identity: %010lu-%04u %s",
-               (unsigned long) this->serial_prefix_,
-               (unsigned) this->serial_suffix_, this->product_name_.c_str());
-    }
-  }
-
   void register_configuration_readback_listener_() {
     if (this->configuration_readback_listener_registered_) return;
     this->configuration_readback_listener_registered_ = true;
@@ -28,10 +15,6 @@
           switch (requested_dgn) {
             case 0xF108:
               this->send_load_disconnect_config_();
-              break;
-            case 0xF403:
-            case 0xF404:
-              this->sync_identity_from_active_object_();
               break;
             case 0xFD04:
             case 0xFD06:
