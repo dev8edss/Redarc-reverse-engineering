@@ -192,6 +192,10 @@ The emulator behaves as a CAN node with its own `source_address`. Do not give it
 the same source address as a real Rogue. A common setup is to leave the real
 Rogue at `0x30` and run the emulator at `0x36`.
 
+The complete example is also available as
+[`TVMS_Rogue_Emulator_Atom_Lite.yaml`](TVMS_Rogue_Emulator_Atom_Lite.yaml),
+with required fields and defaults noted beside each option.
+
 ```yaml
 esphome:
   name: virtual-tvms-rogue
