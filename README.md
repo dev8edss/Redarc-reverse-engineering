@@ -191,6 +191,9 @@ Assistant-driven simulation.
 The emulator behaves as a CAN node with its own `source_address`. Do not give it
 the same source address as a real Rogue. A common setup is to leave the real
 Rogue at `0x30` and run the emulator at `0x36`.
+The advertised serial and product name come from YAML, even when a different
+Object 2 was previously saved. See the detailed guide for how that affects
+configuration readback.
 
 The complete example is also available as
 [`TVMS_Rogue_Emulator_Atom_Lite.yaml`](TVMS_Rogue_Emulator_Atom_Lite.yaml),
