@@ -234,9 +234,31 @@ redarc:
   tvms_rogue_emulator:
     - id: virtual_rogue
       source_address: 0x36
-      serial_prefix: 2606260001
-      product_name: "TVMS Rogue"
+      identity_interval: 1s
+      status_interval: 1s
+      random_update_interval: 5s
       randomize_inputs: false
+      serial_prefix: 2606260001
+      serial_suffix: 0x0013
+      device_subtype: 0x00
+      version_records:
+        - product_number: 323
+          major: 1
+          minor: 4
+          record_index: 0
+        - product_number: 323
+          major: 0
+          minor: 4
+          record_index: 1
+      manufacturing_date:
+        day: 1
+        month: 1
+        year: 2026
+      product_name: "TVMS Rogue"
+      unique_identifier: "00:00:00:00:00:00:01"
+      unique_identifier_record_index: 0
+      # tank1_source: fresh_tank_percent  # Optional: existing sensor ID
+      # tank2_source: waste_tank_percent  # Optional: existing sensor ID
 ```
 
 For the required fields, optional emulator settings and their effective defaults,
