@@ -179,7 +179,7 @@ SCHEMA = cv.Schema(
         ): cv.positive_time_period_milliseconds,
         cv.Optional(CONF_RANDOMIZE_INPUTS, default=True): cv.boolean,
         cv.Optional(CONF_SERIAL_PREFIX, default=0): cv.hex_uint32_t,
-        cv.Optional(CONF_SERIAL_SUFFIX, default=1): cv.hex_uint16_t,
+        cv.Optional(CONF_SERIAL_SUFFIX, default=0x0013): cv.hex_uint16_t,
         cv.Optional(CONF_DEVICE_SUBTYPE, default=0): cv.hex_uint8_t,
         cv.Optional(
             CONF_VERSION_RECORDS,
@@ -187,9 +187,15 @@ SCHEMA = cv.Schema(
                 {
                     CONF_PRODUCT_NUMBER: 323,
                     CONF_MAJOR: 1,
-                    CONF_MINOR: 0,
+                    CONF_MINOR: 4,
                     CONF_RECORD_INDEX: 0,
-                }
+                },
+                {
+                    CONF_PRODUCT_NUMBER: 323,
+                    CONF_MAJOR: 0,
+                    CONF_MINOR: 4,
+                    CONF_RECORD_INDEX: 1,
+                },
             ],
         ): _validate_version_records,
         cv.Optional(
