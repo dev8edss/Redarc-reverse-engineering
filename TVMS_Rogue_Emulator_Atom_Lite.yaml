@@ -1,7 +1,8 @@
 # Complete TVMS Rogue emulator example for Atom Lite + Atomic CAN base.
 # Required: set wifi_ssid, wifi_password and api_encryption_key in secrets.yaml.
 # Required: choose a source_address unused by any real device on this CAN bus.
-# See README_emulated_rogue.md for behavior and configuration-object precedence.
+# YAML controls CAN identity. A saved Object 2 may contain different identity
+# bytes in readback; see README_emulated_rogue.md for details.
 
 esphome:
   name: virtual-tvms-rogue
