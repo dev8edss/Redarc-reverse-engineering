@@ -5,6 +5,7 @@
 
   std::vector<VersionRecord> version_records_{{323, 1, 4, 0},
                                                {323, 0, 4, 1}};
+  bool version_records_overridden_{false};
   uint8_t manufacturing_day_{1};
   uint8_t manufacturing_month_{1};
   uint16_t manufacturing_year_{2026};
