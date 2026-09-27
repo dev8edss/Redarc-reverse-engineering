@@ -33,6 +33,10 @@ source_address = 0x25;
 
 serial_prefix = 2509151234UL;
 serial_suffix = 0x0019;
+
+// Two DGN 0x1F400 records. Edit defaults here; Serial `version` overrides in NVS.
+version0_product = 191; version0_major = 3; version0_minor = 4;
+version1_product = 191; version1_major = 0; version1_minor = 4;
 product_name  = "TVMS 1280 Prime";
 
 // Prime / TVMS1280 tanks 1..6. These map to the captured Prime analogue/tank channels
