@@ -24,6 +24,10 @@ source_address = 0x36;        // keep different from a real Rogue at 0x30
 serial_prefix = 2606260001UL;
 serial_suffix = 0x0013;
 
+// Two DGN 0x1F400 records. Edit defaults here; Serial `version` overrides in NVS.
+version0_product = 323; version0_major = 1; version0_minor = 4;
+version1_product = 323; version1_major = 0; version1_minor = 4;
+
 // Tank levels 1..2
 tank1_percent = 50;
 tank1         = "simulate";
