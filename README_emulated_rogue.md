@@ -140,6 +140,9 @@ and `api_encryption_key` secrets. Use a different source address from every
 real device on the bus: `0x36` below is an example, while a real Rogue often
 uses `0x30`. The CAN interface must use `NORMAL` mode to transmit. Do not
 configure a `tvms_rogue:` monitor at the emulator's source address.
+The same configuration is available as the standalone
+[`TVMS_Rogue_Emulator_Atom_Lite.yaml`](TVMS_Rogue_Emulator_Atom_Lite.yaml),
+with requirement and default comments for each option.
 
 ```yaml
 esphome:
