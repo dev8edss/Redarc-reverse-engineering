@@ -457,3 +457,17 @@ Use `defaults` to restore the built-in defaults, and `factory` to erase the save
 ## CAN safety
 
 Use a bench setup first. Running this emulator on the same bus as a live Redarc system means it will actively transmit frames. Keep its source address unique and avoid source `0x30` unless the real Rogue is unplugged.
+
+## Rogue firmware identity records
+
+The two DGN `0x1F400` records default to product number `323`, versions
+`1.4` (index `0`) and `0.4` (index `1`). Set `version0_product`,
+`version0_major`, `version0_minor`, and the matching `version1_*` fields in
+`RoguePreferences.h`. To override a record from Serial Monitor, run
+`version <0|1> <product-number> <major> <minor>` with decimal values. Overrides
+are saved in NVS; `defaults` restores the preferences-header values. Product
+number must be `0..65535`, and major/minor `0..255`.
+
+CAN serial prefix and suffix come from preferences or NVS. The name comes from
+the matching serial's record in Object 2. If that record is missing, the name
+is `TVMS Rogue`; the sketch does not adopt another record's serial.
