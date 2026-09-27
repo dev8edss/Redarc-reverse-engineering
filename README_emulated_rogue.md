@@ -21,7 +21,8 @@ directed `0x0F03<destination><requester>` requests for:
 - `0x1F405` unique identifier.
 
 The default version records are the captured Rogue firmware records `1.4` and
-`0.4`; `version_records` in YAML can override them.
+`0.4`; `version_records` in YAML can override them. Serial prefix, suffix and
+product name are taken from YAML for all transmitted identity responses.
 
 ### Configuration reads
 
@@ -44,7 +45,10 @@ is recalculated. Longer product names are still returned correctly through DGN
 After a valid configuration write, the exact committed object replaces the
 factory object. The saved object may have a different length; objects up to
 8,192 bytes are supported. Subsequent `0x0E86` reads and reads after an ESP32
-restart return the persisted object byte-for-byte.
+restart return the persisted object byte-for-byte. A saved object with a different
+serial or name does not override the identity sent on CAN; its readback may
+therefore differ from the YAML identity. Clear preferences or program a matching
+object if the Configurator requires the two representations to agree.
 
 The object service supports:
 
@@ -237,7 +241,7 @@ in the schema but is recommended for stable Home Assistant entity names.
 | `random_update_interval` | No | `5s` | Random tank/voltage/current updates. Schema requires a positive duration; `0s` is rejected. Supplying a tank source disables the random update timer at runtime. |
 | `randomize_inputs` | No | `true` | Whether random updates also toggle a digital input. `false` still permits random sensor updates. |
 | `serial_prefix` | No | `0` | Four-byte identity prefix; set it to the intended module's serial prefix. |
-| `serial_suffix` | No | `0x0013` (19) | Two-byte serial suffix; used in identity and patched into the factory configuration object. A persisted object can replace the advertised identity on boot. |
+| `serial_suffix` | No | `0x0013` (19) | Two-byte serial suffix; used in identity and patched into the factory configuration object. A persisted object does not override the advertised YAML identity. |
 | `device_subtype` | No | `0` | Identity subtype byte. |
 | `version_records` | No | Two records: product `323`, version `1.4` (index `0`), and product `323`, version `0.4` (index `1`) | Transmitted as DGN `0x1F400`; provide at least one record to override the defaults. |
 | `manufacturing_date` | No | `day: 1`, `month: 1`, `year: 2026` | All three fields are required if supplied; must form a valid date. |
