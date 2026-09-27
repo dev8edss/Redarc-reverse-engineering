@@ -216,3 +216,23 @@ Runtime status/tank/input/output values are live and come from the assignment sy
 - Prime config DGN replies are captured frames, not decoded dynamically from Object 2 yet.
 - Runtime GPIO outputs are on/off only, but the captured `0x1FD0E` capability replies still reflect whichever Prime configuration was captured.
 - This emulates a Prime node on CAN only; it does not update the broader RedVision system configuration to add a second Prime module.
+
+## Firmware identity records
+
+Two DGN `0x1F400` records are configured in `PrimePreferences.h` as
+`version0_product` / `version0_major` / `version0_minor` and the matching
+`version1_*` fields. The defaults reproduce the captured firmware records.
+Record indexes are 0 and 1. To override either record at runtime, use:
+
+```text
+version <0|1> <product-number> <major> <minor>
+```
+
+The values are saved in NVS and survive restart. `defaults` clears the
+overrides and restores the values from the preferences header. Product number
+is decimal `0..65535`; major and minor are decimal `0..255`.
+
+The embedded factory Object 2 is now the complete 2,628-byte write captured
+in `readwrite changed 6.csv`; its whole-object CRC-32C is `0x3815A305`.
+The earlier header contained only 2,313 explicit bytes and failed the CRC
+self-test because the rest was zero-filled by the C++ array initializer.
